@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import FeedbackKiosk from "./pages/Feedback/KioskPage";
+import FeedbackPage from "./pages/Feedbacks";
 import LoginPage from "./pages/Login";
 import DashboardPage from "./pages/Admin/Dashboard";
 import KiosksPage from "./pages/Admin/Kiosks";
@@ -13,7 +13,7 @@ export function AppRoutes() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Navigate to="/feedback" replace />} />
-        <Route path="/feedback" element={<FeedbackKiosk />} />
+        <Route path="/feedback" element={<FeedbackPage />} />
         <Route path="/login" element={<LoginPage />} />
 
         <Route element={<PrivateRoute />}>
