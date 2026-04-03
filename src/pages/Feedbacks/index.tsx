@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../services/api";
-import { getTags } from "../../services/tags";
+import {
+  getPublicKioskConfig,
+  getPublicKioskTags,
+  type PublicKioskConfig,
+} from "../../services/publicKiosk";
 
 type Step = "rating" | "tags" | "comment" | "done" | "error";
 
@@ -23,7 +27,7 @@ const RATING_OPTIONS: RatingOption[] = [
   { value: 5, emoji: "🤩", label: "Excelente" },
 ];
 
-const RESET_DELAY_MS = 3000;
+const DEFAULT_RESET_DELAY_MS = 3000;
 
 function getKioskTokenFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -37,6 +41,7 @@ export default function FeedbackKiosk() {
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
+  const [config, setConfig] = useState<PublicKioskConfig | null>(null);
 
   const kioskToken = useMemo(() => {
     const fromUrl = getKioskTokenFromUrl();
@@ -44,6 +49,14 @@ export default function FeedbackKiosk() {
 
     return localStorage.getItem("evfeedback_kiosk_token")?.trim() || "";
   }, []);
+
+  const companyName = config?.company?.name || "EvFeedback";
+  const logoUrl = config?.company?.logoUrl || "";
+  const thankYouMessage =
+    config?.company?.thankYouMessage || "Sua opinião é muito importante para nós.";
+  const primaryColor = config?.company?.primaryColor || "#0ea5e9";
+  const resetDelayMs =
+    (config?.company?.kioskResetSeconds ?? 5) * 1000 || DEFAULT_RESET_DELAY_MS;
 
   function resetFlow() {
     setStep("rating");
@@ -93,10 +106,10 @@ export default function FeedbackKiosk() {
 
     const timer = window.setTimeout(() => {
       resetFlow();
-    }, RESET_DELAY_MS);
+    }, resetDelayMs);
 
     return () => window.clearTimeout(timer);
-  }, [step]);
+  }, [step, resetDelayMs]);
 
   useEffect(() => {
     if (step !== "error") return;
@@ -114,9 +127,26 @@ export default function FeedbackKiosk() {
   }, [kioskToken]);
 
   useEffect(() => {
-    async function loadTags() {
+    async function loadConfig() {
+      if (!kioskToken) return;
+
       try {
-        const data = await getTags();
+        const data = await getPublicKioskConfig(kioskToken);
+        setConfig(data);
+      } catch (error) {
+        console.error("Erro ao carregar config do kiosk:", error);
+      }
+    }
+
+    loadConfig();
+  }, [kioskToken]);
+
+  useEffect(() => {
+    async function loadTags() {
+      if (!kioskToken) return;
+
+      try {
+        const data = await getPublicKioskTags(kioskToken);
         setTagOptions(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Erro ao carregar tags:", error);
@@ -125,7 +155,7 @@ export default function FeedbackKiosk() {
     }
 
     loadTags();
-  }, []);
+  }, [kioskToken]);
 
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
 
@@ -135,8 +165,19 @@ export default function FeedbackKiosk() {
         <div className="mx-auto max-w-4xl rounded-3xl border border-slate-800 bg-slate-900/70 backdrop-blur p-6 md:p-10 shadow-2xl">
           {step === "rating" && (
             <section className="text-center">
-              <p className="text-sky-400 text-sm md:text-base font-semibold tracking-[0.25em] uppercase">
-                EvFeedback
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={companyName}
+                  className="h-16 md:h-20 object-contain mx-auto mb-4"
+                />
+              ) : null}
+
+              <p
+                className="text-sm md:text-base font-semibold tracking-[0.25em] uppercase"
+                style={{ color: primaryColor }}
+              >
+                {companyName}
               </p>
 
               <h1 className="mt-4 text-4xl md:text-6xl font-bold leading-tight">
@@ -193,9 +234,17 @@ export default function FeedbackKiosk() {
                         type="button"
                         onClick={() => handleToggleTag(tag.id)}
                         className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${active
-                            ? "border-sky-400 bg-sky-500 text-white"
-                            : "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
+                          ? "text-white"
+                          : "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
                           }`}
+                        style={
+                          active
+                            ? {
+                              borderColor: primaryColor,
+                              backgroundColor: primaryColor,
+                            }
+                            : undefined
+                        }
                       >
                         {tag.name}
                       </button>
@@ -220,7 +269,8 @@ export default function FeedbackKiosk() {
                 <button
                   type="button"
                   onClick={() => setStep("comment")}
-                  className="rounded-2xl bg-sky-500 hover:bg-sky-400 px-8 py-4 text-lg font-semibold text-slate-950 transition"
+                  className="rounded-2xl px-8 py-4 text-lg font-semibold text-slate-950 transition"
+                  style={{ backgroundColor: primaryColor }}
                 >
                   Continuar
                 </button>
@@ -280,7 +330,8 @@ export default function FeedbackKiosk() {
                   type="button"
                   onClick={() => handleSubmit(false)}
                   disabled={isSubmitting}
-                  className="rounded-2xl bg-sky-500 hover:bg-sky-400 disabled:opacity-60 px-8 py-4 text-lg font-semibold text-slate-950 transition"
+                  className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold text-slate-950 transition"
+                  style={{ backgroundColor: primaryColor }}
                 >
                   {isSubmitting ? "Enviando..." : "Enviar"}
                 </button>
@@ -297,7 +348,7 @@ export default function FeedbackKiosk() {
               </h2>
 
               <p className="mt-4 text-slate-300 text-lg md:text-2xl">
-                Sua opinião é muito importante para nós.
+                {thankYouMessage}
               </p>
 
               <p className="mt-6 text-slate-500 text-sm md:text-base">
@@ -327,7 +378,8 @@ export default function FeedbackKiosk() {
               <button
                 type="button"
                 onClick={resetFlow}
-                className="mt-8 rounded-2xl bg-sky-500 hover:bg-sky-400 px-8 py-4 text-lg font-semibold text-slate-950 transition"
+                className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold text-slate-950 transition"
+                style={{ backgroundColor: primaryColor }}
               >
                 Tentar novamente
               </button>

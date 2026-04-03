@@ -6,6 +6,7 @@ const items = [
   { label: "Feedbacks", to: "/admin/feedbacks" },
   { label: "Filiais", to: "/admin/branches" },
   { label: "Tags", to: "/admin/tags" },
+  { label: "Configurações", to: "/admin/settings" },
 ];
 
 export function Sidebar() {
