@@ -1,5 +1,7 @@
-import KioskPage from './pages/KioskPage';
+import { AppRoutes } from "./routes";
 
-export default function App() {
-  return <KioskPage />;
+function App() {
+  return <AppRoutes />;
 }
+
+export default App;
