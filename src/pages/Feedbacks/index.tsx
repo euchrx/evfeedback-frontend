@@ -182,31 +182,31 @@ export default function FeedbackKiosk() {
                 Você pode marcar uma ou mais opções.
               </p>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-10">
-                {tagOptions.length > 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-10">
-                    {tagOptions.map((tag) => {
-                      const active = tagIds.includes(tag.id);
+              {tagOptions.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-10">
+                  {tagOptions.map((tag) => {
+                    const active = tagIds.includes(tag.id);
 
-                      return (
-                        <button
-                          key={tag.id}
-                          type="button"
-                          onClick={() => handleToggleTag(tag.id)}
-                          className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${active
-                              ? "border-sky-400 bg-sky-500 text-white"
-                              : "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
-                            }`}
-                        >
-                          {tag.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="mt-10 text-slate-400">Nenhuma opção cadastrada no momento.</p>
-                )}
-              </div>
+                    return (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        onClick={() => handleToggleTag(tag.id)}
+                        className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${active
+                            ? "border-sky-400 bg-sky-500 text-white"
+                            : "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
+                          }`}
+                      >
+                        {tag.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-10 text-slate-400">
+                  Nenhuma opção cadastrada no momento.
+                </p>
+              )}
 
               <div className="mt-10 flex flex-col md:flex-row gap-4 justify-center">
                 <button
