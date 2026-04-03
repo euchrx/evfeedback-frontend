@@ -82,7 +82,7 @@ export default function FeedbackKiosk() {
         token: kioskToken,
         rating,
         comment: skipComment ? "" : comment.trim(),
-        tagIds,
+        tagIds: [],
       });
 
       setStep("done");
