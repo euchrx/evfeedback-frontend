@@ -17,6 +17,13 @@ export type DashboardSummary = {
   topTags: TopTagItem[];
 };
 
+export type BranchDashboardItem = {
+  id: string;
+  name: string;
+  totalFeedbacks: number;
+  averageRating: number;
+};
+
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   const response = await api.get("/dashboard/summary");
   const data = response.data ?? {};
@@ -27,4 +34,9 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     ratings: Array.isArray(data.ratings) ? data.ratings : [],
     topTags: Array.isArray(data.topTags) ? data.topTags : [],
   };
+}
+
+export async function getDashboardByBranch(): Promise<BranchDashboardItem[]> {
+  const response = await api.get("/dashboard/by-branch");
+  return Array.isArray(response.data) ? response.data : [];
 }

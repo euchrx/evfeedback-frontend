@@ -5,6 +5,7 @@ export type Kiosk = {
   name: string;
   token: string;
   branchId: string;
+  active: boolean;
   branch?: {
     id: string;
     name: string;
@@ -23,5 +24,10 @@ export async function createKiosk(payload: { name: string; branchId: string }) {
 
 export async function deleteKiosk(id: string) {
   const response = await api.delete(`/kiosks/${id}`);
+  return response.data;
+}
+
+export async function updateKioskStatus(id: string, active: boolean) {
+  const response = await api.patch(`/kiosks/${id}/status`, { active });
   return response.data;
 }

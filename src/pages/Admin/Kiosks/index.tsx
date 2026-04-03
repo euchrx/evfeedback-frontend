@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import QRCode from "react-qr-code";
-import { getKiosks, createKiosk, deleteKiosk } from "../../../services/kiosks";
+import {
+  getKiosks,
+  createKiosk,
+  deleteKiosk,
+  updateKioskStatus,
+} from "../../../services/kiosks";
 import { getBranches } from "../../../services/branches";
 
 type Branch = {
@@ -13,6 +18,7 @@ type Kiosk = {
   name: string;
   token: string;
   branchId: string;
+  active: boolean;
   branch?: Branch;
 };
 
@@ -49,8 +55,23 @@ export default function KiosksPage() {
     await load();
   }
 
+  async function handleDisable(id: string) {
+    const confirmed = window.confirm("Deseja desativar este kiosk?");
+    if (!confirmed) return;
+
+    await updateKioskStatus(id, false);
+    await load();
+  }
+
+  async function handleEnable(id: string) {
+    await updateKioskStatus(id, true);
+    await load();
+  }
+
   async function handleDelete(id: string) {
-    const confirmed = window.confirm("Deseja realmente excluir este kiosk?");
+    const confirmed = window.confirm(
+      "Deseja remover este kiosk? Ele será desativado."
+    );
     if (!confirmed) return;
 
     await deleteKiosk(id);
@@ -82,7 +103,7 @@ export default function KiosksPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Kiosks</h1>
         <p className="text-slate-600 mt-1">
-          Cadastre tablets e gere links de feedback automaticamente.
+          Cadastre tablets e controle o status de operação.
         </p>
       </div>
 
@@ -135,18 +156,16 @@ export default function KiosksPage() {
             <h2 className="text-lg font-semibold text-slate-900">
               Kiosks cadastrados
             </h2>
-            <span className="text-sm text-slate-500">
-              {kiosks.length} item(ns)
-            </span>
+            <span className="text-sm text-slate-500">{kiosks.length} item(ns)</span>
           </div>
 
           <div className="mt-5 space-y-4">
-            {(Array.isArray(kiosks) ? kiosks : []).length === 0 ? (
+            {kiosks.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
                 Nenhum kiosk cadastrado.
               </div>
             ) : (
-              (Array.isArray(kiosks) ? kiosks : []).map((kiosk) => {
+              kiosks.map((kiosk) => {
                 const link = `${feedbackBaseUrl}?token=${kiosk.token}`;
 
                 return (
@@ -155,13 +174,25 @@ export default function KiosksPage() {
                     className="rounded-2xl border border-slate-200 p-5"
                   >
                     <div className="flex flex-col gap-4">
-                      <div>
-                        <h3 className="text-base font-semibold text-slate-900">
-                          {kiosk.name}
-                        </h3>
-                        <p className="text-sm text-slate-500 mt-1">
-                          Filial: {kiosk.branch?.name || "Sem filial"}
-                        </p>
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="text-base font-semibold text-slate-900">
+                            {kiosk.name}
+                          </h3>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Filial: {kiosk.branch?.name || "Sem filial"}
+                          </p>
+                        </div>
+
+                        <span
+                          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
+                            kiosk.active
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-rose-100 text-rose-700"
+                          }`}
+                        >
+                          {kiosk.active ? "Ativo" : "Inativo"}
+                        </span>
                       </div>
 
                       <div className="space-y-3">
@@ -206,11 +237,27 @@ export default function KiosksPage() {
                           Ver QR Code
                         </button>
 
+                        {kiosk.active ? (
+                          <button
+                            onClick={() => handleDisable(kiosk.id)}
+                            className="rounded-xl bg-amber-100 hover:bg-amber-200 px-4 py-2 text-sm font-medium text-amber-800 transition"
+                          >
+                            Desativar
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleEnable(kiosk.id)}
+                            className="rounded-xl bg-violet-100 hover:bg-violet-200 px-4 py-2 text-sm font-medium text-violet-800 transition"
+                          >
+                            Reativar
+                          </button>
+                        )}
+
                         <button
                           onClick={() => handleDelete(kiosk.id)}
                           className="rounded-xl bg-rose-50 hover:bg-rose-100 px-4 py-2 text-sm font-medium text-rose-700 transition"
                         >
-                          Excluir
+                          Remover
                         </button>
                       </div>
                     </div>
@@ -246,9 +293,7 @@ export default function KiosksPage() {
             </div>
 
             <div className="mt-5">
-              <p className="text-xs uppercase tracking-wide text-slate-400">
-                Link
-              </p>
+              <p className="text-xs uppercase tracking-wide text-slate-400">Link</p>
               <p className="text-sm text-slate-700 break-all mt-1">
                 {selectedQrLink}
               </p>

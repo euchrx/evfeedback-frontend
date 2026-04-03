@@ -13,9 +13,30 @@ export type FeedbackItem = {
     id: string;
     name: string;
   } | null;
+  tags?: Array<{
+    id: string;
+    feedbackId: string;
+    tagId: string;
+    tag?: {
+      id: string;
+      name: string;
+    } | null;
+  }>;
 };
 
-export async function getFeedbacks(): Promise<FeedbackItem[]> {
-  const response = await api.get("/feedbacks");
+export type FeedbackFilters = {
+  rating?: string;
+  branchId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export async function getFeedbacks(
+  filters?: FeedbackFilters
+): Promise<FeedbackItem[]> {
+  const response = await api.get("/feedbacks", {
+    params: filters,
+  });
+
   return Array.isArray(response.data) ? response.data : [];
 }
