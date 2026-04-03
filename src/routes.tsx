@@ -7,6 +7,7 @@ import FeedbacksPage from "./pages/Admin/Feedbacks";
 import BranchesPage from "./pages/Admin/Branches";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import { PrivateRoute } from "./routes/PrivateRoute";
+import TagsPage from "./pages/Admin/Tags";
 
 export function AppRoutes() {
   return (
@@ -23,6 +24,7 @@ export function AppRoutes() {
             <Route path="kiosks" element={<KiosksPage />} />
             <Route path="feedbacks" element={<FeedbacksPage />} />
             <Route path="branches" element={<BranchesPage />} />
+            <Route path="tags" element={<TagsPage />} />
           </Route>
         </Route>
 

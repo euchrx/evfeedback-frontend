@@ -5,6 +5,7 @@ const items = [
   { label: "Kiosks", to: "/admin/kiosks" },
   { label: "Feedbacks", to: "/admin/feedbacks" },
   { label: "Filiais", to: "/admin/branches" },
+  { label: "Tags", to: "/admin/tags" },
 ];
 
 export function Sidebar() {

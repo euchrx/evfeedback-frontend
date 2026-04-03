@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../services/api";
+import { getTags } from "../../services/tags";
 
 type Step = "rating" | "tags" | "comment" | "done" | "error";
 
@@ -22,14 +23,6 @@ const RATING_OPTIONS: RatingOption[] = [
   { value: 5, emoji: "🤩", label: "Excelente" },
 ];
 
-const TAG_OPTIONS: TagOption[] = [
-  { id: "1", name: "Atendimento" },
-  { id: "2", name: "Rapidez" },
-  { id: "3", name: "Limpeza" },
-  { id: "4", name: "Produto" },
-  { id: "5", name: "Ambiente" },
-];
-
 const RESET_DELAY_MS = 3000;
 
 function getKioskTokenFromUrl() {
@@ -43,6 +36,7 @@ export default function FeedbackKiosk() {
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
 
   const kioskToken = useMemo(() => {
     const fromUrl = getKioskTokenFromUrl();
@@ -82,7 +76,7 @@ export default function FeedbackKiosk() {
         token: kioskToken,
         rating,
         comment: skipComment ? "" : comment.trim(),
-        tagIds: [],
+        tagIds,
       });
 
       setStep("done");
@@ -118,6 +112,20 @@ export default function FeedbackKiosk() {
     if (kioskToken) return;
     setStep("error");
   }, [kioskToken]);
+
+  useEffect(() => {
+    async function loadTags() {
+      try {
+        const data = await getTags();
+        setTagOptions(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Erro ao carregar tags:", error);
+        setTagOptions([]);
+      }
+    }
+
+    loadTags();
+  }, []);
 
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
 
@@ -175,24 +183,29 @@ export default function FeedbackKiosk() {
               </p>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-10">
-                {TAG_OPTIONS.map((tag) => {
-                  const active = tagIds.includes(tag.id);
+                {tagOptions.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-10">
+                    {tagOptions.map((tag) => {
+                      const active = tagIds.includes(tag.id);
 
-                  return (
-                    <button
-                      key={tag.id}
-                      type="button"
-                      onClick={() => handleToggleTag(tag.id)}
-                      className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${
-                        active
-                          ? "border-sky-400 bg-sky-500 text-white"
-                          : "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
-                      }`}
-                    >
-                      {tag.name}
-                    </button>
-                  );
-                })}
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => handleToggleTag(tag.id)}
+                          className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${active
+                              ? "border-sky-400 bg-sky-500 text-white"
+                              : "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
+                            }`}
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-10 text-slate-400">Nenhuma opção cadastrada no momento.</p>
+                )}
               </div>
 
               <div className="mt-10 flex flex-col md:flex-row gap-4 justify-center">
