@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import FeedbackKiosk from "./pages/Feedback";
+import FeedbackKiosk from "./pages/Feedback/KioskPage";
 import LoginPage from "./pages/Login";
 import DashboardPage from "./pages/Admin/Dashboard";
 import KiosksPage from "./pages/Admin/Kiosks";
