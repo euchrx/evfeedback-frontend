@@ -31,7 +31,7 @@ function formatDate(value: string) {
   }).format(date);
 }
 
-export default function FeedbackKiosk() {
+export default function FeedbacksPage() {
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
