@@ -14,15 +14,24 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [branches, setBranches] = useState<BranchDashboardItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   async function loadSummary() {
     try {
       setIsLoading(true);
 
+      const filters = {
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+      };
+
       const [summaryData, branchData] = await Promise.all([
         getDashboardSummary(),
         getDashboardByBranch(),
       ]);
+
+
 
       setSummary(summaryData);
       setBranches(Array.isArray(branchData) ? branchData : []);
@@ -71,6 +80,65 @@ export default function DashboardPage() {
         <p className="text-slate-600 mt-2">
           Visão geral dos feedbacks recebidos.
         </p>
+      </div>
+
+      <div className="mt-6 bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Filtro por período
+          </h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Filtre os indicadores por data inicial e final.
+          </p>
+        </div>
+
+        <div className="mt-4 flex flex-col md:flex-row gap-4">
+          <div className="flex flex-col">
+            <label className="text-sm font-medium text-slate-700 mb-2">
+              Data inicial
+            </label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-sm font-medium text-slate-700 mb-2">
+              Data final
+            </label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+            />
+          </div>
+
+          <div className="flex items-end gap-3">
+            <button
+              onClick={loadSummary}
+              className="rounded-xl bg-sky-500 hover:bg-sky-400 px-5 py-3 font-semibold text-slate-950 transition"
+            >
+              Aplicar período
+            </button>
+
+            <button
+              onClick={() => {
+                setDateFrom("");
+                setDateTo("");
+                setTimeout(() => {
+                  loadSummary();
+                }, 0);
+              }}
+              className="rounded-xl bg-slate-100 hover:bg-slate-200 px-5 py-3 font-semibold text-slate-800 transition"
+            >
+              Limpar
+            </button>
+          </div>
+        </div>
       </div>
 
       {isLoading ? (

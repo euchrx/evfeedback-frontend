@@ -1,5 +1,10 @@
 import { api } from "./api";
 
+export type DashboardFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+};
+
 export type RatingSummaryItem = {
   rating: number;
   count: number;
@@ -24,8 +29,13 @@ export type BranchDashboardItem = {
   averageRating: number;
 };
 
-export async function getDashboardSummary(): Promise<DashboardSummary> {
-  const response = await api.get("/dashboard/summary");
+export async function getDashboardSummary(
+  filters?: DashboardFilters
+): Promise<DashboardSummary> {
+  const response = await api.get("/dashboard/summary", {
+    params: filters,
+  });
+
   const data = response.data ?? {};
 
   return {
@@ -36,7 +46,12 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   };
 }
 
-export async function getDashboardByBranch(): Promise<BranchDashboardItem[]> {
-  const response = await api.get("/dashboard/by-branch");
+export async function getDashboardByBranch(
+  filters?: DashboardFilters
+): Promise<BranchDashboardItem[]> {
+  const response = await api.get("/dashboard/by-branch", {
+    params: filters,
+  });
+
   return Array.isArray(response.data) ? response.data : [];
 }
