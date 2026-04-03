@@ -5,17 +5,17 @@ export type Branch = {
   name: string;
 };
 
-export async function getBranches() {
-  const { data } = await api.get<Branch[]>("/branches");
-  return data;
+export async function getBranches(): Promise<Branch[]> {
+  const response = await api.get("/branches");
+  return Array.isArray(response.data) ? response.data : [];
 }
 
 export async function createBranch(payload: { name: string }) {
-  const { data } = await api.post<Branch>("/branches", payload);
-  return data;
+  const response = await api.post("/branches", payload);
+  return response.data;
 }
 
 export async function deleteBranch(id: string) {
-  const { data } = await api.delete(`/branches/${id}`);
-  return data;
+  const response = await api.delete(`/branches/${id}`);
+  return response.data;
 }

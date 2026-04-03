@@ -1,10 +1,5 @@
 import { api } from "./api";
 
-export type BranchOption = {
-  id: string;
-  name: string;
-};
-
 export type Kiosk = {
   id: string;
   name: string;
@@ -16,22 +11,17 @@ export type Kiosk = {
   };
 };
 
-export type CreateKioskInput = {
-  name: string;
-  branchId: string;
-};
-
-export async function getKiosks() {
-  const { data } = await api.get<Kiosk[]>("/kiosks");
-  return data;
+export async function getKiosks(): Promise<Kiosk[]> {
+  const response = await api.get("/kiosks");
+  return Array.isArray(response.data) ? response.data : [];
 }
 
-export async function createKiosk(payload: CreateKioskInput) {
-  const { data } = await api.post<Kiosk>("/kiosks", payload);
-  return data;
+export async function createKiosk(payload: { name: string; branchId: string }) {
+  const response = await api.post("/kiosks", payload);
+  return response.data;
 }
 
 export async function deleteKiosk(id: string) {
-  const { data } = await api.delete(`/kiosks/${id}`);
-  return data;
+  const response = await api.delete(`/kiosks/${id}`);
+  return response.data;
 }

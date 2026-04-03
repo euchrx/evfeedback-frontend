@@ -17,7 +17,14 @@ export type DashboardSummary = {
   topTags: TopTagItem[];
 };
 
-export async function getDashboardSummary() {
-  const { data } = await api.get<DashboardSummary>("/dashboard/summary");
-  return data;
+export async function getDashboardSummary(): Promise<DashboardSummary> {
+  const response = await api.get("/dashboard/summary");
+  const data = response.data ?? {};
+
+  return {
+    total: data.total ?? 0,
+    averageRating: data.averageRating ?? 0,
+    ratings: Array.isArray(data.ratings) ? data.ratings : [],
+    topTags: Array.isArray(data.topTags) ? data.topTags : [],
+  };
 }
