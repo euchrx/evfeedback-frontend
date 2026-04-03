@@ -17,21 +17,19 @@ export default function DashboardPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  async function loadSummary() {
+  async function loadSummary(customDateFrom?: string, customDateTo?: string) {
     try {
       setIsLoading(true);
 
       const filters = {
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        dateFrom: (customDateFrom ?? dateFrom) || undefined,
+        dateTo: (customDateTo ?? dateTo) || undefined,
       };
 
       const [summaryData, branchData] = await Promise.all([
-        getDashboardSummary(),
-        getDashboardByBranch(),
+        getDashboardSummary(filters),
+        getDashboardByBranch(filters),
       ]);
-
-
 
       setSummary(summaryData);
       setBranches(Array.isArray(branchData) ? branchData : []);
@@ -40,8 +38,18 @@ export default function DashboardPage() {
     }
   }
 
-  useEffect(() => {
+  function handleApplyPeriod() {
     loadSummary();
+  }
+
+  function handleClearPeriod() {
+    setDateFrom("");
+    setDateTo("");
+    loadSummary("", "");
+  }
+
+  useEffect(() => {
+    loadSummary("", "");
   }, []);
 
   const ratingMap = useMemo(() => {
@@ -119,20 +127,14 @@ export default function DashboardPage() {
 
           <div className="flex items-end gap-3">
             <button
-              onClick={loadSummary}
+              onClick={handleApplyPeriod}
               className="rounded-xl bg-sky-500 hover:bg-sky-400 px-5 py-3 font-semibold text-slate-950 transition"
             >
               Aplicar período
             </button>
 
             <button
-              onClick={() => {
-                setDateFrom("");
-                setDateTo("");
-                setTimeout(() => {
-                  loadSummary();
-                }, 0);
-              }}
+              onClick={handleClearPeriod}
               className="rounded-xl bg-slate-100 hover:bg-slate-200 px-5 py-3 font-semibold text-slate-800 transition"
             >
               Limpar
