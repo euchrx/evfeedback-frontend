@@ -31,7 +31,7 @@ function formatDate(value: string) {
   }).format(date);
 }
 
-export default function FeedbackKiosk() {
+export default function FeedbacksPage() {
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -40,6 +40,9 @@ export default function FeedbackKiosk() {
       setIsLoading(true);
       const data = await getFeedbacks();
       setFeedbacks(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Erro ao carregar feedbacks:", error);
+      setFeedbacks([]);
     } finally {
       setIsLoading(false);
     }
