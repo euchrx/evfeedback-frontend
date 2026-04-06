@@ -14,9 +14,7 @@ export default function UsersPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER">(
-    "COMPANY_ADMIN"
-  );
+  const [role, setRole] = useState<"ADMIN" | "MANAGER">("ADMIN");
   const [companyId, setCompanyId] = useState("");
 
   async function load() {
@@ -43,7 +41,7 @@ export default function UsersPage() {
     setName("");
     setEmail("");
     setPassword("");
-    setRole("COMPANY_ADMIN");
+    setRole("ADMIN");
     setCompanyId("");
     await load();
   }
@@ -95,13 +93,10 @@ export default function UsersPage() {
 
           <select
             value={role}
-            onChange={(e) =>
-              setRole(e.target.value as "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER")
-            }
+            onChange={(e) => setRole(e.target.value as "ADMIN" | "MANAGER")}
             className="rounded-xl border border-slate-300 px-4 py-3 bg-white"
           >
-            <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-            <option value="COMPANY_ADMIN">COMPANY_ADMIN</option>
+            <option value="ADMIN">ADMIN</option>
             <option value="MANAGER">MANAGER</option>
           </select>
 

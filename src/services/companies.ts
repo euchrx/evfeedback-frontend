@@ -3,7 +3,6 @@ import { api } from "./api";
 export type Company = {
   id: string;
   name: string;
-  slug: string;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -14,17 +13,14 @@ export async function getCompanies(): Promise<Company[]> {
   return Array.isArray(response.data) ? response.data : [];
 }
 
-export async function createCompany(payload: {
-  name: string;
-  slug: string;
-}) {
+export async function createCompany(payload: { name: string }) {
   const response = await api.post("/companies", payload);
   return response.data;
 }
 
 export async function updateCompany(
   id: string,
-  payload: Partial<{ name: string; slug: string; active: boolean }>
+  payload: Partial<{ name: string; active: boolean }>
 ) {
   const response = await api.patch(`/companies/${id}`, payload);
   return response.data;

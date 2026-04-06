@@ -9,7 +9,6 @@ import {
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
 
   async function load() {
     const data = await getCompanies();
@@ -17,15 +16,13 @@ export default function CompaniesPage() {
   }
 
   async function handleCreate() {
-    if (!name.trim() || !slug.trim()) return;
+    if (!name.trim()) return;
 
     await createCompany({
       name: name.trim(),
-      slug: slug.trim(),
     });
 
     setName("");
-    setSlug("");
     await load();
   }
 
@@ -51,24 +48,17 @@ export default function CompaniesPage() {
       </div>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex gap-4">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Nome da empresa"
-            className="rounded-xl border border-slate-300 px-4 py-3"
-          />
-
-          <input
-            value={slug}
-            onChange={(e) => setSlug(e.target.value)}
-            placeholder="Slug"
-            className="rounded-xl border border-slate-300 px-4 py-3"
+            className="flex-1 rounded-xl border border-slate-300 px-4 py-3"
           />
 
           <button
             onClick={handleCreate}
-            className="rounded-xl bg-sky-500 hover:bg-sky-400 px-4 py-3 font-semibold text-slate-950"
+            className="rounded-xl bg-sky-500 hover:bg-sky-400 px-5 py-3 font-semibold text-slate-950"
           >
             Criar empresa
           </button>
@@ -87,7 +77,6 @@ export default function CompaniesPage() {
               >
                 <div>
                   <h3 className="font-semibold text-slate-900">{company.name}</h3>
-                  <p className="text-sm text-slate-500">Slug: {company.slug}</p>
                   <p className="text-sm text-slate-500">
                     Status: {company.active ? "Ativa" : "Inativa"}
                   </p>
