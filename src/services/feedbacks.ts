@@ -1,10 +1,30 @@
 import { api } from "./api";
 
+export type FeedbackTagItem = {
+  id: string;
+  feedbackId: string;
+  tagId: string;
+  tag?: {
+    id: string;
+    name: string;
+    color?: string | null;
+  } | null;
+};
+
 export type FeedbackItem = {
   id: string;
   rating: number;
   comment?: string | null;
+  active?: boolean;
+  companyId?: string;
+  branchId?: string | null;
+  kioskId?: string | null;
   createdAt: string;
+  updatedAt?: string;
+  company?: {
+    id: string;
+    name: string;
+  } | null;
   kiosk?: {
     id: string;
     name: string;
@@ -13,30 +33,36 @@ export type FeedbackItem = {
     id: string;
     name: string;
   } | null;
-  tags?: Array<{
-    id: string;
-    feedbackId: string;
-    tagId: string;
-    tag?: {
-      id: string;
-      name: string;
-    } | null;
-  }>;
+  tags?: FeedbackTagItem[];
 };
 
 export type FeedbackFilters = {
-  rating?: string;
+  companyId?: string;
   branchId?: string;
-  dateFrom?: string;
-  dateTo?: string;
+  kioskId?: string;
+  rating?: string;
+  startDate?: string;
+  endDate?: string;
+  active?: string;
 };
 
 export async function getFeedbacks(
-  filters?: FeedbackFilters
+  filters?: FeedbackFilters,
 ): Promise<FeedbackItem[]> {
   const response = await api.get("/feedbacks", {
     params: filters,
   });
 
   return Array.isArray(response.data) ? response.data : [];
+}
+
+export async function getFeedbackById(
+  id: string,
+  companyId?: string,
+): Promise<FeedbackItem> {
+  const response = await api.get(`/feedbacks/${id}`, {
+    params: companyId ? { companyId } : undefined,
+  });
+
+  return response.data;
 }

@@ -1,44 +1,60 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import FeedbackKiosk from "./pages/Feedbacks";
-import LoginPage from "./pages/Login";
-import DashboardPage from "./pages/Admin/Dashboard";
-import KiosksPage from "./pages/Admin/Kiosks";
-import FeedbacksPage from "./pages/Admin/Feedbacks";
-import BranchesPage from "./pages/Admin/Branches";
-import { AdminLayout } from "./components/admin/AdminLayout";
 import { PrivateRoute } from "./routes/PrivateRoute";
 import { RoleRoute } from "./routes/RoleRoute";
-import TagsPage from "./pages/Admin/Tags";
-import SettingsPage from "./pages/Admin/Settings";
+import AdminLayout from "./components/admin/AdminLayout";
+
+import LoginPage from "./pages/Login";
+import DashboardPage from "./pages/Admin/Dashboard";
 import CompaniesPage from "./pages/Admin/Companies";
 import UsersPage from "./pages/Admin/Users";
+import BranchesPage from "./pages/Admin/Branches";
+import KiosksPage from "./pages/Admin/Kiosks";
+import TagsPage from "./pages/Admin/Tags";
+import FeedbacksPage from "./pages/Admin/Feedbacks";
+import SettingsPage from "./pages/Admin/Settings";
 
 export function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/feedback" replace />} />
-        <Route path="/feedback" element={<FeedbackKiosk />} />
         <Route path="/login" element={<LoginPage />} />
 
         <Route element={<PrivateRoute />}>
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Navigate to="/admin/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="kiosks" element={<KiosksPage />} />
-            <Route path="feedbacks" element={<FeedbacksPage />} />
-            <Route path="branches" element={<BranchesPage />} />
-            <Route path="tags" element={<TagsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<DashboardPage />} />
 
-            <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
-              <Route path="companies" element={<CompaniesPage />} />
-              <Route path="users" element={<UsersPage />} />
+            <Route
+              element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}
+            >
+              <Route path="/admin/companies" element={<CompaniesPage />} />
+            </Route>
+
+            <Route
+              element={
+                <RoleRoute allowedRoles={["SUPER_ADMIN", "COMPANY_ADMIN"]} />
+              }
+            >
+              <Route path="/admin/users" element={<UsersPage />} />
+            </Route>
+
+            <Route
+              element={
+                <RoleRoute
+                  allowedRoles={["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"]}
+                />
+              }
+            >
+              <Route path="/admin/branches" element={<BranchesPage />} />
+              <Route path="/admin/kiosks" element={<KiosksPage />} />
+              <Route path="/admin/tags" element={<TagsPage />} />
+              <Route path="/admin/feedbacks" element={<FeedbacksPage />} />
+              <Route path="/admin/settings" element={<SettingsPage />} />
             </Route>
           </Route>
         </Route>
 
-        <Route path="*" element={<Navigate to="/feedback" replace />} />
+        <Route path="/" element={<Navigate to="/admin" replace />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </BrowserRouter>
   );

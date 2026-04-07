@@ -1,15 +1,9 @@
 import { api } from "./api";
+import type { AuthUser } from "../utils/permissions";
+import { isSuperAdmin as checkIsSuperAdmin } from "../utils/permissions";
 
-export type UserRole = "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
-
-export type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  companyId?: string;
-  active?: boolean;
-};
+export type { AuthUser } from "../utils/permissions";
+export type UserRole = AuthUser["role"];
 
 export type LoginPayload = {
   email: string;
@@ -24,9 +18,9 @@ export type LoginResponse = {
 const TOKEN_KEY = "evfeedback_token";
 const USER_KEY = "evfeedback_user";
 
-export async function login(payload: LoginPayload) {
-  const response = await api.post<LoginResponse>("/auth/login", payload);
-  const data = response.data;
+export async function login(payload: LoginPayload): Promise<LoginResponse> {
+  const response = await api.post("/auth/login", payload);
+  const data = response.data as LoginResponse;
 
   if (data?.access_token) {
     localStorage.setItem(TOKEN_KEY, data.access_token);
@@ -39,14 +33,15 @@ export async function login(payload: LoginPayload) {
   return data;
 }
 
-export async function fetchMe() {
-  const response = await api.get<AuthUser>("/auth/me");
+export async function fetchMe(): Promise<AuthUser> {
+  const response = await api.get("/auth/me");
+  const data = response.data as AuthUser;
 
-  if (response.data) {
-    localStorage.setItem(USER_KEY, JSON.stringify(response.data));
+  if (data) {
+    localStorage.setItem(USER_KEY, JSON.stringify(data));
   }
 
-  return response.data;
+  return data;
 }
 
 export function getAuthToken() {
@@ -55,6 +50,7 @@ export function getAuthToken() {
 
 export function getStoredUser(): AuthUser | null {
   const raw = localStorage.getItem(USER_KEY);
+
   if (!raw) return null;
 
   try {
@@ -68,11 +64,20 @@ export function isAuthenticated() {
   return !!getAuthToken() && !!getStoredUser();
 }
 
+export function setStoredUser(user: AuthUser | null) {
+  if (!user) {
+    localStorage.removeItem(USER_KEY);
+    return;
+  }
+
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
 export function logout() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
 }
 
 export function isSuperAdmin() {
-  return getStoredUser()?.role === "SUPER_ADMIN";
+  return checkIsSuperAdmin(getStoredUser());
 }

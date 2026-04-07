@@ -3,19 +3,89 @@ import { api } from "./api";
 export type Branch = {
   id: string;
   name: string;
+  code?: string | null;
+  active: boolean;
+  companyId: string;
+  company?: {
+    id: string;
+    name: string;
+    active?: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
 };
 
-export async function getBranches(): Promise<Branch[]> {
-  const response = await api.get("/branches");
+export type CreateBranchPayload = {
+  name: string;
+  code?: string;
+  active?: boolean;
+  companyId?: string;
+};
+
+export type UpdateBranchPayload = Partial<{
+  name: string;
+  code: string | null;
+  active: boolean;
+  companyId: string;
+}>;
+
+export async function getBranches(companyId?: string): Promise<Branch[]> {
+  const response = await api.get("/branches", {
+    params: companyId ? { companyId } : undefined,
+  });
+
   return Array.isArray(response.data) ? response.data : [];
 }
 
-export async function createBranch(payload: { name: string }) {
+export async function getBranchById(
+  id: string,
+  companyId?: string,
+): Promise<Branch> {
+  const response = await api.get(`/branches/${id}`, {
+    params: companyId ? { companyId } : undefined,
+  });
+
+  return response.data;
+}
+
+export async function createBranch(payload: CreateBranchPayload) {
   const response = await api.post("/branches", payload);
   return response.data;
 }
 
-export async function deleteBranch(id: string) {
-  const response = await api.delete(`/branches/${id}`);
+export async function updateBranch(id: string, payload: UpdateBranchPayload) {
+  const response = await api.patch(`/branches/${id}`, payload);
+  return response.data;
+}
+
+export async function deactivateBranch(id: string, companyId?: string) {
+  const response = await api.patch(
+    `/branches/${id}/deactivate`,
+    {},
+    {
+      params: companyId ? { companyId } : undefined,
+    },
+  );
+
+  return response.data;
+}
+
+export async function activateBranch(id: string, companyId?: string) {
+  const response = await api.patch(
+    `/branches/${id}/activate`,
+    {},
+    {
+      params: companyId ? { companyId } : undefined,
+    },
+  );
+
+  return response.data;
+}
+
+export async function hardDeleteBranch(id: string, companyId?: string) {
+  const response = await api.delete(`/branches/${id}`, {
+    params: companyId ? { companyId } : undefined,
+  });
+
   return response.data;
 }

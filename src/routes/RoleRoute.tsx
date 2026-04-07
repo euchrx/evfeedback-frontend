@@ -1,32 +1,22 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { getStoredUser } from "../services/auth";
 
-type UserRole = "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
-
-function getUserRole(): UserRole | null {
-  const raw = localStorage.getItem("evfeedback_user");
-  if (!raw) return null;
-
-  try {
-    const user = JSON.parse(raw);
-    return user?.role ?? null;
-  } catch {
-    return null;
-  }
-}
+export type UserRole = "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
 
 type RoleRouteProps = {
   allowedRoles: UserRole[];
 };
 
 export function RoleRoute({ allowedRoles }: RoleRouteProps) {
-  const role = getUserRole();
+  const location = useLocation();
+  const user = getStoredUser();
 
-  if (!role) {
-    return <Navigate to="/login" replace />;
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (!allowedRoles.includes(role)) {
-    return <Navigate to="/admin/dashboard" replace />;
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to="/admin" replace />;
   }
 
   return <Outlet />;
