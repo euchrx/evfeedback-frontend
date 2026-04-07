@@ -1,43 +1,50 @@
-import { Outlet, useNavigate } from "react-router-dom";
-import { Sidebar } from "./Sidebar";
-import { getStoredUser, logout } from "../../services/auth";
+import { NavLink } from "react-router-dom";
+import type { AuthUser } from "../../services/auth";
 
-export function AdminLayout() {
-  const navigate = useNavigate();
-  const user = getStoredUser();
+type SidebarProps = {
+  user: AuthUser | null;
+};
 
-  function handleLogout() {
-    logout();
-    navigate("/login");
-  }
+export function Sidebar({ user }: SidebarProps) {
+  const items = [
+    { label: "Dashboard", to: "/admin/dashboard" },
+    ...(user?.role === "SUPER_ADMIN"
+      ? [
+          { label: "Empresas", to: "/admin/companies" },
+          { label: "Usuários", to: "/admin/users" },
+        ]
+      : []),
+    { label: "Kiosks", to: "/admin/kiosks" },
+    { label: "Feedbacks", to: "/admin/feedbacks" },
+    { label: "Filiais", to: "/admin/branches" },
+    { label: "Tags", to: "/admin/tags" },
+    { label: "Configurações", to: "/admin/settings" },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-100 flex">
-      <Sidebar user={user} />
-
-      <div className="flex-1 flex flex-col">
-        <header className="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">
-              Painel administrativo
-            </h2>
-            <p className="text-sm text-slate-500">
-              {user?.name} • {user?.role}
-            </p>
-          </div>
-
-          <button
-            onClick={handleLogout}
-            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-          >
-            Sair
-          </button>
-        </header>
-
-        <main className="flex-1 p-6">
-          <Outlet />
-        </main>
+    <aside className="w-72 bg-slate-950 text-white border-r border-slate-800 min-h-screen">
+      <div className="px-6 py-6 border-b border-slate-800">
+        <h1 className="text-2xl font-bold">EvFeedback</h1>
+        <p className="text-sm text-slate-400 mt-1">Painel administrativo</p>
       </div>
-    </div>
+
+      <nav className="p-4 space-y-2">
+        {items.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `block rounded-xl px-4 py-3 text-sm font-medium transition ${
+                isActive
+                  ? "bg-sky-500 text-slate-950"
+                  : "text-slate-300 hover:bg-slate-900 hover:text-white"
+              }`
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+    </aside>
   );
 }
