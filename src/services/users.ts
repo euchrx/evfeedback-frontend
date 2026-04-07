@@ -4,7 +4,7 @@ export type UserItem = {
   id: string;
   name: string;
   email: string;
-  role: "ADMIN" | "MANAGER";
+  role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
   active: boolean;
   companyId: string;
   company?: {
@@ -29,7 +29,7 @@ export async function createUserGlobal(payload: {
   name: string;
   email: string;
   password: string;
-  role: "ADMIN" | "MANAGER";
+  role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
   companyId: string;
 }) {
   const response = await api.post("/users", payload);
@@ -40,7 +40,7 @@ export async function createUserCompany(payload: {
   name: string;
   email: string;
   password: string;
-  role: "ADMIN" | "MANAGER";
+  role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
 }) {
   const response = await api.post("/users/company", payload);
   return response.data;
@@ -52,7 +52,7 @@ export async function updateUserGlobal(
     name: string;
     email: string;
     password: string;
-    role: "ADMIN" | "MANAGER";
+    role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
     active: boolean;
     companyId: string;
   }>
@@ -67,7 +67,7 @@ export async function updateUserCompany(
     name: string;
     email: string;
     password: string;
-    role: "ADMIN" | "MANAGER";
+    role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
     active: boolean;
   }>
 ) {
