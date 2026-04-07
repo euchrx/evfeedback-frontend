@@ -1,17 +1,26 @@
 import { NavLink } from "react-router-dom";
+import type { AuthUser } from "../../services/auth";
 
-const items = [
-  { label: "Dashboard", to: "/admin/dashboard" },
-  { label: "Empresas", to: "/admin/companies"},
-  { label: "Usuários", to: "/admin/users"},
-  { label: "Kiosks", to: "/admin/kiosks" },
-  { label: "Feedbacks", to: "/admin/feedbacks" },
-  { label: "Filiais", to: "/admin/branches" },
-  { label: "Tags", to: "/admin/tags" },
-  { label: "Configurações", to: "/admin/settings" },
-];
+type SidebarProps = {
+  user: AuthUser | null;
+};
 
-export function Sidebar() {
+export function Sidebar({ user }: SidebarProps) {
+  const items = [
+    { label: "Dashboard", to: "/admin/dashboard" },
+    ...(user?.role === "SUPER_ADMIN"
+      ? [
+          { label: "Empresas", to: "/admin/companies" },
+          { label: "Usuários", to: "/admin/users" },
+        ]
+      : []),
+    { label: "Kiosks", to: "/admin/kiosks" },
+    { label: "Feedbacks", to: "/admin/feedbacks" },
+    { label: "Filiais", to: "/admin/branches" },
+    { label: "Tags", to: "/admin/tags" },
+    { label: "Configurações", to: "/admin/settings" },
+  ];
+
   return (
     <aside className="w-72 bg-slate-950 text-white border-r border-slate-800 min-h-screen">
       <div className="px-6 py-6 border-b border-slate-800">
