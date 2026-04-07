@@ -1,7 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { getStoredUser } from "../services/auth";
-
-export type UserRole = "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
+import type { UserRole } from "../utils/permissions";
 
 type RoleRouteProps = {
   allowedRoles: UserRole[];
@@ -16,7 +15,7 @@ export function RoleRoute({ allowedRoles }: RoleRouteProps) {
   }
 
   if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/admin" replace />;
+    return <Navigate to="/admin/dashboard" replace state={{ from: location }} />;
   }
 
   return <Outlet />;

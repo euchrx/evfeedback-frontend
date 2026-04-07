@@ -1,9 +1,5 @@
 import { api } from "./api";
 import type { AuthUser } from "../utils/permissions";
-import { isSuperAdmin as checkIsSuperAdmin } from "../utils/permissions";
-
-export type { AuthUser } from "../utils/permissions";
-export type UserRole = AuthUser["role"];
 
 export type LoginPayload = {
   email: string;
@@ -18,7 +14,7 @@ export type LoginResponse = {
 const TOKEN_KEY = "evfeedback_token";
 const USER_KEY = "evfeedback_user";
 
-export async function login(payload: LoginPayload): Promise<LoginResponse> {
+export async function login(payload: LoginPayload) {
   const response = await api.post("/auth/login", payload);
   const data = response.data as LoginResponse;
 
@@ -33,15 +29,14 @@ export async function login(payload: LoginPayload): Promise<LoginResponse> {
   return data;
 }
 
-export async function fetchMe(): Promise<AuthUser> {
+export async function fetchMe() {
   const response = await api.get("/auth/me");
-  const data = response.data as AuthUser;
 
-  if (data) {
-    localStorage.setItem(USER_KEY, JSON.stringify(data));
+  if (response.data) {
+    localStorage.setItem(USER_KEY, JSON.stringify(response.data));
   }
 
-  return data;
+  return response.data as AuthUser;
 }
 
 export function getAuthToken() {
@@ -50,7 +45,6 @@ export function getAuthToken() {
 
 export function getStoredUser(): AuthUser | null {
   const raw = localStorage.getItem(USER_KEY);
-
   if (!raw) return null;
 
   try {
@@ -64,20 +58,7 @@ export function isAuthenticated() {
   return !!getAuthToken() && !!getStoredUser();
 }
 
-export function setStoredUser(user: AuthUser | null) {
-  if (!user) {
-    localStorage.removeItem(USER_KEY);
-    return;
-  }
-
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
-}
-
 export function logout() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
-}
-
-export function isSuperAdmin() {
-  return checkIsSuperAdmin(getStoredUser());
 }

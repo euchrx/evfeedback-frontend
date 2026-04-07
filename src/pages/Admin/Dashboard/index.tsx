@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { getStoredUser } from "../../../services/auth";
-import { getCompanies, type Company } from "../../../services/companies";
 import {
   getDashboardByBranch,
   getDashboardSummary,
@@ -8,22 +6,24 @@ import {
   type DashboardFilters,
   type DashboardSummary,
 } from "../../../services/dashboard";
-
-type StoredUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
-  companyId?: string | null;
-};
+import { getCompanies, type Company } from "../../../services/companies";
+import { getStoredUser } from "../../../services/auth";
+import {
+  canViewOperationalModules,
+  getResolvedCompanyId,
+  isSuperAdmin,
+} from "../../../utils/permissions";
 
 function formatAverage(value: number) {
   return Number.isFinite(value) ? value.toFixed(1) : "0.0";
 }
 
 export default function DashboardPage() {
-  const currentUser = getStoredUser() as StoredUser | null;
-  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+  const currentUser = getStoredUser();
+
+  const canView = canViewOperationalModules(currentUser);
+  const superAdmin = isSuperAdmin(currentUser);
+  const resolvedCompanyId = getResolvedCompanyId(currentUser);
 
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [branches, setBranches] = useState<BranchDashboardItem[]>([]);
@@ -31,45 +31,51 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [companyId, setCompanyId] = useState(
-    isSuperAdmin ? "" : currentUser?.companyId ?? "",
-  );
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [filters, setFilters] = useState<DashboardFilters>({
+    companyId: resolvedCompanyId ?? "",
+    dateFrom: "",
+    dateTo: "",
+  });
 
-  async function loadCompanies() {
-    if (!isSuperAdmin) return;
+  const selectedCompanyId = useMemo(() => {
+    return superAdmin ? filters.companyId || undefined : resolvedCompanyId;
+  }, [superAdmin, filters.companyId, resolvedCompanyId]);
 
-    const data = await getCompanies();
-    setCompanies(Array.isArray(data) ? data : []);
+  async function loadDependencies() {
+    if (!superAdmin) return;
+
+    try {
+      const data = await getCompanies();
+      setCompanies(Array.isArray(data) ? data : []);
+    } catch {
+      setCompanies([]);
+    }
   }
 
-  async function loadSummary(
-    customCompanyId?: string,
-    customDateFrom?: string,
-    customDateTo?: string,
-  ) {
+  async function loadDashboard(customFilters?: DashboardFilters) {
     try {
-      setError("");
       setIsLoading(true);
+      setError("");
 
-      const filters: DashboardFilters = {
-        companyId: isSuperAdmin
-          ? (customCompanyId ?? companyId) || undefined
-          : currentUser?.companyId ?? undefined,
-        dateFrom: (customDateFrom ?? dateFrom) || undefined,
-        dateTo: (customDateTo ?? dateTo) || undefined,
+      const finalFilters = customFilters ?? filters;
+
+      const sanitizedFilters: DashboardFilters = {
+        companyId: superAdmin
+          ? finalFilters.companyId || undefined
+          : resolvedCompanyId,
+        dateFrom: finalFilters.dateFrom || undefined,
+        dateTo: finalFilters.dateTo || undefined,
       };
 
       const [summaryData, branchData] = await Promise.all([
-        getDashboardSummary(filters),
-        getDashboardByBranch(filters),
+        getDashboardSummary(sanitizedFilters),
+        getDashboardByBranch(sanitizedFilters),
       ]);
 
       setSummary(summaryData);
       setBranches(Array.isArray(branchData) ? branchData : []);
     } catch {
-      setError("Não foi possível carregar os indicadores.");
+      setError("Não foi possível carregar os indicadores do dashboard.");
       setSummary(null);
       setBranches([]);
     } finally {
@@ -78,37 +84,40 @@ export default function DashboardPage() {
   }
 
   function handleApplyPeriod() {
-    loadSummary();
+    void loadDashboard(filters);
   }
 
   function handleClearPeriod() {
-    const resetCompanyId = isSuperAdmin ? "" : currentUser?.companyId ?? "";
-    setCompanyId(resetCompanyId);
-    setDateFrom("");
-    setDateTo("");
-    loadSummary(resetCompanyId, "", "");
+    const cleared: DashboardFilters = {
+      companyId: superAdmin ? "" : resolvedCompanyId ?? "",
+      dateFrom: "",
+      dateTo: "",
+    };
+
+    setFilters(cleared);
+    void loadDashboard(cleared);
   }
 
   useEffect(() => {
-    async function init() {
-      try {
-        if (isSuperAdmin) {
-          await loadCompanies();
-        }
-
-        await loadSummary(
-          isSuperAdmin ? "" : currentUser?.companyId ?? "",
-          "",
-          "",
-        );
-      } catch {
-        setError("Não foi possível iniciar o dashboard.");
-        setIsLoading(false);
-      }
+    if (!canView) {
+      setIsLoading(false);
+      return;
     }
 
-    init();
-  }, []);
+    void loadDependencies();
+  }, [canView, superAdmin]);
+
+  useEffect(() => {
+    if (!canView) return;
+
+    const initial: DashboardFilters = {
+      companyId: superAdmin ? filters.companyId || "" : resolvedCompanyId ?? "",
+      dateFrom: filters.dateFrom || "",
+      dateTo: filters.dateTo || "",
+    };
+
+    void loadDashboard(initial);
+  }, [canView, selectedCompanyId]);
 
   const ratingMap = useMemo(() => {
     const map = new Map<number, number>();
@@ -139,11 +148,26 @@ export default function DashboardPage() {
       .sort((a, b) => a.averageRating - b.averageRating)[0];
   }, [branches]);
 
+  if (!canView) {
+    return (
+      <section className="space-y-3">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Acesso negado
+        </h1>
+        <p className="text-slate-600">
+          Você não tem permissão para acessar o dashboard.
+        </p>
+      </section>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-600">
+    <section className="space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Dashboard
+        </h1>
+        <p className="text-slate-600">
           Visão geral dos feedbacks recebidos.
         </p>
       </div>
@@ -154,121 +178,148 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">
-          Filtro por período
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Filtre os indicadores por empresa e período.
-        </p>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 space-y-1">
+          <h2 className="text-xl font-semibold text-slate-900">
+            Filtro do dashboard
+          </h2>
+          <p className="text-sm text-slate-500">
+            Filtre os indicadores por empresa e período.
+          </p>
+        </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {isSuperAdmin ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {superAdmin ? (
             <select
-              value={companyId}
-              onChange={(e) => setCompanyId(e.target.value)}
+              value={filters.companyId ?? ""}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  companyId: e.target.value,
+                }))
+              }
               className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
             >
-              <option value="">Todas as empresas</option>
+              <option value="">Selecione uma empresa</option>
               {companies.map((company) => (
                 <option key={company.id} value={company.id}>
                   {company.name}
                 </option>
               ))}
             </select>
-          ) : null}
+          ) : (
+            <input
+              value={
+                currentUser?.companyId
+                  ? "Empresa vinculada ao seu usuário"
+                  : "Sem empresa vinculada"
+              }
+              disabled
+              className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-500"
+            />
+          )}
 
           <input
             type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            value={filters.dateFrom ?? ""}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                dateFrom: e.target.value,
+              }))
+            }
             className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
           />
 
           <input
             type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            value={filters.dateTo ?? ""}
+            onChange={(e) =>
+              setFilters((prev) => ({
+                ...prev,
+                dateTo: e.target.value,
+              }))
+            }
             className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
           />
-        </div>
 
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            onClick={handleApplyPeriod}
-            className="rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-          >
-            Aplicar período
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleApplyPeriod}
+              className="w-full rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
+            >
+              Aplicar
+            </button>
 
-          <button
-            onClick={handleClearPeriod}
-            className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-200"
-          >
-            Limpar
-          </button>
+            <button
+              onClick={handleClearPeriod}
+              className="w-full rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
+            >
+              Limpar
+            </button>
+          </div>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600 shadow-sm">
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-slate-500 shadow-sm">
           Carregando indicadores...
         </div>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-sm text-slate-500">Total de feedbacks</p>
+          <div className="grid gap-4 md:grid-cols-3">
+            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">
+                Total de feedbacks
+              </p>
               <h2 className="mt-2 text-3xl font-bold text-slate-900">
                 {summary?.total ?? 0}
               </h2>
-            </div>
+            </article>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-sm text-slate-500">Média geral</p>
+            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">
+                Média geral
+              </p>
               <h2 className="mt-2 text-3xl font-bold text-slate-900">
                 {formatAverage(summary?.averageRating ?? 0)}
               </h2>
-            </div>
+            </article>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-sm text-slate-500">Filiais com feedback</p>
+            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">
+                Filiais com feedback
+              </p>
               <h2 className="mt-2 text-3xl font-bold text-slate-900">
                 {branches.filter((item) => item.totalFeedbacks > 0).length}
               </h2>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-sm text-slate-500">Tags principais</p>
-              <h2 className="mt-2 text-3xl font-bold text-slate-900">
-                {summary?.topTags?.length ?? 0}
-              </h2>
-            </div>
+            </article>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900">
-                Distribuição por nota
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Quantidade de feedbacks por avaliação.
-              </p>
+          <div className="grid gap-6 xl:grid-cols-2">
+            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 space-y-1">
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Distribuição por nota
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Quantidade de feedbacks por avaliação.
+                </p>
+              </div>
 
-              <div className="mt-5 space-y-4">
+              <div className="space-y-4">
                 {ratingMap.map((item) => {
                   const width = `${(item.count / maxRatingCount) * 100}%`;
 
                   return (
-                    <div key={item.rating}>
-                      <div className="mb-1 flex items-center justify-between text-sm text-slate-600">
+                    <div key={item.rating} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm text-slate-600">
                         <span>Nota {item.rating}</span>
                         <span>{item.count}</span>
                       </div>
-
                       <div className="h-3 rounded-full bg-slate-100">
                         <div
-                          className="h-3 rounded-full bg-sky-500"
+                          className="h-3 rounded-full bg-sky-500 transition-all"
                           style={{ width }}
                         />
                       </div>
@@ -276,145 +327,139 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
-            </section>
+            </article>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900">
-                Principais motivos
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Tags mais marcadas pelos clientes.
-              </p>
+            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 space-y-1">
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Principais motivos
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Tags mais marcadas pelos clientes.
+                </p>
+              </div>
 
               {summary?.topTags?.length ? (
-                <div className="mt-5 space-y-3">
+                <div className="space-y-3">
                   {summary.topTags.map((tag, index) => (
                     <div
                       key={`${tag.name}-${index}`}
-                      className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3"
+                      className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3"
                     >
-                      <span className="font-medium text-slate-800">{tag.name}</span>
-                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+                      <span className="font-medium text-slate-800">
+                        {tag.name}
+                      </span>
+                      <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
                         {tag.count}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="mt-5 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
                   Nenhuma tag registrada ainda.
                 </div>
               )}
-            </section>
+            </article>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900">
-                Melhor filial
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Unidade com melhor média de avaliação.
-              </p>
+          <div className="grid gap-6 xl:grid-cols-2">
+            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 space-y-1">
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Melhor filial
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Unidade com melhor média de avaliação.
+                </p>
+              </div>
 
               {bestBranch ? (
-                <div className="mt-5 rounded-2xl bg-emerald-50 p-5">
-                  <h3 className="text-xl font-bold text-emerald-900">
+                <div className="rounded-2xl bg-emerald-50 px-5 py-4">
+                  <h3 className="text-lg font-semibold text-emerald-900">
                     {bestBranch.name}
                   </h3>
                   <p className="mt-2 text-sm text-emerald-800">
                     Média: {formatAverage(bestBranch.averageRating)}
                   </p>
-                  <p className="mt-1 text-sm text-emerald-800">
+                  <p className="text-sm text-emerald-800">
                     Feedbacks: {bestBranch.totalFeedbacks}
-                  </p>
-                  <p className="mt-1 text-sm text-emerald-800">
-                    Empresa: {bestBranch.company?.name ?? "-"}
                   </p>
                 </div>
               ) : (
-                <div className="mt-5 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
                   Ainda não há dados suficientes.
                 </div>
               )}
-            </section>
+            </article>
 
-            <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-slate-900">
-                Pior filial
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Unidade com menor média de avaliação.
-              </p>
+            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-4 space-y-1">
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Pior filial
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Unidade com menor média de avaliação.
+                </p>
+              </div>
 
               {worstBranch ? (
-                <div className="mt-5 rounded-2xl bg-rose-50 p-5">
-                  <h3 className="text-xl font-bold text-rose-900">
+                <div className="rounded-2xl bg-rose-50 px-5 py-4">
+                  <h3 className="text-lg font-semibold text-rose-900">
                     {worstBranch.name}
                   </h3>
                   <p className="mt-2 text-sm text-rose-800">
                     Média: {formatAverage(worstBranch.averageRating)}
                   </p>
-                  <p className="mt-1 text-sm text-rose-800">
+                  <p className="text-sm text-rose-800">
                     Feedbacks: {worstBranch.totalFeedbacks}
-                  </p>
-                  <p className="mt-1 text-sm text-rose-800">
-                    Empresa: {worstBranch.company?.name ?? "-"}
                   </p>
                 </div>
               ) : (
-                <div className="mt-5 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
                   Ainda não há dados suficientes.
                 </div>
               )}
-            </section>
+            </article>
           </div>
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Desempenho por filial
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Compare volume e média entre as unidades.
-            </p>
+          <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 space-y-1">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Desempenho por filial
+              </h2>
+              <p className="text-sm text-slate-500">
+                Compare volume e média entre as unidades.
+              </p>
+            </div>
 
             {branches.length === 0 ? (
-              <div className="mt-5 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
                 Nenhuma filial encontrada.
               </div>
             ) : (
-              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4">
                 {branches.map((branch) => (
                   <div
                     key={branch.id}
-                    className="rounded-2xl border border-slate-200 p-5"
+                    className="rounded-2xl border border-slate-200 p-4"
                   >
-                    <h3 className="text-lg font-semibold text-slate-900">
-                      {branch.name}
-                    </h3>
-                    <p className="mt-2 text-sm text-slate-600">
-                      Empresa:{" "}
-                      <span className="font-medium">
-                        {branch.company?.name ?? "-"}
-                      </span>
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Feedbacks:{" "}
-                      <span className="font-medium">{branch.totalFeedbacks}</span>
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Média:{" "}
-                      <span className="font-medium">
-                        {formatAverage(branch.averageRating)}
-                      </span>
-                    </p>
+                    <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                      <h3 className="text-base font-semibold text-slate-900">
+                        {branch.name}
+                      </h3>
+                      <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+                        <span>Feedbacks: {branch.totalFeedbacks}</span>
+                        <span>Média: {formatAverage(branch.averageRating)}</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
-          </section>
+          </article>
         </>
       )}
-    </div>
+    </section>
   );
 }

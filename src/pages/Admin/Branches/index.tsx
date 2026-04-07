@@ -9,34 +9,39 @@ import {
   hardDeleteBranch,
   type Branch,
 } from "../../../services/branches";
-
-type StoredUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
-  companyId?: string | null;
-};
+import {
+  canHardDelete,
+  canManageOperationalModules,
+  canViewOperationalModules,
+  getResolvedCompanyId,
+  isSuperAdmin,
+} from "../../../utils/permissions";
 
 export default function BranchesPage() {
-  const currentUser = getStoredUser() as StoredUser | null;
+  const currentUser = getStoredUser();
 
-  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
-  const isCompanyAdmin = currentUser?.role === "COMPANY_ADMIN";
-  const isManager = currentUser?.role === "MANAGER";
-  const canViewBranches = isSuperAdmin || isCompanyAdmin || isManager;
-  const canManageBranches = isSuperAdmin || isCompanyAdmin;
+  const canView = canViewOperationalModules(currentUser);
+  const canManage = canManageOperationalModules(currentUser);
+  const canDeletePermanently = canHardDelete(currentUser);
+  const superAdmin = isSuperAdmin(currentUser);
+  const resolvedCompanyId = getResolvedCompanyId(currentUser);
 
   const [branches, setBranches] = useState<Branch[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [companyId, setCompanyId] = useState("");
+  const [companyId, setCompanyId] = useState(resolvedCompanyId ?? "");
   const [showInactive, setShowInactive] = useState(true);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  const selectedCompanyId = useMemo(() => {
+    return superAdmin ? companyId || undefined : resolvedCompanyId;
+  }, [superAdmin, companyId, resolvedCompanyId]);
 
   const visibleBranches = useMemo(() => {
     if (showInactive) return branches;
@@ -48,24 +53,18 @@ export default function BranchesPage() {
       setError("");
       setLoading(true);
 
-      const resolvedCompanyId = isSuperAdmin
-        ? undefined
-        : currentUser?.companyId ?? undefined;
+      const requests: Promise<unknown>[] = [
+        getBranches(selectedCompanyId),
+      ];
 
-      const branchesPromise = getBranches(resolvedCompanyId);
-      const companiesPromise = isSuperAdmin ? getCompanies() : Promise.resolve([]);
-
-      const [branchesData, companiesData] = await Promise.all([
-        branchesPromise,
-        companiesPromise,
-      ]);
-
-      setBranches(Array.isArray(branchesData) ? branchesData : []);
-      setCompanies(Array.isArray(companiesData) ? companiesData : []);
-
-      if (!isSuperAdmin && currentUser?.companyId) {
-        setCompanyId(currentUser.companyId);
+      if (superAdmin) {
+        requests.push(getCompanies());
       }
+
+      const [branchesData, companiesData] = await Promise.all(requests);
+
+      setBranches(Array.isArray(branchesData) ? (branchesData as Branch[]) : []);
+      setCompanies(Array.isArray(companiesData) ? (companiesData as Company[]) : []);
     } catch {
       setError("Não foi possível carregar as filiais.");
     } finally {
@@ -74,16 +73,16 @@ export default function BranchesPage() {
   }
 
   async function handleCreate() {
+    if (!canManage) return;
+
     if (!name.trim()) {
       setError("Informe o nome da filial.");
       return;
     }
 
-    const resolvedCompanyId = isSuperAdmin
-      ? companyId
-      : currentUser?.companyId ?? "";
+    const targetCompanyId = superAdmin ? companyId : resolvedCompanyId ?? "";
 
-    if (!resolvedCompanyId) {
+    if (!targetCompanyId) {
       setError("Selecione uma empresa.");
       return;
     }
@@ -96,13 +95,12 @@ export default function BranchesPage() {
         name: name.trim(),
         code: code.trim() || undefined,
         active: true,
-        companyId: resolvedCompanyId,
+        companyId: targetCompanyId,
       });
 
       setName("");
       setCode("");
-
-      if (isSuperAdmin) {
+      if (superAdmin) {
         setCompanyId("");
       }
 
@@ -115,86 +113,103 @@ export default function BranchesPage() {
   }
 
   async function handleDeactivate(branch: Branch) {
-    const confirmed = window.confirm(
-      `Deseja desativar a filial "${branch.name}"?`,
-    );
+    if (!canManage) return;
 
+    const confirmed = window.confirm(
+      `Deseja desativar a filial "${branch.name}"?`
+    );
     if (!confirmed) return;
 
     try {
+      setProcessingId(branch.id);
       setError("");
 
       await deactivateBranch(
         branch.id,
-        isSuperAdmin ? branch.companyId : undefined,
+        superAdmin ? branch.companyId : undefined
       );
 
       await load();
     } catch {
       setError("Não foi possível desativar a filial.");
+    } finally {
+      setProcessingId(null);
     }
   }
 
   async function handleActivate(branch: Branch) {
+    if (!canManage) return;
+
     try {
+      setProcessingId(branch.id);
       setError("");
 
       await activateBranch(
         branch.id,
-        isSuperAdmin ? branch.companyId : undefined,
+        superAdmin ? branch.companyId : undefined
       );
 
       await load();
     } catch {
       setError("Não foi possível reativar a filial.");
+    } finally {
+      setProcessingId(null);
     }
   }
 
   async function handleHardDelete(branch: Branch) {
-    const confirmed = window.confirm(
-      `Excluir definitivamente a filial "${branch.name}"? Essa ação não poderá ser desfeita.`,
-    );
+    if (!canDeletePermanently) return;
 
+    const confirmed = window.confirm(
+      `Excluir definitivamente a filial "${branch.name}"? Essa ação não poderá ser desfeita.`
+    );
     if (!confirmed) return;
 
     try {
+      setProcessingId(branch.id);
       setError("");
 
       await hardDeleteBranch(
         branch.id,
-        isSuperAdmin ? branch.companyId : undefined,
+        superAdmin ? branch.companyId : undefined
       );
 
       await load();
     } catch {
       setError("Não foi possível excluir definitivamente a filial.");
+    } finally {
+      setProcessingId(null);
     }
   }
 
   useEffect(() => {
-    if (canViewBranches) {
-      load();
+    if (canView) {
+      void load();
     } else {
       setLoading(false);
     }
-  }, [canViewBranches]);
+  }, [canView, selectedCompanyId]);
 
-  if (!canViewBranches) {
+  if (!canView) {
     return (
-      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6">
-        <h1 className="text-xl font-bold text-rose-700">Acesso negado</h1>
-        <p className="mt-2 text-sm text-rose-600">
+      <section className="space-y-3">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Acesso negado
+        </h1>
+        <p className="text-slate-600">
           Você não tem permissão para acessar a página de filiais.
         </p>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Filiais</h1>
-        <p className="mt-1 text-sm text-slate-600">
+    <section className="space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Filiais
+        </h1>
+        <p className="text-slate-600">
           Gerencie as filiais da plataforma.
         </p>
       </div>
@@ -205,11 +220,15 @@ export default function BranchesPage() {
         </div>
       ) : null}
 
-      {canManageBranches ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Nova filial</h2>
+      {canManage ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 space-y-1">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Nova filial
+            </h2>
+          </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-4">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -225,12 +244,12 @@ export default function BranchesPage() {
             />
 
             <select
-              value={isSuperAdmin ? companyId : currentUser?.companyId ?? ""}
+              value={companyId}
               onChange={(e) => setCompanyId(e.target.value)}
-              disabled={!isSuperAdmin}
+              disabled={!superAdmin}
               className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500 disabled:bg-slate-100 disabled:text-slate-500"
             >
-              {isSuperAdmin ? (
+              {superAdmin ? (
                 <>
                   <option value="">Selecione a empresa</option>
                   {companies.map((company) => (
@@ -240,33 +259,33 @@ export default function BranchesPage() {
                   ))}
                 </>
               ) : (
-                <option value={currentUser?.companyId ?? ""}>Empresa atual</option>
+                <option value={resolvedCompanyId ?? ""}>Empresa atual</option>
               )}
             </select>
 
             <button
               onClick={handleCreate}
               disabled={submitting}
-              className="rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Criando..." : "Criar filial"}
             </button>
           </div>
-
-          <div className="mt-4">
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
-              />
-              Mostrar inativas
-            </label>
-          </div>
         </div>
-      ) : (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+      ) : null}
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Filiais cadastradas
+            </h2>
+            <p className="text-sm text-slate-500">
+              {visibleBranches.length} item(ns)
+            </p>
+          </div>
+
+          <label className="inline-flex items-center gap-2 text-sm text-slate-600">
             <input
               type="checkbox"
               checked={showInactive}
@@ -275,89 +294,63 @@ export default function BranchesPage() {
             Mostrar inativas
           </label>
         </div>
-      )}
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Filiais cadastradas
-          </h2>
-          <span className="text-sm text-slate-500">
-            {visibleBranches.length} item(ns)
-          </span>
-        </div>
 
         {loading ? (
-          <div className="mt-4 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Carregando filiais...
           </div>
         ) : visibleBranches.length === 0 ? (
-          <div className="mt-4 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Nenhuma filial cadastrada.
           </div>
         ) : (
-          <div className="mt-4 grid gap-4">
+          <div className="grid gap-4">
             {visibleBranches.map((branch) => {
-              const canHardDelete = isSuperAdmin;
+              const isProcessing = processingId === branch.id;
 
               return (
-                <div
+                <article
                   key={branch.id}
                   className="rounded-2xl border border-slate-200 p-5"
                 >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-1">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-2">
                       <h3 className="text-lg font-semibold text-slate-900">
                         {branch.name}
                       </h3>
 
-                      <p className="text-sm text-slate-600">
-                        Código: <span className="font-medium">{branch.code || "-"}</span>
-                      </p>
-
-                      <p className="text-sm text-slate-600">
-                        Empresa:{" "}
-                        <span className="font-medium">
-                          {branch.company?.name ?? "-"}
-                        </span>
-                      </p>
-
-                      <p className="text-sm text-slate-600">
-                        Status:{" "}
-                        <span
-                          className={
-                            branch.active
-                              ? "font-medium text-emerald-700"
-                              : "font-medium text-amber-700"
-                          }
-                        >
-                          {branch.active ? "Ativa" : "Inativa"}
-                        </span>
-                      </p>
+                      <div className="space-y-1 text-sm text-slate-600">
+                        <p>Código: {branch.code || "-"}</p>
+                        <p>Empresa: {branch.company?.name ?? "-"}</p>
+                        <p>Status: {branch.active ? "Ativa" : "Inativa"}</p>
+                      </div>
                     </div>
 
-                    {canManageBranches ? (
+                    {canManage ? (
                       <div className="flex flex-wrap gap-2">
                         {branch.active ? (
                           <button
                             onClick={() => handleDeactivate(branch)}
-                            className="rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200"
+                            disabled={isProcessing}
+                            className="rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Desativar
                           </button>
                         ) : (
                           <button
                             onClick={() => handleActivate(branch)}
-                            className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200"
+                            disabled={isProcessing}
+                            className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Reativar
                           </button>
                         )}
 
-                        {canHardDelete ? (
+                        {canDeletePermanently ? (
                           <button
                             onClick={() => handleHardDelete(branch)}
-                            className="rounded-xl bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+                            disabled={isProcessing}
+                            className="rounded-xl bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             Excluir definitivo
                           </button>
@@ -365,12 +358,12 @@ export default function BranchesPage() {
                       </div>
                     ) : null}
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }

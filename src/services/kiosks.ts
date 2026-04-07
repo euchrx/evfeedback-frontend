@@ -1,25 +1,33 @@
 import { api } from "./api";
 
+export type KioskCompany = {
+  id: string;
+  name: string;
+};
+
+export type KioskBranch = {
+  id: string;
+  name: string;
+  companyId?: string;
+};
+
 export type Kiosk = {
   id: string;
   name: string;
   token: string;
   branchId: string;
-  companyId: string;
+  companyId?: string;
   locationDescription?: string | null;
   active: boolean;
-  branch?: {
-    id: string;
-    name: string;
-    code?: string | null;
-  };
-  company?: {
-    id: string;
-    name: string;
-    active?: boolean;
-  };
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+  company?: KioskCompany;
+  branch?: KioskBranch;
+};
+
+export type GetKiosksParams = {
+  companyId?: string;
+  active?: boolean;
 };
 
 export type CreateKioskPayload = {
@@ -30,13 +38,13 @@ export type CreateKioskPayload = {
   active?: boolean;
 };
 
-export type UpdateKioskPayload = Partial<{
-  name: string;
-  branchId: string;
-  companyId: string;
-  locationDescription: string | null;
-  active: boolean;
-}>;
+export type UpdateKioskPayload = {
+  name?: string;
+  branchId?: string;
+  companyId?: string;
+  locationDescription?: string;
+  active?: boolean;
+};
 
 export async function getKiosks(companyId?: string): Promise<Kiosk[]> {
   const response = await api.get("/kiosks", {
@@ -46,10 +54,7 @@ export async function getKiosks(companyId?: string): Promise<Kiosk[]> {
   return Array.isArray(response.data) ? response.data : [];
 }
 
-export async function getKioskById(
-  id: string,
-  companyId?: string,
-): Promise<Kiosk> {
+export async function getKioskById(id: string, companyId?: string): Promise<Kiosk> {
   const response = await api.get(`/kiosks/${id}`, {
     params: companyId ? { companyId } : undefined,
   });
@@ -63,7 +68,10 @@ export async function createKiosk(payload: CreateKioskPayload) {
 }
 
 export async function updateKiosk(id: string, payload: UpdateKioskPayload) {
-  const response = await api.patch(`/kiosks/${id}`, payload);
+  const response = await api.patch(`/kiosks/${id}`, payload, {
+    params: payload.companyId ? { companyId: payload.companyId } : undefined,
+  });
+
   return response.data;
 }
 
@@ -73,7 +81,7 @@ export async function deactivateKiosk(id: string, companyId?: string) {
     {},
     {
       params: companyId ? { companyId } : undefined,
-    },
+    }
   );
 
   return response.data;
@@ -85,7 +93,7 @@ export async function activateKiosk(id: string, companyId?: string) {
     {},
     {
       params: companyId ? { companyId } : undefined,
-    },
+    }
   );
 
   return response.data;
@@ -97,7 +105,7 @@ export async function regenerateKioskToken(id: string, companyId?: string) {
     {},
     {
       params: companyId ? { companyId } : undefined,
-    },
+    }
   );
 
   return response.data;

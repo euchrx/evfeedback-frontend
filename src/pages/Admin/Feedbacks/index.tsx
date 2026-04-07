@@ -1,21 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { getStoredUser } from "../../../services/auth";
-import { getCompanies, type Company } from "../../../services/companies";
-import { getBranches, type Branch } from "../../../services/branches";
-import { getKiosks, type Kiosk } from "../../../services/kiosks";
 import {
   getFeedbacks,
   type FeedbackFilters,
   type FeedbackItem,
 } from "../../../services/feedbacks";
-
-type StoredUser = {
-  id: string;
-  name: string;
-  email: string;
-  role: "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
-  companyId?: string | null;
-};
+import { getBranches, type Branch } from "../../../services/branches";
+import { getKiosks, type Kiosk } from "../../../services/kiosks";
+import { getCompanies, type Company } from "../../../services/companies";
+import { getStoredUser } from "../../../services/auth";
+import {
+  canViewOperationalModules,
+  getResolvedCompanyId,
+  isSuperAdmin,
+} from "../../../utils/permissions";
 
 function getRatingLabel(rating: number) {
   switch (rating) {
@@ -34,23 +31,6 @@ function getRatingLabel(rating: number) {
   }
 }
 
-function getRatingBadgeClass(rating: number) {
-  switch (rating) {
-    case 1:
-      return "bg-rose-100 text-rose-700";
-    case 2:
-      return "bg-orange-100 text-orange-700";
-    case 3:
-      return "bg-amber-100 text-amber-700";
-    case 4:
-      return "bg-emerald-100 text-emerald-700";
-    case 5:
-      return "bg-sky-100 text-sky-700";
-    default:
-      return "bg-slate-100 text-slate-700";
-  }
-}
-
 function formatDate(value: string) {
   const date = new Date(value);
 
@@ -65,22 +45,22 @@ function formatDate(value: string) {
 }
 
 export default function FeedbacksPage() {
-  const currentUser = getStoredUser() as StoredUser | null;
+  const currentUser = getStoredUser();
 
-  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
-  const isCompanyAdmin = currentUser?.role === "COMPANY_ADMIN";
-  const isManager = currentUser?.role === "MANAGER";
-  const canViewFeedbacks = isSuperAdmin || isCompanyAdmin || isManager;
+  const canView = canViewOperationalModules(currentUser);
+  const superAdmin = isSuperAdmin(currentUser);
+  const resolvedCompanyId = getResolvedCompanyId(currentUser);
 
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
+  const [companies, setCompanies] = useState<Company[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [filters, setFilters] = useState<FeedbackFilters>({
-    companyId: "",
+    companyId: resolvedCompanyId ?? "",
     branchId: "",
     kioskId: "",
     rating: "",
@@ -89,69 +69,67 @@ export default function FeedbacksPage() {
     active: "",
   });
 
-  const filteredBranches = useMemo(() => {
-    if (!isSuperAdmin) return branches;
-    if (!filters.companyId) return branches;
-    return branches.filter((branch) => branch.companyId === filters.companyId);
-  }, [branches, filters.companyId, isSuperAdmin]);
+  const selectedCompanyId = useMemo(() => {
+    return superAdmin ? filters.companyId || undefined : resolvedCompanyId;
+  }, [superAdmin, filters.companyId, resolvedCompanyId]);
 
-  const filteredKiosks = useMemo(() => {
-    if (!isSuperAdmin) return kiosks;
-
-    let result = kiosks;
-
-    if (filters.companyId) {
-      result = result.filter((kiosk) => kiosk.companyId === filters.companyId);
+  useEffect(() => {
+    if (!canView) {
+      setLoading(false);
+      return;
     }
 
-    if (filters.branchId) {
-      result = result.filter((kiosk) => kiosk.branchId === filters.branchId);
-    }
+    void loadDependencies();
+  }, [canView, selectedCompanyId]);
 
-    return result;
-  }, [kiosks, filters.companyId, filters.branchId, isSuperAdmin]);
+  useEffect(() => {
+    if (!canView) return;
 
-  function handleChangeFilter<K extends keyof FeedbackFilters>(
-    field: K,
-    value: FeedbackFilters[K],
-  ) {
-    setFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  }
+    void loadFeedbacks(filters);
+  }, [canView]);
 
   async function loadDependencies() {
-    const scopeCompanyId = isSuperAdmin
-      ? undefined
-      : currentUser?.companyId ?? undefined;
+    try {
+      setError("");
 
-    const companiesPromise = isSuperAdmin ? getCompanies() : Promise.resolve([]);
-    const branchesPromise = getBranches(scopeCompanyId);
-    const kiosksPromise = getKiosks(scopeCompanyId);
+      const requests: Promise<unknown>[] = [
+        getBranches(selectedCompanyId),
+        getKiosks(selectedCompanyId),
+      ];
 
-    const [companiesData, branchesData, kiosksData] = await Promise.all([
-      companiesPromise,
-      branchesPromise,
-      kiosksPromise,
-    ]);
+      if (superAdmin) {
+        requests.unshift(getCompanies());
+      }
 
-    setCompanies(Array.isArray(companiesData) ? companiesData : []);
-    setBranches(Array.isArray(branchesData) ? branchesData : []);
-    setKiosks(Array.isArray(kiosksData) ? kiosksData : []);
+      const results = await Promise.all(requests);
+
+      if (superAdmin) {
+        const [companiesData, branchesData, kiosksData] = results;
+        setCompanies(Array.isArray(companiesData) ? (companiesData as Company[]) : []);
+        setBranches(Array.isArray(branchesData) ? (branchesData as Branch[]) : []);
+        setKiosks(Array.isArray(kiosksData) ? (kiosksData as Kiosk[]) : []);
+      } else {
+        const [branchesData, kiosksData] = results;
+        setBranches(Array.isArray(branchesData) ? (branchesData as Branch[]) : []);
+        setKiosks(Array.isArray(kiosksData) ? (kiosksData as Kiosk[]) : []);
+      }
+    } catch {
+      setError("Não foi possível carregar os filtros auxiliares.");
+      setCompanies([]);
+      setBranches([]);
+      setKiosks([]);
+    }
   }
 
   async function loadFeedbacks(customFilters?: FeedbackFilters) {
     try {
-      setError("");
       setLoading(true);
+      setError("");
 
       const finalFilters = customFilters ?? filters;
 
       const sanitizedFilters: FeedbackFilters = {
-        companyId: isSuperAdmin
-          ? finalFilters.companyId || undefined
-          : currentUser?.companyId ?? undefined,
+        companyId: superAdmin ? finalFilters.companyId || undefined : resolvedCompanyId,
         branchId: finalFilters.branchId || undefined,
         kioskId: finalFilters.kioskId || undefined,
         rating: finalFilters.rating || undefined,
@@ -170,35 +148,29 @@ export default function FeedbacksPage() {
     }
   }
 
-  async function initialLoad() {
-    try {
-      await loadDependencies();
-
-      const initialFilters: FeedbackFilters = {
-        companyId: isSuperAdmin ? "" : currentUser?.companyId ?? "",
-        branchId: "",
-        kioskId: "",
-        rating: "",
-        startDate: "",
-        endDate: "",
-        active: "",
-      };
-
-      setFilters(initialFilters);
-      await loadFeedbacks(initialFilters);
-    } catch {
-      setError("Não foi possível carregar os dados da página.");
-      setLoading(false);
-    }
+  function handleChangeFilter<K extends keyof FeedbackFilters>(
+    field: K,
+    value: FeedbackFilters[K]
+  ) {
+    setFilters((prev) => ({
+      ...prev,
+      [field]: value,
+      ...(field === "companyId"
+        ? {
+            branchId: "",
+            kioskId: "",
+          }
+        : {}),
+    }));
   }
 
   function handleApplyFilters() {
-    loadFeedbacks(filters);
+    void loadFeedbacks(filters);
   }
 
   function handleClearFilters() {
     const cleared: FeedbackFilters = {
-      companyId: isSuperAdmin ? "" : currentUser?.companyId ?? "",
+      companyId: superAdmin ? "" : resolvedCompanyId ?? "",
       branchId: "",
       kioskId: "",
       rating: "",
@@ -208,51 +180,30 @@ export default function FeedbacksPage() {
     };
 
     setFilters(cleared);
-    loadFeedbacks(cleared);
+    void loadDependencies();
+    void loadFeedbacks(cleared);
   }
 
-  useEffect(() => {
-    if (canViewFeedbacks) {
-      initialLoad();
-    } else {
-      setLoading(false);
-    }
-  }, [canViewFeedbacks]);
-
-  useEffect(() => {
-    if (isSuperAdmin && filters.branchId) {
-      const exists = filteredBranches.some((branch) => branch.id === filters.branchId);
-      if (!exists) {
-        setFilters((prev) => ({ ...prev, branchId: "" }));
-      }
-    }
-  }, [filteredBranches, filters.branchId, isSuperAdmin]);
-
-  useEffect(() => {
-    if (isSuperAdmin && filters.kioskId) {
-      const exists = filteredKiosks.some((kiosk) => kiosk.id === filters.kioskId);
-      if (!exists) {
-        setFilters((prev) => ({ ...prev, kioskId: "" }));
-      }
-    }
-  }, [filteredKiosks, filters.kioskId, isSuperAdmin]);
-
-  if (!canViewFeedbacks) {
+  if (!canView) {
     return (
-      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6">
-        <h1 className="text-xl font-bold text-rose-700">Acesso negado</h1>
-        <p className="mt-2 text-sm text-rose-600">
+      <section className="space-y-3">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Acesso negado
+        </h1>
+        <p className="text-slate-600">
           Você não tem permissão para acessar a página de feedbacks.
         </p>
-      </div>
+      </section>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Feedbacks</h1>
-        <p className="mt-1 text-sm text-slate-600">
+    <section className="space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Feedbacks
+        </h1>
+        <p className="text-slate-600">
           Acompanhe as avaliações enviadas pelos clientes.
         </p>
       </div>
@@ -263,18 +214,20 @@ export default function FeedbacksPage() {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Filtros</h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Refine os resultados por empresa, filial, kiosk, nota e período.
-        </p>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 space-y-1">
+          <h2 className="text-xl font-semibold text-slate-900">Filtros</h2>
+          <p className="text-sm text-slate-500">
+            Refine os resultados por empresa, nota, filial, kiosk, período e status.
+          </p>
+        </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {isSuperAdmin ? (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {superAdmin ? (
             <select
               value={filters.companyId ?? ""}
               onChange={(e) => handleChangeFilter("companyId", e.target.value)}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
             >
               <option value="">Todas as empresas</option>
               {companies.map((company) => (
@@ -286,35 +239,9 @@ export default function FeedbacksPage() {
           ) : null}
 
           <select
-            value={filters.branchId ?? ""}
-            onChange={(e) => handleChangeFilter("branchId", e.target.value)}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            <option value="">Todas as filiais</option>
-            {filteredBranches.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={filters.kioskId ?? ""}
-            onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            <option value="">Todos os kiosks</option>
-            {filteredKiosks.map((kiosk) => (
-              <option key={kiosk.id} value={kiosk.id}>
-                {kiosk.name}
-              </option>
-            ))}
-          </select>
-
-          <select
             value={filters.rating ?? ""}
             onChange={(e) => handleChangeFilter("rating", e.target.value)}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
           >
             <option value="">Todas as notas</option>
             <option value="1">1 - Péssimo</option>
@@ -324,158 +251,176 @@ export default function FeedbacksPage() {
             <option value="5">5 - Excelente</option>
           </select>
 
+          <select
+            value={filters.branchId ?? ""}
+            onChange={(e) => handleChangeFilter("branchId", e.target.value)}
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+          >
+            <option value="">Todas as filiais</option>
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filters.kioskId ?? ""}
+            onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+          >
+            <option value="">Todos os kiosks</option>
+            {kiosks.map((kiosk) => (
+              <option key={kiosk.id} value={kiosk.id}>
+                {kiosk.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filters.active ?? ""}
+            onChange={(e) => handleChangeFilter("active", e.target.value)}
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+          >
+            <option value="">Todos os status</option>
+            <option value="true">Ativos</option>
+            <option value="false">Inativos</option>
+          </select>
+
           <input
             type="date"
             value={filters.startDate ?? ""}
             onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
           />
 
           <input
             type="date"
             value={filters.endDate ?? ""}
             onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
           />
 
-          <select
-            value={filters.active ?? ""}
-            onChange={(e) => handleChangeFilter("active", e.target.value)}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            <option value="">Ativos e inativos</option>
-            <option value="true">Somente ativos</option>
-            <option value="false">Somente inativos</option>
-          </select>
-        </div>
+          <div className="flex gap-3">
+            <button
+              onClick={handleApplyFilters}
+              className="w-full rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
+            >
+              Aplicar filtros
+            </button>
 
-        <div className="mt-4 flex flex-wrap gap-3">
-          <button
-            onClick={handleApplyFilters}
-            className="rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-          >
-            Aplicar filtros
-          </button>
-
-          <button
-            onClick={handleClearFilters}
-            className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-800 transition hover:bg-slate-200"
-          >
-            Limpar filtros
-          </button>
+            <button
+              onClick={handleClearFilters}
+              className="w-full rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
+            >
+              Limpar
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-900">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 space-y-1">
+          <h2 className="text-xl font-semibold text-slate-900">
             Lista de feedbacks
           </h2>
-          <span className="text-sm text-slate-500">
-            {feedbacks.length} item(ns)
-          </span>
+          <p className="text-sm text-slate-500">
+            {loading ? "Carregando..." : `${feedbacks.length} item(ns)`}
+          </p>
         </div>
 
         {loading ? (
-          <div className="mt-4 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Carregando feedbacks...
           </div>
         ) : feedbacks.length === 0 ? (
-          <div className="mt-4 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Nenhum feedback encontrado.
           </div>
         ) : (
-          <div className="mt-4 grid gap-4">
+          <div className="grid gap-4">
             {feedbacks.map((feedback) => (
-              <div
+              <article
                 key={feedback.id}
                 className="rounded-2xl border border-slate-200 p-5"
               >
-                <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${getRatingBadgeClass(
-                          feedback.rating,
-                        )}`}
-                      >
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="rounded-full bg-sky-100 px-3 py-1 text-sm font-semibold text-sky-700">
                         {getRatingLabel(feedback.rating)}
                       </span>
 
-                      <span className="text-xs text-slate-500">
+                      <span className="text-sm text-slate-500">
                         {formatDate(feedback.createdAt)}
                       </span>
                     </div>
 
-                    <p className="text-sm text-slate-600">
-                      Empresa:{" "}
-                      <span className="font-medium">
-                        {feedback.company?.name ?? "-"}
-                      </span>
-                    </p>
+                    <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
+                      {superAdmin ? (
+                        <p>
+                          <span className="font-medium text-slate-800">Empresa:</span>{" "}
+                          {feedback.company?.name ?? "Não informada"}
+                        </p>
+                      ) : null}
 
-                    <p className="text-sm text-slate-600">
-                      Kiosk:{" "}
-                      <span className="font-medium">
+                      <p>
+                        <span className="font-medium text-slate-800">Kiosk:</span>{" "}
                         {feedback.kiosk?.name ?? "Não informado"}
-                      </span>
-                    </p>
-
-                    <p className="text-sm text-slate-600">
-                      Filial:{" "}
-                      <span className="font-medium">
-                        {feedback.branch?.name ?? "Não informada"}
-                      </span>
-                    </p>
-
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Comentário
                       </p>
-                      <p className="mt-1 text-sm text-slate-700">
-                        {feedback.comment?.trim()
-                          ? feedback.comment
-                          : "Sem comentário."}
+
+                      <p>
+                        <span className="font-medium text-slate-800">Filial:</span>{" "}
+                        {feedback.branch?.name ?? "Não informada"}
+                      </p>
+
+                      <p>
+                        <span className="font-medium text-slate-800">Status:</span>{" "}
+                        {feedback.active === false ? "Inativo" : "Ativo"}
                       </p>
                     </div>
 
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Tags
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-slate-800">Comentário</p>
+                      <p className="text-sm text-slate-600">
+                        {feedback.comment?.trim() ? feedback.comment : "Sem comentário."}
                       </p>
+                    </div>
 
-                      {(feedback.tags ?? []).length > 0 ? (
-                        <div className="mt-2 flex flex-wrap gap-2">
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-slate-800">Tags</p>
+
+                      {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
                           {feedback.tags!.map((item) => (
                             <span
                               key={item.id}
                               className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-                              style={{
-                                backgroundColor: item.tag?.color ?? undefined,
-                                color: item.tag?.color ? "#ffffff" : undefined,
-                              }}
                             >
                               {item.tag?.name ?? "Tag"}
                             </span>
                           ))}
                         </div>
                       ) : (
-                        <p className="mt-1 text-sm text-slate-600">Sem tags.</p>
+                        <p className="text-sm text-slate-500">Sem tags.</p>
                       )}
                     </div>
                   </div>
 
-                  <div>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
-                      Nota {feedback.rating}
-                    </span>
+                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-center">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                      Nota
+                    </p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {feedback.rating}
+                    </p>
                   </div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }

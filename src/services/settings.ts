@@ -40,14 +40,14 @@ export async function getMySettings(): Promise<CompanySettings> {
 }
 
 export async function updateMySettings(
-  payload: UpdateCompanySettingsInput,
+  payload: UpdateCompanySettingsInput
 ): Promise<CompanySettings> {
   const response = await api.patch("/settings/me", payload);
   return response.data;
 }
 
 export async function getCompanySettings(
-  companyId: string,
+  companyId: string
 ): Promise<CompanySettings> {
   const response = await api.get(`/settings/company/${companyId}`);
   return response.data;
@@ -55,7 +55,7 @@ export async function getCompanySettings(
 
 export async function updateCompanySettings(
   companyId: string,
-  payload: UpdateCompanySettingsInput,
+  payload: UpdateCompanySettingsInput
 ): Promise<CompanySettings> {
   const response = await api.patch(`/settings/company/${companyId}`, payload);
   return response.data;

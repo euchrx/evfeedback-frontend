@@ -7,7 +7,6 @@ export type FeedbackTagItem = {
   tag?: {
     id: string;
     name: string;
-    color?: string | null;
   } | null;
 };
 
@@ -16,11 +15,10 @@ export type FeedbackItem = {
   rating: number;
   comment?: string | null;
   active?: boolean;
-  companyId?: string;
-  branchId?: string | null;
-  kioskId?: string | null;
   createdAt: string;
-  updatedAt?: string;
+  companyId?: string;
+  branchId?: string;
+  kioskId?: string;
   company?: {
     id: string;
     name: string;
@@ -47,7 +45,7 @@ export type FeedbackFilters = {
 };
 
 export async function getFeedbacks(
-  filters?: FeedbackFilters,
+  filters?: FeedbackFilters
 ): Promise<FeedbackItem[]> {
   const response = await api.get("/feedbacks", {
     params: filters,
@@ -58,7 +56,7 @@ export async function getFeedbacks(
 
 export async function getFeedbackById(
   id: string,
-  companyId?: string,
+  companyId?: string
 ): Promise<FeedbackItem> {
   const response = await api.get(`/feedbacks/${id}`, {
     params: companyId ? { companyId } : undefined,

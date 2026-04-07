@@ -1,50 +1,49 @@
 import { api } from "./api";
 
+export type TagCompany = {
+  id: string;
+  name: string;
+};
+
 export type Tag = {
   id: string;
   name: string;
   color?: string | null;
-  active: boolean;
-  companyId: string;
-  company?: {
-    id: string;
-    name: string;
-    active?: boolean;
-  };
-  createdAt: string;
-  updatedAt: string;
+  active?: boolean;
+  companyId?: string;
+  company?: TagCompany;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
-export type CreateTagPayload = {
-  name: string;
-  color?: string;
+export type GetTagsParams = {
   companyId?: string;
   active?: boolean;
 };
 
-export type UpdateTagPayload = Partial<{
+export type CreateTagPayload = {
   name: string;
-  color: string | null;
-  active: boolean;
-  companyId: string;
-}>;
+  color?: string | null;
+  active?: boolean;
+  companyId?: string;
+};
 
-export async function getTags(companyId?: string): Promise<Tag[]> {
-  const response = await api.get("/tags", {
-    params: companyId ? { companyId } : undefined,
-  });
+export type UpdateTagPayload = {
+  name?: string;
+  color?: string | null;
+  active?: boolean;
+  companyId?: string;
+};
 
+export async function getTags(params?: GetTagsParams): Promise<Tag[]> {
+  const response = await api.get("/tags", { params });
   return Array.isArray(response.data) ? response.data : [];
 }
 
-export async function getTagById(
-  id: string,
-  companyId?: string,
-): Promise<Tag> {
+export async function getTagById(id: string, companyId?: string): Promise<Tag> {
   const response = await api.get(`/tags/${id}`, {
     params: companyId ? { companyId } : undefined,
   });
-
   return response.data;
 }
 
@@ -54,7 +53,9 @@ export async function createTag(payload: CreateTagPayload) {
 }
 
 export async function updateTag(id: string, payload: UpdateTagPayload) {
-  const response = await api.patch(`/tags/${id}`, payload);
+  const response = await api.patch(`/tags/${id}`, payload, {
+    params: payload.companyId ? { companyId: payload.companyId } : undefined,
+  });
   return response.data;
 }
 
@@ -64,9 +65,8 @@ export async function deactivateTag(id: string, companyId?: string) {
     {},
     {
       params: companyId ? { companyId } : undefined,
-    },
+    }
   );
-
   return response.data;
 }
 
@@ -76,9 +76,8 @@ export async function activateTag(id: string, companyId?: string) {
     {},
     {
       params: companyId ? { companyId } : undefined,
-    },
+    }
   );
-
   return response.data;
 }
 
@@ -86,6 +85,5 @@ export async function hardDeleteTag(id: string, companyId?: string) {
   const response = await api.delete(`/tags/${id}`, {
     params: companyId ? { companyId } : undefined,
   });
-
   return response.data;
 }

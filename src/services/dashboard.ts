@@ -26,17 +26,12 @@ export type DashboardSummary = {
 export type BranchDashboardItem = {
   id: string;
   name: string;
-  companyId?: string;
-  company?: {
-    id: string;
-    name: string;
-  } | null;
   totalFeedbacks: number;
   averageRating: number;
 };
 
 export async function getDashboardSummary(
-  filters?: DashboardFilters,
+  filters?: DashboardFilters
 ): Promise<DashboardSummary> {
   const response = await api.get("/dashboard/summary", {
     params: filters,
@@ -53,7 +48,7 @@ export async function getDashboardSummary(
 }
 
 export async function getDashboardByBranch(
-  filters?: DashboardFilters,
+  filters?: DashboardFilters
 ): Promise<BranchDashboardItem[]> {
   const response = await api.get("/dashboard/by-branch", {
     params: filters,
