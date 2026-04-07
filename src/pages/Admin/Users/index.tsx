@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCompanies, type Company } from "../../../services/companies";
+import { getStoredUser } from "../../../services/auth";
 import {
   createUserGlobal,
   deleteUserGlobal,
@@ -7,56 +8,107 @@ import {
   type UserItem,
 } from "../../../services/users";
 
+type UserRole = "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER";
+
 export default function UsersPage() {
+  const currentUser = getStoredUser();
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+
   const [users, setUsers] = useState<UserItem[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER">("SUPER_ADMIN");
+  const [role, setRole] = useState<UserRole>("COMPANY_ADMIN");
   const [companyId, setCompanyId] = useState("");
 
-  async function load() {
-    const [usersData, companiesData] = await Promise.all([
-      getUsersGlobal(),
-      getCompanies(),
-    ]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-    setUsers(Array.isArray(usersData) ? usersData : []);
-    setCompanies(Array.isArray(companiesData) ? companiesData : []);
+  async function load() {
+    try {
+      setError("");
+      setLoading(true);
+
+      const [usersData, companiesData] = await Promise.all([
+        getUsersGlobal(),
+        getCompanies(),
+      ]);
+
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      setCompanies(Array.isArray(companiesData) ? companiesData : []);
+    } catch {
+      setError("Não foi possível carregar os dados da página.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleCreate() {
-    if (!name.trim() || !email.trim() || !password.trim() || !companyId) return;
+    if (!name.trim() || !email.trim() || !password.trim() || !companyId) {
+      setError("Preencha nome, e-mail, senha e empresa.");
+      return;
+    }
 
-    await createUserGlobal({
-      name: name.trim(),
-      email: email.trim(),
-      password,
-      role,
-      companyId,
-    });
+    try {
+      setSubmitting(true);
+      setError("");
 
-    setName("");
-    setEmail("");
-    setPassword("");
-    setRole("SUPER_ADMIN");
-    setCompanyId("");
-    await load();
+      await createUserGlobal({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+        role,
+        companyId,
+      });
+
+      setName("");
+      setEmail("");
+      setPassword("");
+      setRole("COMPANY_ADMIN");
+      setCompanyId("");
+
+      await load();
+    } catch {
+      setError("Não foi possível criar o usuário.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function handleDelete(id: string) {
     const confirmed = window.confirm("Deseja desativar este usuário?");
     if (!confirmed) return;
 
-    await deleteUserGlobal(id);
-    await load();
+    try {
+      setError("");
+      await deleteUserGlobal(id);
+      await load();
+    } catch {
+      setError("Não foi possível desativar o usuário.");
+    }
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    if (isSuperAdmin) {
+      load();
+    } else {
+      setLoading(false);
+    }
+  }, [isSuperAdmin]);
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-bold text-slate-900">Acesso negado</h1>
+        <p className="mt-2 text-sm text-slate-500">
+          Apenas SUPER_ADMIN pode acessar a página de usuários.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -66,6 +118,12 @@ export default function UsersPage() {
           Gerencie os usuários da plataforma.
         </p>
       </div>
+
+      {error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
+        </div>
+      ) : null}
 
       <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
@@ -93,7 +151,7 @@ export default function UsersPage() {
 
           <select
             value={role}
-            onChange={(e) => setRole(e.target.value as "SUPER_ADMIN" | "COMPANY_ADMIN" | "MANAGER")}
+            onChange={(e) => setRole(e.target.value as UserRole)}
             className="rounded-xl border border-slate-300 px-4 py-3 bg-white"
           >
             <option value="SUPER_ADMIN">SUPER_ADMIN</option>
@@ -117,44 +175,49 @@ export default function UsersPage() {
 
         <button
           onClick={handleCreate}
-          className="rounded-xl bg-sky-500 hover:bg-sky-400 px-5 py-3 font-semibold text-slate-950"
+          disabled={submitting}
+          className="rounded-xl bg-sky-500 hover:bg-sky-400 disabled:opacity-60 px-5 py-3 font-semibold text-slate-950"
         >
-          Criar usuário
+          {submitting ? "Criando..." : "Criar usuário"}
         </button>
       </section>
 
       <section className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <div className="space-y-4">
-          {users.length === 0 ? (
-            <div className="text-slate-500">Nenhum usuário cadastrado.</div>
-          ) : (
-            users.map((user) => (
-              <div
-                key={user.id}
-                className="rounded-2xl border border-slate-200 p-4 flex items-center justify-between gap-4"
-              >
-                <div>
-                  <h3 className="font-semibold text-slate-900">{user.name}</h3>
-                  <p className="text-sm text-slate-500">{user.email}</p>
-                  <p className="text-sm text-slate-500">Role: {user.role}</p>
-                  <p className="text-sm text-slate-500">
-                    Empresa: {user.company?.name ?? "-"}
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    Status: {user.active ? "Ativo" : "Inativo"}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => handleDelete(user.id)}
-                  className="rounded-xl bg-rose-50 hover:bg-rose-100 px-4 py-2 text-sm font-medium text-rose-700"
+        {loading ? (
+          <div className="text-slate-500">Carregando usuários...</div>
+        ) : (
+          <div className="space-y-4">
+            {users.length === 0 ? (
+              <div className="text-slate-500">Nenhum usuário cadastrado.</div>
+            ) : (
+              users.map((user) => (
+                <div
+                  key={user.id}
+                  className="rounded-2xl border border-slate-200 p-4 flex items-center justify-between gap-4"
                 >
-                  Desativar
-                </button>
-              </div>
-            ))
-          )}
-        </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900">{user.name}</h3>
+                    <p className="text-sm text-slate-500">{user.email}</p>
+                    <p className="text-sm text-slate-500">Role: {user.role}</p>
+                    <p className="text-sm text-slate-500">
+                      Empresa: {user.company?.name ?? "-"}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      Status: {user.active ? "Ativo" : "Inativo"}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => handleDelete(user.id)}
+                    className="rounded-xl bg-rose-50 hover:bg-rose-100 px-4 py-2 text-sm font-medium text-rose-700"
+                  >
+                    Desativar
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </section>
     </div>
   );

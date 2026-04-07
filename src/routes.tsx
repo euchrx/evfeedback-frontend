@@ -7,6 +7,7 @@ import FeedbacksPage from "./pages/Admin/Feedbacks";
 import BranchesPage from "./pages/Admin/Branches";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import { PrivateRoute } from "./routes/PrivateRoute";
+import { RoleRoute } from "./routes/RoleRoute";
 import TagsPage from "./pages/Admin/Tags";
 import SettingsPage from "./pages/Admin/Settings";
 import CompaniesPage from "./pages/Admin/Companies";
@@ -28,9 +29,12 @@ export function AppRoutes() {
             <Route path="feedbacks" element={<FeedbacksPage />} />
             <Route path="branches" element={<BranchesPage />} />
             <Route path="tags" element={<TagsPage />} />
-            <Route path="companies" element={<CompaniesPage />} />
-            <Route path="users" element={<UsersPage />} />
             <Route path="settings" element={<SettingsPage />} />
+
+            <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
+              <Route path="companies" element={<CompaniesPage />} />
+              <Route path="users" element={<UsersPage />} />
+            </Route>
           </Route>
         </Route>
 
