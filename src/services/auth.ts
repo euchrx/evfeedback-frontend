@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { removeAuthToken, saveAuthToken } from "./authToken";
 import type { AuthUser } from "../utils/permissions";
 
 export type LoginPayload = {
@@ -11,7 +12,6 @@ export type LoginResponse = {
   user: AuthUser;
 };
 
-const TOKEN_KEY = "evfeedback_token";
 const USER_KEY = "evfeedback_user";
 
 export async function login(payload: LoginPayload) {
@@ -19,7 +19,7 @@ export async function login(payload: LoginPayload) {
   const data = response.data as LoginResponse;
 
   if (data?.access_token) {
-    localStorage.setItem(TOKEN_KEY, data.access_token);
+    saveAuthToken(data.access_token);
   }
 
   if (data?.user) {
@@ -40,7 +40,7 @@ export async function fetchMe() {
 }
 
 export function getAuthToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  return localStorage.getItem("evfeedback_token");
 }
 
 export function getStoredUser(): AuthUser | null {
@@ -59,6 +59,6 @@ export function isAuthenticated() {
 }
 
 export function logout() {
-  localStorage.removeItem(TOKEN_KEY);
+  removeAuthToken();
   localStorage.removeItem(USER_KEY);
 }

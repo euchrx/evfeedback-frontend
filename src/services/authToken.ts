@@ -1,4 +1,4 @@
-const AUTH_TOKEN_KEY = "evfeedback_auth_token";
+const AUTH_TOKEN_KEY = "evfeedback_token";
 
 export function saveAuthToken(token: string) {
   localStorage.setItem(AUTH_TOKEN_KEY, token);

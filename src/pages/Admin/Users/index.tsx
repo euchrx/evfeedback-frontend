@@ -22,9 +22,11 @@ export default function UsersPage() {
 
   const superAdmin = isSuperAdmin(currentUser);
   const canManageUsers = canAccessUsers(currentUser);
+  const canDeletePermanently = canHardDelete(currentUser);
 
   const [users, setUsers] = useState<UserItem[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,12 +36,17 @@ export default function UsersPage() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const visibleUsers = useMemo(() => {
     if (showInactive) return users;
     return users.filter((user) => user.active);
   }, [users, showInactive]);
+
+  const availableRoles: UserRole[] = superAdmin
+    ? ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"]
+    : ["COMPANY_ADMIN", "MANAGER"];
 
   async function load() {
     try {
@@ -48,12 +55,9 @@ export default function UsersPage() {
 
       const resolvedCompanyId = getResolvedCompanyId(currentUser);
 
-      const usersPromise = getUsers(resolvedCompanyId);
-      const companiesPromise = superAdmin ? getCompanies() : Promise.resolve([]);
-
       const [usersData, companiesData] = await Promise.all([
-        usersPromise,
-        companiesPromise,
+        getUsers(resolvedCompanyId),
+        superAdmin ? getCompanies() : Promise.resolve([]),
       ]);
 
       setUsers(Array.isArray(usersData) ? usersData : []);
@@ -116,55 +120,59 @@ export default function UsersPage() {
 
   async function handleDeactivate(user: UserItem) {
     const confirmed = window.confirm(
-      `Deseja desativar o usuário "${user.name}"?`,
+      `Deseja desativar o usuário "${user.name}"?`
     );
-
     if (!confirmed) return;
 
     try {
+      setProcessingId(user.id);
       setError("");
 
       await deactivateUser(user.id, superAdmin ? user.companyId : undefined);
-
       await load();
     } catch {
       setError("Não foi possível desativar o usuário.");
+    } finally {
+      setProcessingId(null);
     }
   }
 
   async function handleActivate(user: UserItem) {
     try {
+      setProcessingId(user.id);
       setError("");
 
       await activateUser(user.id, superAdmin ? user.companyId : undefined);
-
       await load();
     } catch {
       setError("Não foi possível reativar o usuário.");
+    } finally {
+      setProcessingId(null);
     }
   }
 
   async function handleHardDelete(user: UserItem) {
     const confirmed = window.confirm(
-      `Excluir definitivamente o usuário "${user.name}"? Essa ação não poderá ser desfeita.`,
+      `Excluir definitivamente o usuário "${user.name}"? Essa ação não poderá ser desfeita.`
     );
-
     if (!confirmed) return;
 
     try {
+      setProcessingId(user.id);
       setError("");
 
       await hardDeleteUser(user.id, superAdmin ? user.companyId : undefined);
-
       await load();
     } catch {
       setError("Não foi possível excluir definitivamente o usuário.");
+    } finally {
+      setProcessingId(null);
     }
   }
 
   useEffect(() => {
     if (canManageUsers) {
-      load();
+      void load();
     } else {
       setLoading(false);
     }
@@ -172,24 +180,24 @@ export default function UsersPage() {
 
   if (!canManageUsers) {
     return (
-      <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6">
-        <h1 className="text-xl font-bold text-rose-700">Acesso negado</h1>
-        <p className="mt-2 text-sm text-rose-600">
+      <section className="space-y-3">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Acesso negado
+        </h1>
+        <p className="text-slate-600">
           Apenas SUPER_ADMIN e COMPANY_ADMIN podem acessar a página de usuários.
         </p>
-      </div>
+      </section>
     );
   }
 
-  const availableRoles: UserRole[] = superAdmin
-    ? ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"]
-    : ["COMPANY_ADMIN", "MANAGER"];
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Usuários</h1>
-        <p className="mt-1 text-sm text-slate-600">
+    <section className="space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+          Usuários
+        </h1>
+        <p className="text-slate-600">
           Gerencie os usuários da plataforma.
         </p>
       </div>
@@ -200,10 +208,14 @@ export default function UsersPage() {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Novo usuário</h2>
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 space-y-1">
+          <h2 className="text-xl font-semibold text-slate-900">
+            Novo usuário
+          </h2>
+        </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-5">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -239,7 +251,7 @@ export default function UsersPage() {
           </select>
 
           <select
-            value={superAdmin ? companyId : currentUser?.companyId ?? ""}
+            value={companyId}
             onChange={(e) => setCompanyId(e.target.value)}
             disabled={!superAdmin}
             className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500 disabled:bg-slate-100 disabled:text-slate-500"
@@ -259,16 +271,29 @@ export default function UsersPage() {
           </select>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className="mt-4">
           <button
             onClick={handleCreate}
             disabled={submitting}
-            className="rounded-xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? "Criando..." : "Criar usuário"}
           </button>
+        </div>
+      </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-600">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">
+              Usuários cadastrados
+            </h2>
+            <p className="text-sm text-slate-500">
+              {visibleUsers.length} item(ns)
+            </p>
+          </div>
+
+          <label className="inline-flex items-center gap-2 text-sm text-slate-600">
             <input
               type="checkbox"
               checked={showInactive}
@@ -277,78 +302,55 @@ export default function UsersPage() {
             Mostrar inativos
           </label>
         </div>
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Usuários cadastrados
-          </h2>
-          <span className="text-sm text-slate-500">
-            {visibleUsers.length} item(ns)
-          </span>
-        </div>
 
         {loading ? (
-          <div className="mt-4 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Carregando usuários...
           </div>
         ) : visibleUsers.length === 0 ? (
-          <div className="mt-4 rounded-xl bg-slate-50 px-4 py-6 text-sm text-slate-600">
+          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Nenhum usuário cadastrado.
           </div>
         ) : (
-          <div className="mt-4 grid gap-4">
+          <div className="grid gap-4">
             {visibleUsers.map((user) => {
-              const canDelete = canHardDelete(currentUser) && currentUser?.id !== user.id;
+              const isProcessing = processingId === user.id;
+              const canDelete =
+                canDeletePermanently && currentUser?.id !== user.id;
 
               return (
-                <div
+                <article
                   key={user.id}
                   className="rounded-2xl border border-slate-200 p-5"
                 >
-                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                    <div className="space-y-1">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-2">
                       <h3 className="text-lg font-semibold text-slate-900">
                         {user.name}
                       </h3>
 
-                      <p className="text-sm text-slate-600">{user.email}</p>
-                      <p className="text-sm text-slate-600">
-                        Role: <span className="font-medium">{user.role}</span>
-                      </p>
-                      <p className="text-sm text-slate-600">
-                        Empresa:{" "}
-                        <span className="font-medium">
-                          {user.company?.name ?? "-"}
-                        </span>
-                      </p>
-                      <p className="text-sm text-slate-600">
-                        Status:{" "}
-                        <span
-                          className={
-                            user.active
-                              ? "font-medium text-emerald-700"
-                              : "font-medium text-amber-700"
-                          }
-                        >
-                          {user.active ? "Ativo" : "Inativo"}
-                        </span>
-                      </p>
+                      <div className="space-y-1 text-sm text-slate-600">
+                        <p>{user.email}</p>
+                        <p>Role: {user.role}</p>
+                        <p>Empresa: {user.company?.name ?? "-"}</p>
+                        <p>Status: {user.active ? "Ativo" : "Inativo"}</p>
+                      </div>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
                       {user.active ? (
                         <button
                           onClick={() => handleDeactivate(user)}
-                          className="rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200"
+                          disabled={isProcessing}
+                          className="rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Desativar
                         </button>
                       ) : (
                         <button
                           onClick={() => handleActivate(user)}
-                          className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200"
+                          disabled={isProcessing}
+                          className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Reativar
                         </button>
@@ -357,19 +359,20 @@ export default function UsersPage() {
                       {canDelete ? (
                         <button
                           onClick={() => handleHardDelete(user)}
-                          className="rounded-xl bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100"
+                          disabled={isProcessing}
+                          className="rounded-xl bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           Excluir definitivo
                         </button>
                       ) : null}
                     </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }
