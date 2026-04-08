@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { api } from "../../services/api";
 import {
   getPublicKioskConfig,
@@ -6,7 +7,15 @@ import {
   type PublicKioskConfig,
 } from "../../services/publicKiosk";
 
-type Step = "rating" | "tags" | "comment" | "done" | "error";
+type Step =
+  | "rating"
+  | "tags"
+  | "comment"
+  | "contact"
+  | "done"
+  | "error";
+
+type KioskErrorType = "missing_token" | "invalid_token" | "request_error" | null;
 
 type RatingOption = {
   value: number;
@@ -36,6 +45,7 @@ function getKioskTokenFromUrl() {
 
 export default function FeedbackKiosk() {
   const [step, setStep] = useState<Step>("rating");
+  const [kioskErrorType, setKioskErrorType] = useState<KioskErrorType>(null);
   const [rating, setRating] = useState<number | null>(null);
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [comment, setComment] = useState("");
@@ -48,18 +58,13 @@ export default function FeedbackKiosk() {
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
 
   const kioskToken = useMemo(() => {
-    const fromUrl = getKioskTokenFromUrl();
-    if (fromUrl) return fromUrl;
-
-    return localStorage.getItem("evfeedback_kiosk_token")?.trim() || "";
+    return getKioskTokenFromUrl();
   }, []);
 
   const settings = config?.settings;
 
   const companyName =
-    settings?.companyName?.trim() ||
-    config?.company?.name ||
-    "EvFeedback";
+    settings?.companyName?.trim() || config?.company?.name || "EvFeedback";
 
   const logoUrl = settings?.logoUrl?.trim() || "";
 
@@ -93,7 +98,22 @@ export default function FeedbackKiosk() {
   const isNegativeRating = rating === 1 || rating === 2;
 
   function resetFlow() {
+    if (!kioskToken) {
+      setStep("error");
+      setKioskErrorType("missing_token");
+      setRating(null);
+      setTagIds([]);
+      setComment("");
+      setContactName("");
+      setContactPhone("");
+      setContactMessage("");
+      setContactConsent(false);
+      setIsSubmitting(false);
+      return;
+    }
+
     setStep("rating");
+    setKioskErrorType(null);
     setRating(null);
     setTagIds([]);
     setComment("");
@@ -123,6 +143,15 @@ export default function FeedbackKiosk() {
     );
   }
 
+  function handleAdvanceFromComment() {
+    if (isNegativeRating) {
+      setStep("contact");
+      return;
+    }
+
+    void handleSubmit(false);
+  }
+
   async function handleSubmit(skipComment = false) {
     if (!rating || !kioskToken || isSubmitting) return;
 
@@ -143,6 +172,7 @@ export default function FeedbackKiosk() {
       setStep("done");
     } catch (error) {
       console.error("Erro ao enviar feedback:", error);
+      setKioskErrorType("request_error");
       setStep("error");
     } finally {
       setIsSubmitting(false);
@@ -161,16 +191,20 @@ export default function FeedbackKiosk() {
 
   useEffect(() => {
     if (step !== "error") return;
+    if (kioskErrorType === "missing_token" || kioskErrorType === "invalid_token") {
+      return;
+    }
 
     const timer = window.setTimeout(() => {
       resetFlow();
     }, 5000);
 
     return () => window.clearTimeout(timer);
-  }, [step]);
+  }, [step, kioskErrorType]);
 
   useEffect(() => {
     if (kioskToken) return;
+    setKioskErrorType("missing_token");
     setStep("error");
   }, [kioskToken]);
 
@@ -181,8 +215,21 @@ export default function FeedbackKiosk() {
       try {
         const data = await getPublicKioskConfig(kioskToken);
         setConfig(data);
+        setKioskErrorType(null);
+        setStep("rating");
       } catch (error) {
         console.error("Erro ao carregar config do kiosk:", error);
+
+        if (
+          axios.isAxiosError(error) &&
+          (error.response?.status === 404 || error.response?.status === 400)
+        ) {
+          setKioskErrorType("invalid_token");
+        } else {
+          setKioskErrorType("request_error");
+        }
+
+        setStep("error");
       }
     }
 
@@ -192,6 +239,7 @@ export default function FeedbackKiosk() {
   useEffect(() => {
     async function loadTags() {
       if (!kioskToken) return;
+      if (!config) return;
 
       try {
         const data = await getPublicKioskTags(kioskToken);
@@ -203,9 +251,41 @@ export default function FeedbackKiosk() {
     }
 
     loadTags();
-  }, [kioskToken]);
+  }, [kioskToken, config]);
 
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
+
+  function getErrorTitle() {
+    switch (kioskErrorType) {
+      case "missing_token":
+        return "Kiosk não identificado";
+      case "invalid_token":
+        return "Kiosk inválido ou inativo";
+      default:
+        return "Não foi possível continuar";
+    }
+  }
+
+  function getErrorDescription() {
+    switch (kioskErrorType) {
+      case "missing_token":
+        return "Este acesso é exclusivo para links válidos de atendimento. Verifique o link ou solicite um novo acesso.";
+      case "invalid_token":
+        return "Não foi possível localizar um kiosk válido para este link. Verifique o token informado ou contate o responsável.";
+      default:
+        return "Verifique a configuração do kiosk ou a conexão com a API.";
+    }
+  }
+
+  function getErrorEmoji() {
+    switch (kioskErrorType) {
+      case "missing_token":
+      case "invalid_token":
+        return "🔒";
+      default:
+        return "⚠️";
+    }
+  }
 
   return (
     <main
@@ -377,81 +457,6 @@ export default function FeedbackKiosk() {
                 {comment.length}/500
               </div>
 
-              {isNegativeRating && (
-                <div className="mt-10 rounded-3xl border border-white/10 bg-black/10 p-5 md:p-6 text-left">
-                  <h3 className="text-2xl md:text-3xl font-bold">
-                    Deseja se identificar?
-                  </h3>
-
-                  <p className="mt-3 text-base md:text-lg opacity-90">
-                    Se quiser, deixe seus dados para que a equipe possa entrar em
-                    contato sobre sua experiência.
-                  </p>
-
-                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Nome
-                      </label>
-                      <input
-                        type="text"
-                        value={contactName}
-                        onChange={(e) => setContactName(e.target.value)}
-                        placeholder="Seu nome"
-                        className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none"
-                        style={{ color: textColor }}
-                        maxLength={120}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Telefone / WhatsApp
-                      </label>
-                      <input
-                        type="text"
-                        value={contactPhone}
-                        onChange={(e) => setContactPhone(e.target.value)}
-                        placeholder="(00) 00000-0000"
-                        className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none"
-                        style={{ color: textColor }}
-                        maxLength={30}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium mb-2">
-                      Mensagem para contato
-                    </label>
-                    <textarea
-                      value={contactMessage}
-                      onChange={(e) => setContactMessage(e.target.value)}
-                      placeholder="Se quiser, informe mais detalhes para contato."
-                      className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none min-h-[120px] resize-none"
-                      style={{ color: textColor }}
-                      maxLength={500}
-                    />
-                    <div className="mt-2 text-right text-sm opacity-70">
-                      {contactMessage.length}/500
-                    </div>
-                  </div>
-
-                  <label className="mt-5 flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={contactConsent}
-                      onChange={(e) => setContactConsent(e.target.checked)}
-                      className="mt-1 h-5 w-5 rounded border-white/20 bg-black/10"
-                    />
-                    <span className="text-sm md:text-base leading-relaxed opacity-90">
-                      Autorizo que a empresa entre em contato comigo sobre este
-                      atendimento.
-                    </span>
-                  </label>
-                </div>
-              )}
-
               <div className="mt-8 flex flex-col md:flex-row gap-4 justify-center">
                 <button
                   type="button"
@@ -462,13 +467,156 @@ export default function FeedbackKiosk() {
                   Voltar
                 </button>
 
+                {isNegativeRating ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleSubmit(false)}
+                      disabled={isSubmitting}
+                      className="rounded-2xl bg-black/25 hover:bg-black/35 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                    >
+                      {isSubmitting ? "Enviando..." : "Enviar agora"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleAdvanceFromComment}
+                      disabled={isSubmitting}
+                      className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                      style={{
+                        backgroundColor: primaryColor,
+                        color: buttonTextColor,
+                      }}
+                    >
+                      Próximo
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleSubmit(true)}
+                      disabled={isSubmitting}
+                      className="rounded-2xl bg-black/25 hover:bg-black/35 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                    >
+                      Pular
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSubmit(false)}
+                      disabled={isSubmitting}
+                      className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                      style={{
+                        backgroundColor: primaryColor,
+                        color: buttonTextColor,
+                      }}
+                    >
+                      {isSubmitting ? "Enviando..." : "Enviar"}
+                    </button>
+                  </>
+                )}
+              </div>
+            </section>
+          )}
+
+          {step === "contact" && (
+            <section className="text-center">
+              <p className="text-sm md:text-base opacity-80">
+                Avaliação:
+                <span className="ml-2 font-semibold">
+                  {selectedRating?.emoji} {selectedRating?.label}
+                </span>
+              </p>
+
+              <h2 className="mt-4 text-3xl md:text-5xl font-bold">
+                Deseja se identificar?
+              </h2>
+
+              <p className="mt-4 text-lg opacity-90">
+                Se quiser, deixe seus dados para que a equipe possa entrar em contato sobre sua experiência.
+              </p>
+
+              <div className="mt-10 rounded-3xl border border-white/10 bg-black/10 p-5 md:p-6 text-left">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Nome
+                    </label>
+                    <input
+                      type="text"
+                      value={contactName}
+                      onChange={(e) => setContactName(e.target.value)}
+                      placeholder="Seu nome"
+                      className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none"
+                      style={{ color: textColor }}
+                      maxLength={120}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      Telefone / WhatsApp
+                    </label>
+                    <input
+                      type="text"
+                      value={contactPhone}
+                      onChange={(e) => setContactPhone(e.target.value)}
+                      placeholder="(00) 00000-0000"
+                      className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none"
+                      style={{ color: textColor }}
+                      maxLength={30}
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm font-medium mb-2">
+                    Mensagem para contato
+                  </label>
+                  <textarea
+                    value={contactMessage}
+                    onChange={(e) => setContactMessage(e.target.value)}
+                    placeholder="Se quiser, informe mais detalhes para contato."
+                    className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none min-h-[120px] resize-none"
+                    style={{ color: textColor }}
+                    maxLength={500}
+                  />
+                  <div className="mt-2 text-right text-sm opacity-70">
+                    {contactMessage.length}/500
+                  </div>
+                </div>
+
+                <label className="mt-5 flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={contactConsent}
+                    onChange={(e) => setContactConsent(e.target.checked)}
+                    className="mt-1 h-5 w-5 rounded border-white/20 bg-black/10"
+                  />
+                  <span className="text-sm md:text-base leading-relaxed opacity-90">
+                    Autorizo que a empresa entre em contato comigo sobre este atendimento.
+                  </span>
+                </label>
+              </div>
+
+              <div className="mt-8 flex flex-col md:flex-row gap-4 justify-center">
                 <button
                   type="button"
-                  onClick={() => handleSubmit(true)}
+                  onClick={() => setStep("comment")}
+                  disabled={isSubmitting}
+                  className="rounded-2xl bg-black/15 hover:bg-black/25 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                >
+                  Voltar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSubmit(false)}
                   disabled={isSubmitting}
                   className="rounded-2xl bg-black/25 hover:bg-black/35 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
                 >
-                  Pular
+                  {isSubmitting ? "Enviando..." : "Pular e enviar"}
                 </button>
 
                 <button
@@ -507,33 +655,29 @@ export default function FeedbackKiosk() {
 
           {step === "error" && (
             <section className="text-center py-10">
-              <div className="text-7xl md:text-8xl">⚠️</div>
+              <div className="text-7xl md:text-8xl">{getErrorEmoji()}</div>
 
               <h2 className="mt-6 text-3xl md:text-5xl font-bold">
-                Não foi possível continuar
+                {getErrorTitle()}
               </h2>
 
               <p className="mt-4 text-lg opacity-90">
-                Verifique a configuração do kiosk ou a conexão com a API.
+                {getErrorDescription()}
               </p>
 
-              {!kioskToken && (
-                <p className="mt-3 text-rose-300">
-                  Token do kiosk não encontrado.
-                </p>
+              {kioskErrorType === "request_error" && (
+                <button
+                  type="button"
+                  onClick={resetFlow}
+                  className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold transition"
+                  style={{
+                    backgroundColor: primaryColor,
+                    color: buttonTextColor,
+                  }}
+                >
+                  Tentar novamente
+                </button>
               )}
-
-              <button
-                type="button"
-                onClick={resetFlow}
-                className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold transition"
-                style={{
-                  backgroundColor: primaryColor,
-                  color: buttonTextColor,
-                }}
-              >
-                Tentar novamente
-              </button>
             </section>
           )}
         </div>
