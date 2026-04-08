@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  deleteFeedback,
   getFeedbacks,
   type FeedbackFilters,
   type FeedbackItem,
@@ -9,6 +10,7 @@ import { getKiosks, type Kiosk } from "../../../services/kiosks";
 import { getCompanies, type Company } from "../../../services/companies";
 import { getStoredUser } from "../../../services/auth";
 import {
+  canManageOperationalModules,
   canViewOperationalModules,
   getResolvedCompanyId,
   isSuperAdmin,
@@ -57,6 +59,7 @@ export default function FeedbacksPage() {
   const currentUser = getStoredUser();
 
   const canView = canViewOperationalModules(currentUser);
+  const canManage = canManageOperationalModules(currentUser);
   const superAdmin = isSuperAdmin(currentUser);
   const resolvedCompanyId = getResolvedCompanyId(currentUser);
 
@@ -67,6 +70,7 @@ export default function FeedbacksPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<FeedbackFilters>({
     companyId: resolvedCompanyId ?? "",
@@ -191,6 +195,33 @@ export default function FeedbacksPage() {
     setFilters(cleared);
     void loadDependencies();
     void loadFeedbacks(cleared);
+  }
+
+  async function handleDelete(feedback: FeedbackItem) {
+    if (!canManage) return;
+
+    const confirmed = window.confirm(
+      "Tem certeza que deseja excluir este feedback? Esta ação não pode ser desfeita."
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(feedback.id);
+      setError("");
+
+      const companyId = superAdmin
+        ? feedback.companyId || filters.companyId || undefined
+        : resolvedCompanyId || undefined;
+
+      await deleteFeedback(feedback.id, companyId);
+
+      setFeedbacks((current) => current.filter((item) => item.id !== feedback.id));
+    } catch {
+      setError("Não foi possível excluir o feedback.");
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   if (!canView) {
@@ -469,13 +500,26 @@ export default function FeedbacksPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-slate-50 px-4 py-3 text-center">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">
-                      Nota
-                    </p>
-                    <p className="text-2xl font-bold text-slate-900">
-                      {feedback.rating}
-                    </p>
+                  <div className="flex flex-col gap-3">
+                    <div className="rounded-2xl bg-slate-50 px-4 py-3 text-center">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">
+                        Nota
+                      </p>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {feedback.rating}
+                      </p>
+                    </div>
+
+                    {canManage ? (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(feedback)}
+                        disabled={deletingId === feedback.id}
+                        className="rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {deletingId === feedback.id ? "Excluindo..." : "Excluir"}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </article>

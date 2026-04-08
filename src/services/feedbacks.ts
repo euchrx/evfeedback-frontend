@@ -68,3 +68,14 @@ export async function getFeedbackById(
 
   return response.data;
 }
+
+export async function deleteFeedback(
+  id: string,
+  companyId?: string
+): Promise<{ message: string }> {
+  const response = await api.delete(`/feedbacks/${id}`, {
+    params: companyId ? { companyId } : undefined,
+  });
+
+  return response.data;
+}
