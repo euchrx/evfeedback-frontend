@@ -44,6 +44,15 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+function hasContactInfo(feedback: FeedbackItem) {
+  return Boolean(
+    feedback.contactName?.trim() ||
+      feedback.contactPhone?.trim() ||
+      feedback.contactMessage?.trim() ||
+      feedback.contactConsent
+  );
+}
+
 export default function FeedbacksPage() {
   const currentUser = getStoredUser();
 
@@ -345,9 +354,17 @@ export default function FeedbacksPage() {
                 className="rounded-2xl border border-slate-200 p-5"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="flex flex-wrap items-center gap-3">
-                      <span className="rounded-full bg-sky-100 px-3 py-1 text-sm font-semibold text-sky-700">
+                      <span
+                        className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                          feedback.rating <= 2
+                            ? "bg-rose-100 text-rose-700"
+                            : feedback.rating === 3
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
                         {getRatingLabel(feedback.rating)}
                       </span>
 
@@ -386,6 +403,51 @@ export default function FeedbacksPage() {
                         {feedback.comment?.trim() ? feedback.comment : "Sem comentário."}
                       </p>
                     </div>
+
+                    {hasContactInfo(feedback) ? (
+                      <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold text-amber-900">
+                            Dados para contato
+                          </p>
+
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                              feedback.contactConsent
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {feedback.contactConsent
+                              ? "Autorizou contato"
+                              : "Sem autorização explícita"}
+                          </span>
+                        </div>
+
+                        <div className="grid gap-2 text-sm text-slate-700 md:grid-cols-2">
+                          <p>
+                            <span className="font-medium text-slate-800">Nome:</span>{" "}
+                            {feedback.contactName?.trim() || "Não informado"}
+                          </p>
+
+                          <p>
+                            <span className="font-medium text-slate-800">Telefone / WhatsApp:</span>{" "}
+                            {feedback.contactPhone?.trim() || "Não informado"}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-slate-800">
+                            Mensagem para contato
+                          </p>
+                          <p className="text-sm text-slate-700">
+                            {feedback.contactMessage?.trim()
+                              ? feedback.contactMessage
+                              : "Sem mensagem adicional."}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
 
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-slate-800">Tags</p>

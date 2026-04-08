@@ -14,6 +14,10 @@ export type FeedbackItem = {
   id: string;
   rating: number;
   comment?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  contactMessage?: string | null;
+  contactConsent?: boolean;
   active?: boolean;
   createdAt: string;
   companyId?: string;

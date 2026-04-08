@@ -4,15 +4,27 @@ export type PublicKioskConfig = {
   kiosk: {
     id: string;
     name: string;
-    active: boolean;
+    token: string;
+    branchId: string;
+    companyId: string;
+    locationDescription?: string | null;
   };
   company: {
     id: string;
     name: string;
+  } | null;
+  branch: {
+    id: string;
+    name: string;
+  } | null;
+  settings: {
+    id?: string;
+    companyId?: string;
+    companyName?: string | null;
     logoUrl?: string | null;
     thankYouMessage?: string | null;
     primaryColor?: string | null;
-    kioskResetSeconds?: number;
+    kioskResetSeconds?: number | null;
     heroTitle?: string | null;
     heroSubtitle?: string | null;
     backgroundColor?: string | null;
@@ -20,7 +32,9 @@ export type PublicKioskConfig = {
     cardBackgroundColor?: string | null;
     textColor?: string | null;
     buttonTextColor?: string | null;
-  };
+    createdAt?: string;
+    updatedAt?: string;
+  } | null;
 };
 
 export type PublicKioskTag = {

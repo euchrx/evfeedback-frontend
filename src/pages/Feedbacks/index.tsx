@@ -39,6 +39,10 @@ export default function FeedbackKiosk() {
   const [rating, setRating] = useState<number | null>(null);
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [comment, setComment] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactConsent, setContactConsent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
@@ -50,24 +54,64 @@ export default function FeedbackKiosk() {
     return localStorage.getItem("evfeedback_kiosk_token")?.trim() || "";
   }, []);
 
-  const companyName = config?.company?.name || "EvFeedback";
-  const logoUrl = config?.company?.logoUrl || "";
+  const settings = config?.settings;
+
+  const companyName =
+    settings?.companyName?.trim() ||
+    config?.company?.name ||
+    "EvFeedback";
+
+  const logoUrl = settings?.logoUrl?.trim() || "";
+
   const thankYouMessage =
-    config?.company?.thankYouMessage || "Sua opinião é muito importante para nós.";
-  const primaryColor = config?.company?.primaryColor || "#0ea5e9";
+    settings?.thankYouMessage?.trim() ||
+    "Sua opinião é muito importante para nós.";
+
+  const primaryColor = settings?.primaryColor?.trim() || "#0ea5e9";
+
+  const heroTitle =
+    settings?.heroTitle?.trim() || "Como foi sua experiência hoje?";
+
+  const heroSubtitle =
+    settings?.heroSubtitle?.trim() ||
+    "Toque em uma opção para avaliar rapidamente.";
+
+  const backgroundColor = settings?.backgroundColor?.trim() || "#020617";
+
+  const backgroundImageUrl = settings?.backgroundImageUrl?.trim() || "";
+
+  const cardBackgroundColor =
+    settings?.cardBackgroundColor?.trim() || "rgba(15,23,42,0.72)";
+
+  const textColor = settings?.textColor?.trim() || "#ffffff";
+
+  const buttonTextColor = settings?.buttonTextColor?.trim() || "#0f172a";
+
   const resetDelayMs =
-    (config?.company?.kioskResetSeconds ?? 5) * 1000 || DEFAULT_RESET_DELAY_MS;
+    ((settings?.kioskResetSeconds ?? 5) * 1000) || DEFAULT_RESET_DELAY_MS;
+
+  const isNegativeRating = rating === 1 || rating === 2;
 
   function resetFlow() {
     setStep("rating");
     setRating(null);
     setTagIds([]);
     setComment("");
+    setContactName("");
+    setContactPhone("");
+    setContactMessage("");
+    setContactConsent(false);
     setIsSubmitting(false);
   }
 
   function handleSelectRating(value: number) {
     setRating(value);
+    setTagIds([]);
+    setComment("");
+    setContactName("");
+    setContactPhone("");
+    setContactMessage("");
+    setContactConsent(false);
     setStep("tags");
   }
 
@@ -90,6 +134,10 @@ export default function FeedbackKiosk() {
         rating,
         comment: skipComment ? "" : comment.trim(),
         tagIds,
+        contactName: isNegativeRating ? contactName.trim() : "",
+        contactPhone: isNegativeRating ? contactPhone.trim() : "",
+        contactMessage: isNegativeRating ? contactMessage.trim() : "",
+        contactConsent: isNegativeRating ? contactConsent : false,
       });
 
       setStep("done");
@@ -160,9 +208,23 @@ export default function FeedbackKiosk() {
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4 py-8">
+    <main
+      className="min-h-screen flex items-center justify-center px-4 py-8"
+      style={{
+        backgroundColor,
+        color: textColor,
+        backgroundImage: backgroundImageUrl
+          ? `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImageUrl})`
+          : undefined,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
       <div className="w-full max-w-5xl">
-        <div className="mx-auto max-w-4xl rounded-3xl border border-slate-800 bg-slate-900/70 backdrop-blur p-6 md:p-10 shadow-2xl">
+        <div
+          className="mx-auto max-w-4xl rounded-3xl border border-white/10 backdrop-blur p-6 md:p-10 shadow-2xl"
+          style={{ backgroundColor: cardBackgroundColor }}
+        >
           {step === "rating" && (
             <section className="text-center">
               {logoUrl ? (
@@ -181,11 +243,11 @@ export default function FeedbackKiosk() {
               </p>
 
               <h1 className="mt-4 text-4xl md:text-6xl font-bold leading-tight">
-                Como foi sua experiência hoje?
+                {heroTitle}
               </h1>
 
-              <p className="mt-4 text-slate-300 text-lg md:text-xl">
-                Toque em uma opção para avaliar rapidamente.
+              <p className="mt-4 text-lg md:text-xl opacity-90">
+                {heroSubtitle}
               </p>
 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-10">
@@ -194,10 +256,10 @@ export default function FeedbackKiosk() {
                     key={option.value}
                     type="button"
                     onClick={() => handleSelectRating(option.value)}
-                    className="rounded-3xl border border-slate-700 bg-slate-800 hover:bg-slate-700 active:scale-95 transition p-6 md:p-8 flex flex-col items-center justify-center min-h-[140px] md:min-h-[180px]"
+                    className="rounded-3xl border border-white/10 bg-black/10 hover:bg-black/20 active:scale-95 transition p-6 md:p-8 flex flex-col items-center justify-center min-h-[140px] md:min-h-[180px]"
                   >
                     <span className="text-5xl md:text-6xl">{option.emoji}</span>
-                    <span className="mt-3 text-sm md:text-base font-medium text-slate-200">
+                    <span className="mt-3 text-sm md:text-base font-medium">
                       {option.label}
                     </span>
                   </button>
@@ -208,9 +270,9 @@ export default function FeedbackKiosk() {
 
           {step === "tags" && (
             <section className="text-center">
-              <p className="text-slate-400 text-sm md:text-base">
+              <p className="text-sm md:text-base opacity-80">
                 Avaliação selecionada:
-                <span className="ml-2 font-semibold text-white">
+                <span className="ml-2 font-semibold">
                   {selectedRating?.emoji} {selectedRating?.label}
                 </span>
               </p>
@@ -219,7 +281,7 @@ export default function FeedbackKiosk() {
                 O que mais influenciou sua experiência?
               </h2>
 
-              <p className="mt-4 text-slate-300 text-lg">
+              <p className="mt-4 text-lg opacity-90">
                 Você pode marcar uma ou mais opções.
               </p>
 
@@ -233,17 +295,21 @@ export default function FeedbackKiosk() {
                         key={tag.id}
                         type="button"
                         onClick={() => handleToggleTag(tag.id)}
-                        className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${active
-                          ? "text-white"
-                          : "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
-                          }`}
+                        className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${
+                          active
+                            ? ""
+                            : "border-white/10 bg-black/10 hover:bg-black/20"
+                        }`}
                         style={
                           active
                             ? {
-                              borderColor: primaryColor,
-                              backgroundColor: primaryColor,
-                            }
-                            : undefined
+                                borderColor: primaryColor,
+                                backgroundColor: primaryColor,
+                                color: buttonTextColor,
+                              }
+                            : {
+                                color: textColor,
+                              }
                         }
                       >
                         {tag.name}
@@ -252,7 +318,7 @@ export default function FeedbackKiosk() {
                   })}
                 </div>
               ) : (
-                <p className="mt-10 text-slate-400">
+                <p className="mt-10 opacity-80">
                   Nenhuma opção cadastrada no momento.
                 </p>
               )}
@@ -261,7 +327,7 @@ export default function FeedbackKiosk() {
                 <button
                   type="button"
                   onClick={() => setStep("rating")}
-                  className="rounded-2xl bg-slate-800 hover:bg-slate-700 px-8 py-4 text-lg font-semibold transition"
+                  className="rounded-2xl bg-black/15 hover:bg-black/25 px-8 py-4 text-lg font-semibold transition"
                 >
                   Voltar
                 </button>
@@ -269,8 +335,11 @@ export default function FeedbackKiosk() {
                 <button
                   type="button"
                   onClick={() => setStep("comment")}
-                  className="rounded-2xl px-8 py-4 text-lg font-semibold text-slate-950 transition"
-                  style={{ backgroundColor: primaryColor }}
+                  className="rounded-2xl px-8 py-4 text-lg font-semibold transition"
+                  style={{
+                    backgroundColor: primaryColor,
+                    color: buttonTextColor,
+                  }}
                 >
                   Continuar
                 </button>
@@ -280,9 +349,9 @@ export default function FeedbackKiosk() {
 
           {step === "comment" && (
             <section className="text-center">
-              <p className="text-slate-400 text-sm md:text-base">
+              <p className="text-sm md:text-base opacity-80">
                 Avaliação:
-                <span className="ml-2 font-semibold text-white">
+                <span className="ml-2 font-semibold">
                   {selectedRating?.emoji} {selectedRating?.label}
                 </span>
               </p>
@@ -291,7 +360,7 @@ export default function FeedbackKiosk() {
                 Deseja deixar um comentário?
               </h2>
 
-              <p className="mt-4 text-slate-300 text-lg">
+              <p className="mt-4 text-lg opacity-90">
                 Essa etapa é opcional.
               </p>
 
@@ -299,20 +368,96 @@ export default function FeedbackKiosk() {
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder="Escreva aqui sua opinião..."
-                className="mt-8 w-full rounded-2xl border border-slate-700 bg-slate-800 px-5 py-4 text-white text-lg outline-none focus:border-sky-400 min-h-[140px] resize-none"
+                className="mt-8 w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-lg outline-none min-h-[140px] resize-none"
+                style={{ color: textColor }}
                 maxLength={500}
               />
 
-              <div className="mt-3 text-right text-sm text-slate-400">
+              <div className="mt-3 text-right text-sm opacity-70">
                 {comment.length}/500
               </div>
+
+              {isNegativeRating && (
+                <div className="mt-10 rounded-3xl border border-white/10 bg-black/10 p-5 md:p-6 text-left">
+                  <h3 className="text-2xl md:text-3xl font-bold">
+                    Deseja se identificar?
+                  </h3>
+
+                  <p className="mt-3 text-base md:text-lg opacity-90">
+                    Se quiser, deixe seus dados para que a equipe possa entrar em
+                    contato sobre sua experiência.
+                  </p>
+
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Nome
+                      </label>
+                      <input
+                        type="text"
+                        value={contactName}
+                        onChange={(e) => setContactName(e.target.value)}
+                        placeholder="Seu nome"
+                        className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none"
+                        style={{ color: textColor }}
+                        maxLength={120}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        Telefone / WhatsApp
+                      </label>
+                      <input
+                        type="text"
+                        value={contactPhone}
+                        onChange={(e) => setContactPhone(e.target.value)}
+                        placeholder="(00) 00000-0000"
+                        className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none"
+                        style={{ color: textColor }}
+                        maxLength={30}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium mb-2">
+                      Mensagem para contato
+                    </label>
+                    <textarea
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      placeholder="Se quiser, informe mais detalhes para contato."
+                      className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none min-h-[120px] resize-none"
+                      style={{ color: textColor }}
+                      maxLength={500}
+                    />
+                    <div className="mt-2 text-right text-sm opacity-70">
+                      {contactMessage.length}/500
+                    </div>
+                  </div>
+
+                  <label className="mt-5 flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={contactConsent}
+                      onChange={(e) => setContactConsent(e.target.checked)}
+                      className="mt-1 h-5 w-5 rounded border-white/20 bg-black/10"
+                    />
+                    <span className="text-sm md:text-base leading-relaxed opacity-90">
+                      Autorizo que a empresa entre em contato comigo sobre este
+                      atendimento.
+                    </span>
+                  </label>
+                </div>
+              )}
 
               <div className="mt-8 flex flex-col md:flex-row gap-4 justify-center">
                 <button
                   type="button"
                   onClick={() => setStep("tags")}
                   disabled={isSubmitting}
-                  className="rounded-2xl bg-slate-800 hover:bg-slate-700 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                  className="rounded-2xl bg-black/15 hover:bg-black/25 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
                 >
                   Voltar
                 </button>
@@ -321,7 +466,7 @@ export default function FeedbackKiosk() {
                   type="button"
                   onClick={() => handleSubmit(true)}
                   disabled={isSubmitting}
-                  className="rounded-2xl bg-slate-700 hover:bg-slate-600 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                  className="rounded-2xl bg-black/25 hover:bg-black/35 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
                 >
                   Pular
                 </button>
@@ -330,8 +475,11 @@ export default function FeedbackKiosk() {
                   type="button"
                   onClick={() => handleSubmit(false)}
                   disabled={isSubmitting}
-                  className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold text-slate-950 transition"
-                  style={{ backgroundColor: primaryColor }}
+                  className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                  style={{
+                    backgroundColor: primaryColor,
+                    color: buttonTextColor,
+                  }}
                 >
                   {isSubmitting ? "Enviando..." : "Enviar"}
                 </button>
@@ -347,11 +495,11 @@ export default function FeedbackKiosk() {
                 Obrigado!
               </h2>
 
-              <p className="mt-4 text-slate-300 text-lg md:text-2xl">
+              <p className="mt-4 text-lg md:text-2xl opacity-90">
                 {thankYouMessage}
               </p>
 
-              <p className="mt-6 text-slate-500 text-sm md:text-base">
+              <p className="mt-6 text-sm md:text-base opacity-70">
                 A tela será reiniciada automaticamente.
               </p>
             </section>
@@ -365,12 +513,12 @@ export default function FeedbackKiosk() {
                 Não foi possível continuar
               </h2>
 
-              <p className="mt-4 text-slate-300 text-lg">
+              <p className="mt-4 text-lg opacity-90">
                 Verifique a configuração do kiosk ou a conexão com a API.
               </p>
 
               {!kioskToken && (
-                <p className="mt-3 text-rose-400">
+                <p className="mt-3 text-rose-300">
                   Token do kiosk não encontrado.
                 </p>
               )}
@@ -378,8 +526,11 @@ export default function FeedbackKiosk() {
               <button
                 type="button"
                 onClick={resetFlow}
-                className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold text-slate-950 transition"
-                style={{ backgroundColor: primaryColor }}
+                className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold transition"
+                style={{
+                  backgroundColor: primaryColor,
+                  color: buttonTextColor,
+                }}
               >
                 Tentar novamente
               </button>
