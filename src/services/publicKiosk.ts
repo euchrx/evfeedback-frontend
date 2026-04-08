@@ -45,7 +45,7 @@ export type PublicKioskTag = {
 export async function getPublicKioskConfig(
   token: string
 ): Promise<PublicKioskConfig> {
-  const response = await api.get("/kiosks/config", {
+  const response = await api.get("/kiosk/config", {
     params: { token },
   });
 
@@ -55,7 +55,7 @@ export async function getPublicKioskConfig(
 export async function getPublicKioskTags(
   token: string
 ): Promise<PublicKioskTag[]> {
-  const response = await api.get("/kiosks/tags", {
+  const response = await api.get("/kiosk/tags", {
     params: { token },
   });
 
