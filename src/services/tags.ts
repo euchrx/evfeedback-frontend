@@ -1,5 +1,7 @@
 import { api } from "./api";
 
+export type EnvironmentType = "POSTO" | "CONVENIENCIA" | "RESTAURANTE";
+
 export type TagCompany = {
   id: string;
   name: string;
@@ -9,6 +11,7 @@ export type Tag = {
   id: string;
   name: string;
   color?: string | null;
+  environmentType: EnvironmentType;
   active?: boolean;
   companyId?: string;
   company?: TagCompany;
@@ -24,6 +27,7 @@ export type GetTagsParams = {
 export type CreateTagPayload = {
   name: string;
   color?: string | null;
+  environmentType?: EnvironmentType;
   active?: boolean;
   companyId?: string;
 };
@@ -31,7 +35,13 @@ export type CreateTagPayload = {
 export type UpdateTagPayload = {
   name?: string;
   color?: string | null;
+  environmentType?: EnvironmentType;
   active?: boolean;
+  companyId?: string;
+};
+
+export type ImportTagsBySegmentPayload = {
+  segment: "RESTAURANTE" | "CONVENIENCIA" | "POSTO";
   companyId?: string;
 };
 
@@ -49,6 +59,16 @@ export async function getTagById(id: string, companyId?: string): Promise<Tag> {
 
 export async function createTag(payload: CreateTagPayload) {
   const response = await api.post("/tags", payload);
+  return response.data;
+}
+
+export async function importTagsBySegment(payload: ImportTagsBySegmentPayload): Promise<{
+  segment: string;
+  createdCount: number;
+  skippedCount: number;
+  tags: Tag[];
+}> {
+  const response = await api.post("/tags/import-by-segment", payload);
   return response.data;
 }
 

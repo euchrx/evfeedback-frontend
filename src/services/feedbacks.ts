@@ -10,6 +10,8 @@ export type FeedbackTagItem = {
   } | null;
 };
 
+export type FeedbackEnvironmentType = "POSTO" | "CONVENIENCIA" | "RESTAURANTE";
+
 export type FeedbackItem = {
   id: string;
   rating: number;
@@ -30,6 +32,7 @@ export type FeedbackItem = {
   kiosk?: {
     id: string;
     name: string;
+    environmentType?: FeedbackEnvironmentType;
   } | null;
   branch?: {
     id: string;
@@ -43,6 +46,7 @@ export type FeedbackFilters = {
   branchId?: string;
   kioskId?: string;
   rating?: string;
+  environmentType?: string;
   startDate?: string;
   endDate?: string;
   active?: string;

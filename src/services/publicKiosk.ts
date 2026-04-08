@@ -1,5 +1,7 @@
 import { api } from "./api";
 
+export type PublicEnvironmentType = "POSTO" | "CONVENIENCIA" | "RESTAURANTE";
+
 export type PublicKioskConfig = {
   kiosk: {
     id: string;
@@ -8,6 +10,7 @@ export type PublicKioskConfig = {
     branchId: string;
     companyId: string;
     locationDescription?: string | null;
+    environmentType: PublicEnvironmentType;
   };
   company: {
     id: string;

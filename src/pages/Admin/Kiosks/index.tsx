@@ -10,7 +10,9 @@ import {
   getKiosks,
   hardDeleteKiosk,
   regenerateKioskToken,
+  updateKiosk,
   type Kiosk,
+  type EnvironmentType,
 } from "../../../services/kiosks";
 import {
   canHardDelete,
@@ -19,6 +21,17 @@ import {
   getResolvedCompanyId,
   isSuperAdmin,
 } from "../../../utils/permissions";
+
+type EditingState = {
+  id: string;
+  name: string;
+  branchId: string;
+  locationDescription: string;
+  environmentType: EnvironmentType;
+  companyId?: string;
+} | null;
+
+type EnvironmentFilter = "ALL" | EnvironmentType;
 
 export default function KiosksPage() {
   const currentUser = getStoredUser();
@@ -36,12 +49,19 @@ export default function KiosksPage() {
   const [name, setName] = useState("");
   const [branchId, setBranchId] = useState("");
   const [locationDescription, setLocationDescription] = useState("");
+  const [environmentType, setEnvironmentType] =
+    useState<EnvironmentType>("POSTO");
   const [companyId, setCompanyId] = useState(resolvedCompanyId ?? "");
   const [showInactive, setShowInactive] = useState(true);
+  const [environmentFilter, setEnvironmentFilter] =
+    useState<EnvironmentFilter>("ALL");
   const [selectedQrLink, setSelectedQrLink] = useState<string | null>(null);
+
+  const [editing, setEditing] = useState<EditingState>(null);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
@@ -54,15 +74,43 @@ export default function KiosksPage() {
   }, [superAdmin, companyId, resolvedCompanyId]);
 
   const visibleKiosks = useMemo(() => {
-    if (showInactive) return kiosks;
-    return kiosks.filter((kiosk) => kiosk.active);
-  }, [kiosks, showInactive]);
+    const base = showInactive ? kiosks : kiosks.filter((kiosk) => kiosk.active);
+
+    if (environmentFilter === "ALL") {
+      return base;
+    }
+
+    return base.filter((kiosk) => kiosk.environmentType === environmentFilter);
+  }, [kiosks, showInactive, environmentFilter]);
 
   const filteredBranches = useMemo(() => {
     if (!superAdmin) return branches;
     if (!selectedCompanyId) return [];
     return branches.filter((branch) => branch.companyId === selectedCompanyId);
   }, [branches, selectedCompanyId, superAdmin]);
+
+  const editingBranches = useMemo(() => {
+    if (!editing) return [];
+
+    if (!superAdmin) return branches;
+
+    if (!editing.companyId) return [];
+
+    return branches.filter((branch) => branch.companyId === editing.companyId);
+  }, [branches, editing, superAdmin]);
+
+  function getEnvironmentLabel(environment: EnvironmentType) {
+    switch (environment) {
+      case "POSTO":
+        return "Posto";
+      case "CONVENIENCIA":
+        return "Conveniência";
+      case "RESTAURANTE":
+        return "Restaurante";
+      default:
+        return environment;
+    }
+  }
 
   async function load() {
     try {
@@ -121,12 +169,14 @@ export default function KiosksPage() {
         branchId,
         companyId: targetCompanyId,
         locationDescription: locationDescription.trim() || undefined,
+        environmentType,
         active: true,
       });
 
       setName("");
       setBranchId("");
       setLocationDescription("");
+      setEnvironmentType("POSTO");
 
       if (superAdmin) {
         setCompanyId("");
@@ -137,6 +187,55 @@ export default function KiosksPage() {
       setError("Não foi possível criar o kiosk.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function handleStartEdit(kiosk: Kiosk) {
+    setEditing({
+      id: kiosk.id,
+      name: kiosk.name ?? "",
+      branchId: kiosk.branchId ?? "",
+      locationDescription: kiosk.locationDescription ?? "",
+      environmentType: kiosk.environmentType ?? "POSTO",
+      companyId: kiosk.companyId,
+    });
+  }
+
+  function handleCancelEdit() {
+    setEditing(null);
+  }
+
+  async function handleSaveEdit(kiosk: Kiosk) {
+    if (!canManage || !editing) return;
+
+    if (!editing.name.trim()) {
+      setError("Informe o nome do kiosk.");
+      return;
+    }
+
+    if (!editing.branchId) {
+      setError("Selecione uma filial para o kiosk.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setError("");
+
+      await updateKiosk(kiosk.id, {
+        name: editing.name.trim(),
+        branchId: editing.branchId,
+        locationDescription: editing.locationDescription.trim() || "",
+        environmentType: editing.environmentType,
+        companyId: superAdmin ? editing.companyId : resolvedCompanyId,
+      });
+
+      setEditing(null);
+      await load();
+    } catch {
+      setError("Não foi possível atualizar o kiosk.");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -275,6 +374,21 @@ export default function KiosksPage() {
     }
   }, [filteredBranches, branchId, superAdmin]);
 
+  useEffect(() => {
+    if (!editing || !superAdmin) return;
+
+    if (!editing.companyId) return;
+
+    const stillExists = branches.some(
+      (branch) =>
+        branch.id === editing.branchId && branch.companyId === editing.companyId
+    );
+
+    if (!stillExists) {
+      setEditing((prev) => (prev ? { ...prev, branchId: "" } : prev));
+    }
+  }, [branches, editing, superAdmin]);
+
   if (!canView) {
     return (
       <section className="space-y-3">
@@ -313,7 +427,7 @@ export default function KiosksPage() {
             </h2>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-6">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -327,6 +441,18 @@ export default function KiosksPage() {
               placeholder="Localização/descrição"
               className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
             />
+
+            <select
+              value={environmentType}
+              onChange={(e) =>
+                setEnvironmentType(e.target.value as EnvironmentType)
+              }
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+            >
+              <option value="POSTO">Posto</option>
+              <option value="CONVENIENCIA">Conveniência</option>
+              <option value="RESTAURANTE">Restaurante</option>
+            </select>
 
             <select
               value={companyId}
@@ -373,7 +499,7 @@ export default function KiosksPage() {
       ) : null}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">
               Kiosks cadastrados
@@ -383,14 +509,29 @@ export default function KiosksPage() {
             </p>
           </div>
 
-          <label className="inline-flex items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-            />
-            Mostrar inativos
-          </label>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <select
+              value={environmentFilter}
+              onChange={(e) =>
+                setEnvironmentFilter(e.target.value as EnvironmentFilter)
+              }
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-sky-500"
+            >
+              <option value="ALL">Todos os ambientes</option>
+              <option value="POSTO">Posto</option>
+              <option value="CONVENIENCIA">Conveniência</option>
+              <option value="RESTAURANTE">Restaurante</option>
+            </select>
+
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+              />
+              Mostrar inativos
+            </label>
+          </div>
         </div>
 
         {loading ? (
@@ -399,13 +540,14 @@ export default function KiosksPage() {
           </div>
         ) : visibleKiosks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-            Nenhum kiosk cadastrado.
+            Nenhum kiosk cadastrado para o filtro selecionado.
           </div>
         ) : (
           <div className="grid gap-4">
             {visibleKiosks.map((kiosk) => {
               const link = `${feedbackBaseUrl}?token=${kiosk.token}`;
               const isProcessing = processingId === kiosk.id;
+              const isEditing = editing?.id === kiosk.id;
 
               return (
                 <article
@@ -413,17 +555,94 @@ export default function KiosksPage() {
                   className="rounded-2xl border border-slate-200 p-5"
                 >
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-3">
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {kiosk.name}
-                      </h3>
+                    <div className="space-y-3 flex-1">
+                      {isEditing ? (
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                          <input
+                            value={editing.name}
+                            onChange={(e) =>
+                              setEditing((prev) =>
+                                prev ? { ...prev, name: e.target.value } : prev
+                              )
+                            }
+                            placeholder="Nome do kiosk"
+                            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                          />
 
-                      <div className="space-y-1 text-sm text-slate-600">
-                        <p>Empresa: {kiosk.company?.name ?? "-"}</p>
-                        <p>Filial: {kiosk.branch?.name ?? "Sem filial"}</p>
-                        <p>Local: {kiosk.locationDescription || "-"}</p>
-                        <p>Status: {kiosk.active ? "Ativo" : "Inativo"}</p>
-                      </div>
+                          <input
+                            value={editing.locationDescription}
+                            onChange={(e) =>
+                              setEditing((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      locationDescription: e.target.value,
+                                    }
+                                  : prev
+                              )
+                            }
+                            placeholder="Localização/descrição"
+                            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                          />
+
+                          <select
+                            value={editing.environmentType}
+                            onChange={(e) =>
+                              setEditing((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      environmentType: e.target
+                                        .value as EnvironmentType,
+                                    }
+                                  : prev
+                              )
+                            }
+                            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+                          >
+                            <option value="POSTO">Posto</option>
+                            <option value="CONVENIENCIA">Conveniência</option>
+                            <option value="RESTAURANTE">Restaurante</option>
+                          </select>
+
+                          <select
+                            value={editing.branchId}
+                            onChange={(e) =>
+                              setEditing((prev) =>
+                                prev
+                                  ? { ...prev, branchId: e.target.value }
+                                  : prev
+                              )
+                            }
+                            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+                          >
+                            <option value="">Selecione a filial</option>
+                            {(superAdmin ? editingBranches : branches).map(
+                              (branch) => (
+                                <option key={branch.id} value={branch.id}>
+                                  {branch.name}
+                                </option>
+                              )
+                            )}
+                          </select>
+                        </div>
+                      ) : (
+                        <>
+                          <h3 className="text-lg font-semibold text-slate-900">
+                            {kiosk.name}
+                          </h3>
+
+                          <div className="space-y-1 text-sm text-slate-600">
+                            <p>Empresa: {kiosk.company?.name ?? "-"}</p>
+                            <p>Filial: {kiosk.branch?.name ?? "Sem filial"}</p>
+                            <p>
+                              Ambiente: {getEnvironmentLabel(kiosk.environmentType)}
+                            </p>
+                            <p>Local: {kiosk.locationDescription || "-"}</p>
+                            <p>Status: {kiosk.active ? "Ativo" : "Inativo"}</p>
+                          </div>
+                        </>
+                      )}
 
                       <div className="space-y-2 rounded-2xl bg-slate-50 p-4">
                         <div>
@@ -447,66 +666,94 @@ export default function KiosksPage() {
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => handleCopyToken(kiosk.token)}
-                        className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
-                      >
-                        Copiar token
-                      </button>
-
-                      <button
-                        onClick={() => handleCopyLink(kiosk.token)}
-                        className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-sky-400"
-                      >
-                        Copiar link
-                      </button>
-
-                      <button
-                        onClick={() => handleShowQr(kiosk.token)}
-                        className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200"
-                      >
-                        Ver QR Code
-                      </button>
-
-                      {canManage ? (
+                      {isEditing ? (
                         <>
                           <button
-                            onClick={() => handleRegenerateToken(kiosk)}
-                            disabled={isProcessing}
-                            className="rounded-xl bg-violet-100 px-4 py-2 text-sm font-medium text-violet-800 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={() => handleSaveEdit(kiosk)}
+                            disabled={savingEdit}
+                            className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            Regenerar token
+                            {savingEdit ? "Salvando..." : "Salvar"}
                           </button>
 
-                          {kiosk.active ? (
-                            <button
-                              onClick={() => handleDeactivate(kiosk)}
-                              disabled={isProcessing}
-                              className="rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Desativar
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleActivate(kiosk)}
-                              disabled={isProcessing}
-                              className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Reativar
-                            </button>
-                          )}
+                          <button
+                            onClick={handleCancelEdit}
+                            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
+                          >
+                            Cancelar
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleCopyToken(kiosk.token)}
+                            className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                          >
+                            Copiar token
+                          </button>
 
-                          {canDeletePermanently ? (
-                            <button
-                              onClick={() => handleHardDelete(kiosk)}
-                              disabled={isProcessing}
-                              className="rounded-xl bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              Excluir definitivo
-                            </button>
+                          <button
+                            onClick={() => handleCopyLink(kiosk.token)}
+                            className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-sky-400"
+                          >
+                            Copiar link
+                          </button>
+
+                          <button
+                            onClick={() => handleShowQr(kiosk.token)}
+                            className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200"
+                          >
+                            Ver QR Code
+                          </button>
+
+                          {canManage ? (
+                            <>
+                              <button
+                                onClick={() => handleStartEdit(kiosk)}
+                                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                              >
+                                Editar
+                              </button>
+
+                              <button
+                                onClick={() => handleRegenerateToken(kiosk)}
+                                disabled={isProcessing}
+                                className="rounded-xl bg-violet-100 px-4 py-2 text-sm font-medium text-violet-800 transition hover:bg-violet-200 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                Regenerar token
+                              </button>
+
+                              {kiosk.active ? (
+                                <button
+                                  onClick={() => handleDeactivate(kiosk)}
+                                  disabled={isProcessing}
+                                  className="rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Desativar
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleActivate(kiosk)}
+                                  disabled={isProcessing}
+                                  className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Reativar
+                                </button>
+                              )}
+
+                              {canDeletePermanently ? (
+                                <button
+                                  onClick={() => handleHardDelete(kiosk)}
+                                  disabled={isProcessing}
+                                  className="rounded-xl bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Excluir definitivo
+                                </button>
+                              ) : null}
+                            </>
                           ) : null}
                         </>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                 </article>

@@ -1,5 +1,7 @@
 import { api } from "./api";
 
+export type EnvironmentType = "POSTO" | "CONVENIENCIA" | "RESTAURANTE";
+
 export type KioskCompany = {
   id: string;
   name: string;
@@ -18,6 +20,7 @@ export type Kiosk = {
   branchId: string;
   companyId?: string;
   locationDescription?: string | null;
+  environmentType: EnvironmentType;
   active: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -35,6 +38,7 @@ export type CreateKioskPayload = {
   branchId: string;
   companyId?: string;
   locationDescription?: string;
+  environmentType?: EnvironmentType;
   active?: boolean;
 };
 
@@ -43,6 +47,7 @@ export type UpdateKioskPayload = {
   branchId?: string;
   companyId?: string;
   locationDescription?: string;
+  environmentType?: EnvironmentType;
   active?: boolean;
 };
 

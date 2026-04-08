@@ -4,6 +4,7 @@ import { api } from "../../services/api";
 import {
   getPublicKioskConfig,
   getPublicKioskTags,
+  type PublicEnvironmentType,
   type PublicKioskConfig,
 } from "../../services/publicKiosk";
 
@@ -41,6 +42,19 @@ const DEFAULT_RESET_DELAY_MS = 3000;
 function getKioskTokenFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get("token")?.trim() || "";
+}
+
+function getEnvironmentLabel(environment?: PublicEnvironmentType) {
+  switch (environment) {
+    case "POSTO":
+      return "Posto";
+    case "CONVENIENCIA":
+      return "Conveniência";
+    case "RESTAURANTE":
+      return "Restaurante";
+    default:
+      return "Atendimento";
+  }
 }
 
 export default function FeedbackKiosk() {
@@ -96,6 +110,7 @@ export default function FeedbackKiosk() {
     ((settings?.kioskResetSeconds ?? 5) * 1000) || DEFAULT_RESET_DELAY_MS;
 
   const isNegativeRating = rating === 1 || rating === 2;
+  const environmentLabel = getEnvironmentLabel(config?.kiosk?.environmentType);
 
   function resetFlow() {
     if (!kioskToken) {
@@ -322,6 +337,10 @@ export default function FeedbackKiosk() {
                 {companyName}
               </p>
 
+              <div className="mt-4 inline-flex items-center rounded-full border border-white/10 bg-black/15 px-4 py-2 text-sm md:text-base font-medium">
+                Ambiente: {environmentLabel}
+              </div>
+
               <h1 className="mt-4 text-4xl md:text-6xl font-bold leading-tight">
                 {heroTitle}
               </h1>
@@ -355,6 +374,10 @@ export default function FeedbackKiosk() {
                 <span className="ml-2 font-semibold">
                   {selectedRating?.emoji} {selectedRating?.label}
                 </span>
+              </p>
+
+              <p className="mt-3 text-sm md:text-base opacity-80">
+                Ambiente: <span className="font-semibold">{environmentLabel}</span>
               </p>
 
               <h2 className="mt-4 text-3xl md:text-5xl font-bold">
@@ -434,6 +457,10 @@ export default function FeedbackKiosk() {
                 <span className="ml-2 font-semibold">
                   {selectedRating?.emoji} {selectedRating?.label}
                 </span>
+              </p>
+
+              <p className="mt-3 text-sm md:text-base opacity-80">
+                Ambiente: <span className="font-semibold">{environmentLabel}</span>
               </p>
 
               <h2 className="mt-4 text-3xl md:text-5xl font-bold">
@@ -527,6 +554,10 @@ export default function FeedbackKiosk() {
                 <span className="ml-2 font-semibold">
                   {selectedRating?.emoji} {selectedRating?.label}
                 </span>
+              </p>
+
+              <p className="mt-3 text-sm md:text-base opacity-80">
+                Ambiente: <span className="font-semibold">{environmentLabel}</span>
               </p>
 
               <h2 className="mt-4 text-3xl md:text-5xl font-bold">
@@ -642,6 +673,10 @@ export default function FeedbackKiosk() {
               <h2 className="mt-6 text-4xl md:text-6xl font-bold">
                 Obrigado!
               </h2>
+
+              <p className="mt-3 text-sm md:text-base opacity-80">
+                Ambiente: <span className="font-semibold">{environmentLabel}</span>
+              </p>
 
               <p className="mt-4 text-lg md:text-2xl opacity-90">
                 {thankYouMessage}

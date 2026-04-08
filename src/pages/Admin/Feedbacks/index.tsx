@@ -4,6 +4,7 @@ import {
   getFeedbacks,
   type FeedbackFilters,
   type FeedbackItem,
+  type FeedbackEnvironmentType,
 } from "../../../services/feedbacks";
 import { getBranches, type Branch } from "../../../services/branches";
 import { getKiosks, type Kiosk } from "../../../services/kiosks";
@@ -55,6 +56,19 @@ function hasContactInfo(feedback: FeedbackItem) {
   );
 }
 
+function getEnvironmentLabel(environment?: FeedbackEnvironmentType) {
+  switch (environment) {
+    case "POSTO":
+      return "Posto";
+    case "CONVENIENCIA":
+      return "Conveniência";
+    case "RESTAURANTE":
+      return "Restaurante";
+    default:
+      return "Não informado";
+  }
+}
+
 export default function FeedbacksPage() {
   const currentUser = getStoredUser();
 
@@ -77,6 +91,7 @@ export default function FeedbacksPage() {
     branchId: "",
     kioskId: "",
     rating: "",
+    environmentType: "",
     startDate: "",
     endDate: "",
     active: "",
@@ -146,6 +161,7 @@ export default function FeedbacksPage() {
         branchId: finalFilters.branchId || undefined,
         kioskId: finalFilters.kioskId || undefined,
         rating: finalFilters.rating || undefined,
+        environmentType: finalFilters.environmentType || undefined,
         startDate: finalFilters.startDate || undefined,
         endDate: finalFilters.endDate || undefined,
         active: finalFilters.active || undefined,
@@ -187,6 +203,7 @@ export default function FeedbacksPage() {
       branchId: "",
       kioskId: "",
       rating: "",
+      environmentType: "",
       startDate: "",
       endDate: "",
       active: "",
@@ -258,7 +275,7 @@ export default function FeedbacksPage() {
         <div className="mb-4 space-y-1">
           <h2 className="text-xl font-semibold text-slate-900">Filtros</h2>
           <p className="text-sm text-slate-500">
-            Refine os resultados por empresa, nota, filial, kiosk, período e status.
+            Refine os resultados por empresa, ambiente, nota, filial, kiosk, período e status.
           </p>
         </div>
 
@@ -277,6 +294,17 @@ export default function FeedbacksPage() {
               ))}
             </select>
           ) : null}
+
+          <select
+            value={filters.environmentType ?? ""}
+            onChange={(e) => handleChangeFilter("environmentType", e.target.value)}
+            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+          >
+            <option value="">Todos os ambientes</option>
+            <option value="POSTO">Posto</option>
+            <option value="CONVENIENCIA">Conveniência</option>
+            <option value="RESTAURANTE">Restaurante</option>
+          </select>
 
           <select
             value={filters.rating ?? ""}
@@ -420,6 +448,11 @@ export default function FeedbacksPage() {
                       <p>
                         <span className="font-medium text-slate-800">Filial:</span>{" "}
                         {feedback.branch?.name ?? "Não informada"}
+                      </p>
+
+                      <p>
+                        <span className="font-medium text-slate-800">Ambiente:</span>{" "}
+                        {getEnvironmentLabel(feedback.kiosk?.environmentType)}
                       </p>
 
                       <p>

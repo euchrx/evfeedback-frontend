@@ -5,8 +5,10 @@ import {
   deactivateTag,
   getTags,
   hardDeleteTag,
+  importTagsBySegment,
   updateTag,
   type Tag,
+  type EnvironmentType,
 } from "../../../services/tags";
 import { getCompanies, type Company } from "../../../services/companies";
 import { getStoredUser } from "../../../services/auth";
@@ -22,7 +24,11 @@ type EditingState = {
   id: string;
   name: string;
   color: string;
+  environmentType: EnvironmentType;
 } | null;
+
+type SegmentOption = "RESTAURANTE" | "CONVENIENCIA" | "POSTO";
+type EnvironmentFilter = "ALL" | EnvironmentType;
 
 export default function TagsPage() {
   const currentUser = getStoredUser();
@@ -38,13 +44,20 @@ export default function TagsPage() {
 
   const [name, setName] = useState("");
   const [color, setColor] = useState("#0ea5e9");
+  const [environmentType, setEnvironmentType] =
+    useState<EnvironmentType>("POSTO");
   const [companyId, setCompanyId] = useState(resolvedCompanyId ?? "");
   const [showInactive, setShowInactive] = useState(false);
+  const [selectedSegment, setSelectedSegment] =
+    useState<SegmentOption>("POSTO");
+  const [environmentFilter, setEnvironmentFilter] =
+    useState<EnvironmentFilter>("ALL");
 
   const [editing, setEditing] = useState<EditingState>(null);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [importingSegment, setImportingSegment] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -52,6 +65,24 @@ export default function TagsPage() {
   const selectedCompanyId = useMemo(() => {
     return superAdmin ? companyId || undefined : resolvedCompanyId;
   }, [superAdmin, companyId, resolvedCompanyId]);
+
+  function getEnvironmentLabel(value: EnvironmentType) {
+    switch (value) {
+      case "POSTO":
+        return "Posto";
+      case "CONVENIENCIA":
+        return "Conveniência";
+      case "RESTAURANTE":
+        return "Restaurante";
+      default:
+        return value;
+    }
+  }
+
+  const filteredTags = useMemo(() => {
+    if (environmentFilter === "ALL") return tags;
+    return tags.filter((tag) => tag.environmentType === environmentFilter);
+  }, [tags, environmentFilter]);
 
   useEffect(() => {
     if (!canView) {
@@ -92,6 +123,7 @@ export default function TagsPage() {
   function resetForm() {
     setName("");
     setColor("#0ea5e9");
+    setEnvironmentType("POSTO");
   }
 
   async function handleCreate() {
@@ -115,6 +147,7 @@ export default function TagsPage() {
       await createTag({
         name: trimmedName,
         color: color?.trim() || null,
+        environmentType,
         companyId: superAdmin ? selectedCompanyId : resolvedCompanyId,
       });
 
@@ -127,11 +160,54 @@ export default function TagsPage() {
     }
   }
 
+  async function handleImportBySegment() {
+    if (!canManage) return;
+
+    if (superAdmin && !selectedCompanyId) {
+      setError("Selecione a empresa antes de importar tags por ambiente.");
+      return;
+    }
+
+    const segmentLabel =
+      selectedSegment === "RESTAURANTE"
+        ? "Restaurante"
+        : selectedSegment === "CONVENIENCIA"
+        ? "Conveniência"
+        : "Posto";
+
+    const confirmed = window.confirm(
+      `Deseja importar as tags padrão do ambiente "${segmentLabel}"?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setImportingSegment(true);
+      setError("");
+
+      const result = await importTagsBySegment({
+        segment: selectedSegment,
+        companyId: superAdmin ? selectedCompanyId : resolvedCompanyId,
+      });
+
+      await load();
+
+      window.alert(
+        `Importação concluída.\n\nCriadas: ${result.createdCount}\nIgnoradas por já existirem: ${result.skippedCount}`
+      );
+    } catch {
+      setError("Não foi possível importar as tags do ambiente.");
+    } finally {
+      setImportingSegment(false);
+    }
+  }
+
   function handleStartEdit(tag: Tag) {
     setEditing({
       id: tag.id,
       name: tag.name ?? "",
       color: tag.color ?? "#0ea5e9",
+      environmentType: tag.environmentType ?? "POSTO",
     });
   }
 
@@ -155,6 +231,7 @@ export default function TagsPage() {
       await updateTag(tag.id, {
         name: trimmedName,
         color: editing.color?.trim() || null,
+        environmentType: editing.environmentType,
         companyId: superAdmin ? tag.companyId ?? selectedCompanyId : resolvedCompanyId,
       });
 
@@ -256,7 +333,7 @@ export default function TagsPage() {
           Tags
         </h1>
         <p className="text-slate-600">
-          Gerencie os motivos exibidos no kiosk conforme o escopo do seu perfil.
+          Gerencie os motivos exibidos no kiosk conforme o ambiente de atendimento.
         </p>
       </div>
 
@@ -267,66 +344,132 @@ export default function TagsPage() {
       ) : null}
 
       {canManage ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 space-y-1">
-            <h2 className="text-xl font-semibold text-slate-900">Nova tag</h2>
-            <p className="text-sm text-slate-500">
-              Cadastre uma nova tag no escopo permitido pelo seu usuário.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-4">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex.: Atendimento"
-              className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-sky-500"
-            />
-
-            <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
-              />
-              <span className="text-sm text-slate-600">{color}</span>
+        <>
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 space-y-1">
+              <h2 className="text-xl font-semibold text-slate-900">Nova tag</h2>
+              <p className="text-sm text-slate-500">
+                Cadastre uma nova tag no escopo permitido pelo seu usuário.
+              </p>
             </div>
 
-            {superAdmin ? (
+            <div className="grid gap-4 md:grid-cols-5">
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex.: Atendimento"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-sky-500"
+              />
+
+              <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
+                />
+                <span className="text-sm text-slate-600">{color}</span>
+              </div>
+
               <select
-                value={companyId}
-                onChange={(e) => setCompanyId(e.target.value)}
+                value={environmentType}
+                onChange={(e) =>
+                  setEnvironmentType(e.target.value as EnvironmentType)
+                }
                 className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-sky-500"
               >
-                <option value="">Selecione a empresa</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
+                <option value="POSTO">Posto</option>
+                <option value="CONVENIENCIA">Conveniência</option>
+                <option value="RESTAURANTE">Restaurante</option>
               </select>
-            ) : (
-              <input
-                value={
-                  currentUser?.companyId
-                    ? "Empresa vinculada ao seu usuário"
-                    : "Sem empresa vinculada"
-                }
-                disabled
-                className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-500"
-              />
-            )}
 
-            <button
-              onClick={handleCreate}
-              disabled={submitting}
-              className="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting ? "Criando..." : "Criar tag"}
-            </button>
+              {superAdmin ? (
+                <select
+                  value={companyId}
+                  onChange={(e) => setCompanyId(e.target.value)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-sky-500"
+                >
+                  <option value="">Selecione a empresa</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={
+                    currentUser?.companyId
+                      ? "Empresa vinculada ao seu usuário"
+                      : "Sem empresa vinculada"
+                  }
+                  disabled
+                  className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-500"
+                />
+              )}
+
+              <button
+                onClick={handleCreate}
+                disabled={submitting}
+                className="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submitting ? "Criando..." : "Criar tag"}
+              </button>
+            </div>
           </div>
-        </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 space-y-1">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Importar tags por ambiente
+              </h2>
+              <p className="text-sm text-slate-500">
+                Importe rapidamente um conjunto padrão de tags para posto, conveniência ou restaurante.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              <select
+                value={selectedSegment}
+                onChange={(e) => setSelectedSegment(e.target.value as SegmentOption)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-sky-500"
+              >
+                <option value="POSTO">Posto</option>
+                <option value="CONVENIENCIA">Conveniência</option>
+                <option value="RESTAURANTE">Restaurante</option>
+              </select>
+
+              {superAdmin ? (
+                <input
+                  value={
+                    selectedCompanyId
+                      ? `Empresa selecionada: ${
+                          companies.find((company) => company.id === selectedCompanyId)?.name ??
+                          "Selecionada"
+                        }`
+                      : "Selecione uma empresa acima"
+                  }
+                  disabled
+                  className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-500"
+                />
+              ) : (
+                <input
+                  value="Importação no escopo da sua empresa"
+                  disabled
+                  className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-500"
+                />
+              )}
+
+              <button
+                onClick={handleImportBySegment}
+                disabled={importingSegment}
+                className="rounded-xl bg-emerald-500 px-4 py-3 font-semibold text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importingSegment ? "Importando..." : "Importar tags do ambiente"}
+              </button>
+            </div>
+          </div>
+        </>
       ) : null}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -334,31 +477,46 @@ export default function TagsPage() {
           <div className="space-y-1">
             <h2 className="text-xl font-semibold text-slate-900">Tags cadastradas</h2>
             <p className="text-sm text-slate-500">
-              {loading ? "Carregando..." : `${tags.length} item(ns)`}
+              {loading ? "Carregando..." : `${filteredTags.length} item(ns)`}
             </p>
           </div>
 
-          <label className="inline-flex items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-            />
-            Mostrar inativas
-          </label>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <select
+              value={environmentFilter}
+              onChange={(e) =>
+                setEnvironmentFilter(e.target.value as EnvironmentFilter)
+              }
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-sky-500"
+            >
+              <option value="ALL">Todos os ambientes</option>
+              <option value="POSTO">Posto</option>
+              <option value="CONVENIENCIA">Conveniência</option>
+              <option value="RESTAURANTE">Restaurante</option>
+            </select>
+
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+              />
+              Mostrar inativas
+            </label>
+          </div>
         </div>
 
         {loading ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Carregando tags...
           </div>
-        ) : tags.length === 0 ? (
+        ) : filteredTags.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-            Nenhuma tag cadastrada.
+            Nenhuma tag cadastrada para o filtro selecionado.
           </div>
         ) : (
           <div className="grid gap-4">
-            {tags.map((tag) => {
+            {filteredTags.map((tag) => {
               const isEditing = editing?.id === tag.id;
               const isProcessing = processingId === tag.id;
 
@@ -370,7 +528,7 @@ export default function TagsPage() {
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-3">
                       {isEditing ? (
-                        <div className="grid gap-3 md:grid-cols-2">
+                        <div className="grid gap-3 md:grid-cols-3">
                           <input
                             value={editing.name}
                             onChange={(e) =>
@@ -396,6 +554,25 @@ export default function TagsPage() {
                               {editing.color}
                             </span>
                           </div>
+
+                          <select
+                            value={editing.environmentType}
+                            onChange={(e) =>
+                              setEditing((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      environmentType: e.target.value as EnvironmentType,
+                                    }
+                                  : prev
+                              )
+                            }
+                            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-sky-500"
+                          >
+                            <option value="POSTO">Posto</option>
+                            <option value="CONVENIENCIA">Conveniência</option>
+                            <option value="RESTAURANTE">Restaurante</option>
+                          </select>
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
@@ -414,6 +591,7 @@ export default function TagsPage() {
                         {superAdmin ? (
                           <p>Empresa: {tag.company?.name ?? tag.companyId ?? "-"}</p>
                         ) : null}
+                        <p>Ambiente: {getEnvironmentLabel(tag.environmentType)}</p>
                         <p>Cor: {tag.color ?? "-"}</p>
                         <p>Status: {tag.active === false ? "Inativa" : "Ativa"}</p>
                       </div>
