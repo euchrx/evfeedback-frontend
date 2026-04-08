@@ -8,10 +8,21 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = readAuthToken();
+  const url = config.url ?? "";
 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  const isPublicKioskRoute =
+    url.startsWith("/kiosk/config") ||
+    url.startsWith("/kiosk/tags") ||
+    url.startsWith("/kiosk/feedback");
+
+  if (!isPublicKioskRoute) {
+    const token = readAuthToken();
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } else if (config.headers?.Authorization) {
+    delete config.headers.Authorization;
   }
 
   return config;
