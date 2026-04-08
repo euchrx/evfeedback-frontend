@@ -79,11 +79,14 @@ export default function UsersPage() {
       return;
     }
 
-    const resolvedCompanyId = superAdmin
-      ? companyId
-      : currentUser?.companyId ?? "";
+    const resolvedCompanyId =
+      role === "SUPER_ADMIN"
+        ? undefined
+        : superAdmin
+          ? companyId
+          : currentUser?.companyId ?? "";
 
-    if (!resolvedCompanyId) {
+    if (role !== "SUPER_ADMIN" && !resolvedCompanyId) {
       setError("Selecione uma empresa.");
       return;
     }
@@ -253,12 +256,14 @@ export default function UsersPage() {
           <select
             value={companyId}
             onChange={(e) => setCompanyId(e.target.value)}
-            disabled={!superAdmin}
+            disabled={!superAdmin || role === "SUPER_ADMIN"}
             className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500 disabled:bg-slate-100 disabled:text-slate-500"
           >
             {superAdmin ? (
               <>
-                <option value="">Selecione a empresa</option>
+                <option value="">
+                  {role === "SUPER_ADMIN" ? "Empresa ignorada para SUPER_ADMIN" : "Selecione a empresa"}
+                </option>
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>
                     {company.name}
