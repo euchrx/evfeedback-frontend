@@ -11,6 +11,7 @@ import DashboardPage from "./pages/Admin/Dashboard";
 import { PrivateRoute } from "./routes/PrivateRoute";
 import { RoleRoute } from "./routes/RoleRoute";
 import { AdminLayout } from "./components/admin/AdminLayout";
+import FeedbackKiosk from "./pages/Feedbacks";
 
 export function AppRoutes() {
   return (
@@ -53,7 +54,7 @@ export function AppRoutes() {
             </Route>
           </Route>
         </Route>
-
+        <Route path="feedback" element={<FeedbackKiosk />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
