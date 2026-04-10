@@ -189,15 +189,6 @@ export default function FeedbackKiosk() {
     );
   }
 
-  function handleAdvanceFromComment() {
-    if (isNegativeRating) {
-      setStep("contact");
-      return;
-    }
-
-    void handleSubmit(false);
-  }
-
   function handleSubmitCommentStep() {
     const trimmedComment = comment.trim();
 
