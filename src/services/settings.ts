@@ -58,3 +58,15 @@ export async function updateMySettings(
 
   return response.data;
 }
+
+export async function sendTestEmail(companyId?: string) {
+  const response = await api.post(
+    "/settings/test-email",
+    {},
+    {
+      params: companyId ? { companyId } : undefined,
+    }
+  );
+
+  return response.data;
+}

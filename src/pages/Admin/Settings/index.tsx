@@ -3,6 +3,7 @@ import { getStoredUser } from "../../../services/auth";
 import { getCompanies, type Company } from "../../../services/companies";
 import {
   getMySettings,
+  sendTestEmail,
   updateMySettings,
 } from "../../../services/settings";
 import {
@@ -97,6 +98,31 @@ export default function SettingsPage() {
       setError("Não foi possível carregar as configurações.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleSendTestEmail() {
+    if (!canManage) return;
+
+    if (superAdmin && !selectedCompanyId) {
+      setError("Selecione uma empresa.");
+      return;
+    }
+
+    try {
+      setError("");
+      setSuccess("");
+
+      const result = await sendTestEmail(selectedCompanyId);
+
+      setSuccess(
+        `E-mail de teste enviado com sucesso para: ${result.recipients.join(", ")}`
+      );
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+        "Não foi possível enviar o e-mail de teste."
+      );
     }
   }
 
@@ -342,6 +368,15 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleSendTestEmail}
+              className="rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-white transition hover:bg-emerald-400"
+            >
+              Enviar e-mail de teste
+            </button>
+          </div>
           {canManage ? (
             <div className="flex justify-end">
               <button
