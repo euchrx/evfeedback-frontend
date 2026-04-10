@@ -450,7 +450,7 @@ export default function FeedbackKiosk() {
 
   return (
     <main
-      className="min-h-screen flex items-center justify-center px-4 py-8"
+      className="min-h-screen flex items-center justify-center px-4 py-8 select-none"
       style={{
         backgroundColor,
         color: textColor,
@@ -460,6 +460,9 @@ export default function FeedbackKiosk() {
         backgroundSize: "cover",
         backgroundPosition: "center",
         touchAction: "manipulation",
+        WebkitUserSelect: "none",
+        userSelect: "none",
+        WebkitTouchCallout: "none",
       }}
     >
       <div className="w-full max-w-5xl">
@@ -473,7 +476,8 @@ export default function FeedbackKiosk() {
                 <img
                   src={logoUrl}
                   alt={companyName}
-                  className="h-16 md:h-20 object-contain mx-auto mb-4"
+                  className="h-16 md:h-20 object-contain mx-auto mb-4 pointer-events-none"
+                  draggable={false}
                 />
               ) : null}
 
@@ -631,7 +635,11 @@ export default function FeedbackKiosk() {
                 placeholder="Escreva aqui sua opinião..."
                 className={`mt-8 w-full rounded-2xl border bg-black/10 px-5 py-4 text-base outline-none min-h-[140px] resize-none ${commentError ? "border-rose-400" : "border-white/10"
                   }`}
-                style={{ color: textColor }}
+                style={{
+                  color: textColor,
+                  WebkitUserSelect: "text",
+                  userSelect: "text",
+                }}
                 maxLength={500}
               />
 
@@ -725,7 +733,11 @@ export default function FeedbackKiosk() {
                       placeholder="Seu nome"
                       className={`w-full rounded-2xl border bg-black/10 px-4 py-3 text-base outline-none ${contactNameError ? "border-rose-400" : "border-white/10"
                         }`}
-                      style={{ color: textColor }}
+                      style={{
+                        color: textColor,
+                        WebkitUserSelect: "text",
+                        userSelect: "text",
+                      }}
                       maxLength={120}
                     />
                     {contactNameError ? (
@@ -749,7 +761,11 @@ export default function FeedbackKiosk() {
                       placeholder="(00) 00000-0000"
                       className={`w-full rounded-2xl border bg-black/10 px-4 py-3 text-base outline-none ${contactPhoneError ? "border-rose-400" : "border-white/10"
                         }`}
-                      style={{ color: textColor }}
+                      style={{
+                        color: textColor,
+                        WebkitUserSelect: "text",
+                        userSelect: "text",
+                      }}
                       maxLength={30}
                     />
                     {contactPhoneError ? (
@@ -767,7 +783,11 @@ export default function FeedbackKiosk() {
                     onChange={(e) => setContactMessage(e.target.value)}
                     placeholder="Se quiser, informe mais detalhes para contato."
                     className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none min-h-[120px] resize-none"
-                    style={{ color: textColor }}
+                    style={{
+                      color: textColor,
+                      WebkitUserSelect: "text",
+                      userSelect: "text",
+                    }}
                     maxLength={500}
                   />
                   <div className="mt-2 text-right text-sm opacity-70">
