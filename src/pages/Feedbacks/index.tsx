@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { api } from "../../services/api";
 import {
@@ -38,6 +38,7 @@ const RATING_OPTIONS: RatingOption[] = [
 ];
 
 const DEFAULT_RESET_DELAY_MS = 3000;
+const INACTIVITY_TIMEOUT_MS = 30000;
 
 function getKioskTokenFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -70,6 +71,8 @@ export default function FeedbackKiosk() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
+
+  const inactivityTimerRef = useRef<number | null>(null);
 
   const kioskToken = useMemo(() => {
     return getKioskTokenFromUrl();
@@ -112,7 +115,16 @@ export default function FeedbackKiosk() {
   const isNegativeRating = rating === 1 || rating === 2;
   const environmentLabel = getEnvironmentLabel(config?.kiosk?.environmentType);
 
+  function clearInactivityTimer() {
+    if (inactivityTimerRef.current) {
+      window.clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+  }
+
   function resetFlow() {
+    clearInactivityTimer();
+
     if (!kioskToken) {
       setStep("error");
       setKioskErrorType("missing_token");
@@ -137,6 +149,19 @@ export default function FeedbackKiosk() {
     setContactMessage("");
     setContactConsent(false);
     setIsSubmitting(false);
+  }
+
+  function restartInactivityTimer() {
+    if (!rating || step === "rating" || step === "done" || step === "error") {
+      clearInactivityTimer();
+      return;
+    }
+
+    clearInactivityTimer();
+
+    inactivityTimerRef.current = window.setTimeout(() => {
+      resetFlow();
+    }, INACTIVITY_TIMEOUT_MS);
   }
 
   function handleSelectRating(value: number) {
@@ -172,6 +197,7 @@ export default function FeedbackKiosk() {
 
     try {
       setIsSubmitting(true);
+      clearInactivityTimer();
 
       await api.post("/kiosk/feedback", {
         token: kioskToken,
@@ -193,6 +219,14 @@ export default function FeedbackKiosk() {
       setIsSubmitting(false);
     }
   }
+
+  useEffect(() => {
+    restartInactivityTimer();
+
+    return () => {
+      clearInactivityTimer();
+    };
+  }, [step, rating]);
 
   useEffect(() => {
     if (step !== "done") return;
@@ -267,6 +301,12 @@ export default function FeedbackKiosk() {
 
     loadTags();
   }, [kioskToken, config]);
+
+  useEffect(() => {
+    return () => {
+      clearInactivityTimer();
+    };
+  }, []);
 
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
 
@@ -429,7 +469,10 @@ export default function FeedbackKiosk() {
               <div className="mt-10 flex flex-col md:flex-row gap-4 justify-center">
                 <button
                   type="button"
-                  onClick={() => setStep("rating")}
+                  onClick={() => {
+                    setStep("rating");
+                    clearInactivityTimer();
+                  }}
                   className="rounded-2xl bg-black/15 hover:bg-black/25 px-8 py-4 text-lg font-semibold transition"
                 >
                   Voltar

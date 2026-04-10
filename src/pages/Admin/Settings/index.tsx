@@ -368,15 +368,17 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="pt-2">
-            <button
-              type="button"
-              onClick={handleSendTestEmail}
-              className="rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-white transition hover:bg-emerald-400"
-            >
-              Enviar e-mail de teste
-            </button>
-          </div>
+          {superAdmin ? (
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleSendTestEmail}
+                className="rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-white transition hover:bg-emerald-400"
+              >
+                Enviar e-mail de teste
+              </button>
+            </div>
+          ) : null}
           {canManage ? (
             <div className="flex justify-end">
               <button

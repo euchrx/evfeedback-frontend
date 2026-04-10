@@ -29,6 +29,9 @@ type EditingState = {
 
 type SegmentOption = "RESTAURANTE" | "CONVENIENCIA" | "POSTO";
 type EnvironmentFilter = "ALL" | EnvironmentType;
+type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
+
+const PAGE_SIZE = 10;
 
 export default function TagsPage() {
   const currentUser = getStoredUser();
@@ -46,12 +49,18 @@ export default function TagsPage() {
   const [color, setColor] = useState("#0ea5e9");
   const [environmentType, setEnvironmentType] =
     useState<EnvironmentType>("POSTO");
-  const [companyId, setCompanyId] = useState(resolvedCompanyId ?? "");
-  const [showInactive, setShowInactive] = useState(false);
+  const [companyId, setCompanyId] = useState(
+    resolvedCompanyId ?? currentUser?.companyId ?? ""
+  );
+
   const [selectedSegment, setSelectedSegment] =
     useState<SegmentOption>("POSTO");
+
+  const [search, setSearch] = useState("");
   const [environmentFilter, setEnvironmentFilter] =
     useState<EnvironmentFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [page, setPage] = useState(1);
 
   const [editing, setEditing] = useState<EditingState>(null);
 
@@ -63,8 +72,10 @@ export default function TagsPage() {
   const [error, setError] = useState("");
 
   const selectedCompanyId = useMemo(() => {
-    return superAdmin ? companyId || undefined : resolvedCompanyId;
-  }, [superAdmin, companyId, resolvedCompanyId]);
+    return superAdmin
+      ? companyId || currentUser?.companyId || undefined
+      : resolvedCompanyId;
+  }, [superAdmin, companyId, resolvedCompanyId, currentUser?.companyId]);
 
   function getEnvironmentLabel(value: EnvironmentType) {
     switch (value) {
@@ -79,20 +90,6 @@ export default function TagsPage() {
     }
   }
 
-  const filteredTags = useMemo(() => {
-    if (environmentFilter === "ALL") return tags;
-    return tags.filter((tag) => tag.environmentType === environmentFilter);
-  }, [tags, environmentFilter]);
-
-  useEffect(() => {
-    if (!canView) {
-      setLoading(false);
-      return;
-    }
-
-    void load();
-  }, [canView, selectedCompanyId, showInactive]);
-
   async function load() {
     try {
       setLoading(true);
@@ -101,7 +98,6 @@ export default function TagsPage() {
       const requests: Promise<unknown>[] = [
         getTags({
           ...(selectedCompanyId ? { companyId: selectedCompanyId } : {}),
-          ...(showInactive ? {} : { active: true }),
         }),
       ];
 
@@ -130,6 +126,7 @@ export default function TagsPage() {
     if (!canManage) return;
 
     const trimmedName = name.trim();
+
     if (!trimmedName) {
       setError("Informe o nome da tag.");
       return;
@@ -152,6 +149,7 @@ export default function TagsPage() {
       });
 
       resetForm();
+      setPage(1);
       await load();
     } catch {
       setError("Não foi possível criar a tag.");
@@ -164,7 +162,7 @@ export default function TagsPage() {
     if (!canManage) return;
 
     if (superAdmin && !selectedCompanyId) {
-      setError("Selecione a empresa antes de importar tags por ambiente.");
+      setError("Selecione uma empresa antes de importar tags por ambiente.");
       return;
     }
 
@@ -219,6 +217,7 @@ export default function TagsPage() {
     if (!canManage || !editing) return;
 
     const trimmedName = editing.name.trim();
+
     if (!trimmedName) {
       setError("Informe o nome da tag.");
       return;
@@ -312,6 +311,62 @@ export default function TagsPage() {
       setProcessingId(null);
     }
   }
+
+  function handleClearFilters() {
+    setSearch("");
+    setEnvironmentFilter("ALL");
+    setStatusFilter("ALL");
+    setPage(1);
+  }
+
+  const filteredTags = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    return tags.filter((tag) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        tag.name.toLowerCase().includes(normalizedSearch) ||
+        (tag.company?.name ?? "").toLowerCase().includes(normalizedSearch) ||
+        (tag.color ?? "").toLowerCase().includes(normalizedSearch);
+
+      const matchesEnvironment =
+        environmentFilter === "ALL" ||
+        tag.environmentType === environmentFilter;
+
+      const matchesStatus =
+        statusFilter === "ALL" ||
+        (statusFilter === "ACTIVE" && tag.active !== false) ||
+        (statusFilter === "INACTIVE" && tag.active === false);
+
+      return matchesSearch && matchesEnvironment && matchesStatus;
+    });
+  }, [tags, search, environmentFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredTags.length / PAGE_SIZE));
+
+  const paginatedTags = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredTags.slice(start, start + PAGE_SIZE);
+  }, [filteredTags, page]);
+
+  useEffect(() => {
+    if (!canView) {
+      setLoading(false);
+      return;
+    }
+
+    void load();
+  }, [canView, selectedCompanyId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, environmentFilter, statusFilter, selectedCompanyId]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   if (!canView) {
     return (
@@ -473,36 +528,51 @@ export default function TagsPage() {
       ) : null}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-4 grid gap-3 md:grid-cols-4">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome, cor ou empresa"
+            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+          />
+
+          <select
+            value={environmentFilter}
+            onChange={(e) =>
+              setEnvironmentFilter(e.target.value as EnvironmentFilter)
+            }
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+          >
+            <option value="ALL">Todos os ambientes</option>
+            <option value="POSTO">Posto</option>
+            <option value="CONVENIENCIA">Conveniência</option>
+            <option value="RESTAURANTE">Restaurante</option>
+          </select>
+
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+          >
+            <option value="ALL">Todos os status</option>
+            <option value="ACTIVE">Ativas</option>
+            <option value="INACTIVE">Inativas</option>
+          </select>
+
+          <button
+            onClick={handleClearFilters}
+            className="rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
+          >
+            Limpar filtros
+          </button>
+        </div>
+
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <h2 className="text-xl font-semibold text-slate-900">Tags cadastradas</h2>
             <p className="text-sm text-slate-500">
               {loading ? "Carregando..." : `${filteredTags.length} item(ns)`}
             </p>
-          </div>
-
-          <div className="flex flex-col gap-3 md:flex-row md:items-center">
-            <select
-              value={environmentFilter}
-              onChange={(e) =>
-                setEnvironmentFilter(e.target.value as EnvironmentFilter)
-              }
-              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm outline-none transition focus:border-sky-500"
-            >
-              <option value="ALL">Todos os ambientes</option>
-              <option value="POSTO">Posto</option>
-              <option value="CONVENIENCIA">Conveniência</option>
-              <option value="RESTAURANTE">Restaurante</option>
-            </select>
-
-            <label className="inline-flex items-center gap-2 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                checked={showInactive}
-                onChange={(e) => setShowInactive(e.target.checked)}
-              />
-              Mostrar inativas
-            </label>
           </div>
         </div>
 
@@ -512,159 +582,211 @@ export default function TagsPage() {
           </div>
         ) : filteredTags.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-            Nenhuma tag cadastrada para o filtro selecionado.
+            Nenhuma tag encontrada.
           </div>
         ) : (
-          <div className="grid gap-4">
-            {filteredTags.map((tag) => {
-              const isEditing = editing?.id === tag.id;
-              const isProcessing = processingId === tag.id;
+          <>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr className="text-left text-sm text-slate-600">
+                    <th className="px-4 py-3 font-semibold">Nome</th>
+                    <th className="px-4 py-3 font-semibold">Cor</th>
+                    <th className="px-4 py-3 font-semibold">Ambiente</th>
+                    <th className="px-4 py-3 font-semibold">Empresa</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Ações</th>
+                  </tr>
+                </thead>
 
-              return (
-                <article
-                  key={tag.id}
-                  className="rounded-2xl border border-slate-200 p-5"
-                >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-3">
-                      {isEditing ? (
-                        <div className="grid gap-3 md:grid-cols-3">
-                          <input
-                            value={editing.name}
-                            onChange={(e) =>
-                              setEditing((prev) =>
-                                prev ? { ...prev, name: e.target.value } : prev
-                              )
-                            }
-                            className="rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-sky-500"
-                          />
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {paginatedTags.map((tag) => {
+                    const isEditing = editing?.id === tag.id;
+                    const isProcessing = processingId === tag.id;
 
-                          <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+                    return (
+                      <tr key={tag.id} className="align-top">
+                        <td className="px-4 py-4">
+                          {isEditing ? (
                             <input
-                              type="color"
-                              value={editing.color}
+                              value={editing.name}
                               onChange={(e) =>
                                 setEditing((prev) =>
-                                  prev ? { ...prev, color: e.target.value } : prev
+                                  prev ? { ...prev, name: e.target.value } : prev
                                 )
                               }
-                              className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
+                              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-sky-500"
                             />
+                          ) : (
+                            <div className="font-medium text-slate-900">{tag.name}</div>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          {isEditing ? (
+                            <div className="flex items-center gap-3 rounded-lg border border-slate-300 px-3 py-2">
+                              <input
+                                type="color"
+                                value={editing.color}
+                                onChange={(e) =>
+                                  setEditing((prev) =>
+                                    prev ? { ...prev, color: e.target.value } : prev
+                                  )
+                                }
+                                className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
+                              />
+                              <span className="text-sm text-slate-600">{editing.color}</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              <span
+                                className="inline-block h-4 w-4 rounded-full border border-slate-200"
+                                style={{ backgroundColor: tag.color ?? "#cbd5e1" }}
+                              />
+                              <span className="text-sm text-slate-600">
+                                {tag.color ?? "-"}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          {isEditing ? (
+                            <select
+                              value={editing.environmentType}
+                              onChange={(e) =>
+                                setEditing((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        environmentType: e.target.value as EnvironmentType,
+                                      }
+                                    : prev
+                                )
+                              }
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-sky-500"
+                            >
+                              <option value="POSTO">Posto</option>
+                              <option value="CONVENIENCIA">Conveniência</option>
+                              <option value="RESTAURANTE">Restaurante</option>
+                            </select>
+                          ) : (
                             <span className="text-sm text-slate-600">
-                              {editing.color}
+                              {getEnvironmentLabel(tag.environmentType)}
                             </span>
-                          </div>
+                          )}
+                        </td>
 
-                          <select
-                            value={editing.environmentType}
-                            onChange={(e) =>
-                              setEditing((prev) =>
-                                prev
-                                  ? {
-                                      ...prev,
-                                      environmentType: e.target.value as EnvironmentType,
-                                    }
-                                  : prev
-                              )
-                            }
-                            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-sky-500"
-                          >
-                            <option value="POSTO">Posto</option>
-                            <option value="CONVENIENCIA">Conveniência</option>
-                            <option value="RESTAURANTE">Restaurante</option>
-                          </select>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          {superAdmin ? tag.company?.name ?? tag.companyId ?? "-" : "-"}
+                        </td>
+
+                        <td className="px-4 py-4">
                           <span
-                            className="inline-block h-4 w-4 rounded-full border border-slate-200"
-                            style={{ backgroundColor: tag.color ?? "#cbd5e1" }}
-                          />
-                          <h3 className="text-lg font-semibold text-slate-900">
-                            {tag.name}
-                          </h3>
-                        </div>
-                      )}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              tag.active === false
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            {tag.active === false ? "Inativa" : "Ativa"}
+                          </span>
+                        </td>
 
-                      <div className="space-y-1 text-sm text-slate-600">
-                        <p>ID: {tag.id}</p>
-                        {superAdmin ? (
-                          <p>Empresa: {tag.company?.name ?? tag.companyId ?? "-"}</p>
-                        ) : null}
-                        <p>Ambiente: {getEnvironmentLabel(tag.environmentType)}</p>
-                        <p>Cor: {tag.color ?? "-"}</p>
-                        <p>Status: {tag.active === false ? "Inativa" : "Ativa"}</p>
-                      </div>
-                    </div>
-
-                    {(canManage || canDeletePermanently) && (
-                      <div className="flex flex-wrap gap-2">
-                        {isEditing ? (
-                          <>
-                            <button
-                              onClick={() => handleSaveEdit(tag)}
-                              disabled={savingEdit}
-                              className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {savingEdit ? "Salvando..." : "Salvar"}
-                            </button>
-
-                            <button
-                              onClick={handleCancelEdit}
-                              className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200"
-                            >
-                              Cancelar
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            {canManage ? (
+                        <td className="px-4 py-4">
+                          {isEditing ? (
+                            <div className="flex flex-wrap gap-2">
                               <button
-                                onClick={() => handleStartEdit(tag)}
-                                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                                onClick={() => handleSaveEdit(tag)}
+                                disabled={savingEdit}
+                                className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-200 disabled:opacity-60"
                               >
-                                Editar
+                                {savingEdit ? "Salvando..." : "Salvar"}
                               </button>
-                            ) : null}
 
-                            {canManage && tag.active !== false ? (
                               <button
-                                onClick={() => handleDeactivate(tag)}
-                                disabled={isProcessing}
-                                className="rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                                onClick={handleCancelEdit}
+                                className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200"
                               >
-                                {isProcessing ? "Processando..." : "Desativar"}
+                                Cancelar
                               </button>
-                            ) : null}
+                            </div>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {canManage ? (
+                                <button
+                                  onClick={() => handleStartEdit(tag)}
+                                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 hover:bg-slate-200"
+                                >
+                                  Editar
+                                </button>
+                              ) : null}
 
-                            {canManage && tag.active === false ? (
-                              <button
-                                onClick={() => handleActivate(tag)}
-                                disabled={isProcessing}
-                                className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {isProcessing ? "Processando..." : "Ativar"}
-                              </button>
-                            ) : null}
+                              {canManage && tag.active !== false ? (
+                                <button
+                                  onClick={() => handleDeactivate(tag)}
+                                  disabled={isProcessing}
+                                  className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-60"
+                                >
+                                  Desativar
+                                </button>
+                              ) : null}
 
-                            {canDeletePermanently ? (
-                              <button
-                                onClick={() => handleHardDelete(tag)}
-                                disabled={isProcessing}
-                                className="rounded-xl bg-rose-100 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-200 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                {isProcessing ? "Processando..." : "Excluir definitivo"}
-                              </button>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                              {canManage && tag.active === false ? (
+                                <button
+                                  onClick={() => handleActivate(tag)}
+                                  disabled={isProcessing}
+                                  className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-200 disabled:opacity-60"
+                                >
+                                  Ativar
+                                </button>
+                              ) : null}
+
+                              {canDeletePermanently ? (
+                                <button
+                                  onClick={() => handleHardDelete(tag)}
+                                  disabled={isProcessing}
+                                  className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-200 disabled:opacity-60"
+                                >
+                                  Excluir
+                                </button>
+                              ) : null}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-slate-500">
+                Página {page} de {totalPages}
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Anterior
+                </button>
+
+                <button
+                  onClick={() =>
+                    setPage((current) => Math.min(totalPages, current + 1))
+                  }
+                  disabled={page === totalPages}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </section>

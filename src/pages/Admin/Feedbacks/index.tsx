@@ -17,6 +17,8 @@ import {
   isSuperAdmin,
 } from "../../../utils/permissions";
 
+const PAGE_SIZE = 10;
+
 function getRatingLabel(rating: number) {
   switch (rating) {
     case 1:
@@ -87,7 +89,7 @@ export default function FeedbacksPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<FeedbackFilters>({
-    companyId: resolvedCompanyId ?? "",
+    companyId: resolvedCompanyId ?? currentUser?.companyId ?? "",
     branchId: "",
     kioskId: "",
     rating: "",
@@ -97,9 +99,14 @@ export default function FeedbacksPage() {
     active: "",
   });
 
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
   const selectedCompanyId = useMemo(() => {
-    return superAdmin ? filters.companyId || undefined : resolvedCompanyId;
-  }, [superAdmin, filters.companyId, resolvedCompanyId]);
+    return superAdmin
+      ? filters.companyId || currentUser?.companyId || undefined
+      : resolvedCompanyId;
+  }, [superAdmin, filters.companyId, resolvedCompanyId, currentUser?.companyId]);
 
   useEffect(() => {
     if (!canView) {
@@ -157,7 +164,9 @@ export default function FeedbacksPage() {
       const finalFilters = customFilters ?? filters;
 
       const sanitizedFilters: FeedbackFilters = {
-        companyId: superAdmin ? finalFilters.companyId || undefined : resolvedCompanyId,
+        companyId: superAdmin
+          ? finalFilters.companyId || currentUser?.companyId || undefined
+          : resolvedCompanyId,
         branchId: finalFilters.branchId || undefined,
         kioskId: finalFilters.kioskId || undefined,
         rating: finalFilters.rating || undefined,
@@ -194,12 +203,13 @@ export default function FeedbacksPage() {
   }
 
   function handleApplyFilters() {
+    setPage(1);
     void loadFeedbacks(filters);
   }
 
   function handleClearFilters() {
     const cleared: FeedbackFilters = {
-      companyId: superAdmin ? "" : resolvedCompanyId ?? "",
+      companyId: superAdmin ? currentUser?.companyId ?? "" : resolvedCompanyId ?? "",
       branchId: "",
       kioskId: "",
       rating: "",
@@ -210,6 +220,8 @@ export default function FeedbacksPage() {
     };
 
     setFilters(cleared);
+    setSearch("");
+    setPage(1);
     void loadDependencies();
     void loadFeedbacks(cleared);
   }
@@ -228,7 +240,7 @@ export default function FeedbacksPage() {
       setError("");
 
       const companyId = superAdmin
-        ? feedback.companyId || filters.companyId || undefined
+        ? feedback.companyId || filters.companyId || currentUser?.companyId || undefined
         : resolvedCompanyId || undefined;
 
       await deleteFeedback(feedback.id, companyId);
@@ -240,6 +252,49 @@ export default function FeedbacksPage() {
       setDeletingId(null);
     }
   }
+
+  const filteredFeedbacks = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return feedbacks;
+    }
+
+    return feedbacks.filter((feedback) => {
+      const tagsText = (feedback.tags ?? [])
+        .map((item) => item.tag?.name ?? "")
+        .join(" ")
+        .toLowerCase();
+
+      return (
+        (feedback.comment ?? "").toLowerCase().includes(normalizedSearch) ||
+        (feedback.company?.name ?? "").toLowerCase().includes(normalizedSearch) ||
+        (feedback.branch?.name ?? "").toLowerCase().includes(normalizedSearch) ||
+        (feedback.kiosk?.name ?? "").toLowerCase().includes(normalizedSearch) ||
+        (feedback.contactName ?? "").toLowerCase().includes(normalizedSearch) ||
+        (feedback.contactPhone ?? "").toLowerCase().includes(normalizedSearch) ||
+        (feedback.contactMessage ?? "").toLowerCase().includes(normalizedSearch) ||
+        tagsText.includes(normalizedSearch)
+      );
+    });
+  }, [feedbacks, search]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredFeedbacks.length / PAGE_SIZE));
+
+  const paginatedFeedbacks = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredFeedbacks.slice(start, start + PAGE_SIZE);
+  }, [filteredFeedbacks, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   if (!canView) {
     return (
@@ -368,196 +423,198 @@ export default function FeedbacksPage() {
             onChange={(e) => handleChangeFilter("endDate", e.target.value)}
             className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
           />
+        </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={handleApplyFilters}
-              className="w-full rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
-            >
-              Aplicar filtros
-            </button>
+        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+          />
 
-            <button
-              onClick={handleClearFilters}
-              className="w-full rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
-            >
-              Limpar
-            </button>
-          </div>
+          <button
+            onClick={handleApplyFilters}
+            className="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
+          >
+            Aplicar filtros
+          </button>
+
+          <button
+            onClick={handleClearFilters}
+            className="rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
+          >
+            Limpar
+          </button>
         </div>
       </div>
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 space-y-1">
-          <h2 className="text-xl font-semibold text-slate-900">
-            Lista de feedbacks
-          </h2>
-          <p className="text-sm text-slate-500">
-            {loading ? "Carregando..." : `${feedbacks.length} item(ns)`}
-          </p>
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Lista de feedbacks
+            </h2>
+            <p className="text-sm text-slate-500">
+              {loading ? "Carregando..." : `${filteredFeedbacks.length} item(ns)`}
+            </p>
+          </div>
         </div>
 
         {loading ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Carregando feedbacks...
           </div>
-        ) : feedbacks.length === 0 ? (
+        ) : filteredFeedbacks.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Nenhum feedback encontrado.
           </div>
         ) : (
-          <div className="grid gap-4">
-            {feedbacks.map((feedback) => (
-              <article
-                key={feedback.id}
-                className="rounded-2xl border border-slate-200 p-5"
-              >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span
-                        className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                          feedback.rating <= 2
-                            ? "bg-rose-100 text-rose-700"
-                            : feedback.rating === 3
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-emerald-100 text-emerald-700"
-                        }`}
-                      >
-                        {getRatingLabel(feedback.rating)}
-                      </span>
+          <>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr className="text-left text-sm text-slate-600">
+                    <th className="px-4 py-3 font-semibold">Data</th>
+                    <th className="px-4 py-3 font-semibold">Nota</th>
+                    <th className="px-4 py-3 font-semibold">Empresa</th>
+                    <th className="px-4 py-3 font-semibold">Filial</th>
+                    <th className="px-4 py-3 font-semibold">Kiosk</th>
+                    <th className="px-4 py-3 font-semibold">Ambiente</th>
+                    <th className="px-4 py-3 font-semibold">Comentário</th>
+                    <th className="px-4 py-3 font-semibold">Contato</th>
+                    <th className="px-4 py-3 font-semibold">Tags</th>
+                    <th className="px-4 py-3 font-semibold">Ações</th>
+                  </tr>
+                </thead>
 
-                      <span className="text-sm text-slate-500">
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {paginatedFeedbacks.map((feedback) => (
+                    <tr key={feedback.id} className="align-top">
+                      <td className="px-4 py-4 text-sm text-slate-600 whitespace-nowrap">
                         {formatDate(feedback.createdAt)}
-                      </span>
-                    </div>
+                      </td>
 
-                    <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-2">
-                      {superAdmin ? (
-                        <p>
-                          <span className="font-medium text-slate-800">Empresa:</span>{" "}
-                          {feedback.company?.name ?? "Não informada"}
-                        </p>
-                      ) : null}
+                      <td className="px-4 py-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            feedback.rating <= 2
+                              ? "bg-rose-100 text-rose-700"
+                              : feedback.rating === 3
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-emerald-100 text-emerald-700"
+                          }`}
+                        >
+                          {feedback.rating} - {getRatingLabel(feedback.rating)}
+                        </span>
+                      </td>
 
-                      <p>
-                        <span className="font-medium text-slate-800">Kiosk:</span>{" "}
-                        {feedback.kiosk?.name ?? "Não informado"}
-                      </p>
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {superAdmin ? feedback.company?.name ?? "-" : "-"}
+                      </td>
 
-                      <p>
-                        <span className="font-medium text-slate-800">Filial:</span>{" "}
-                        {feedback.branch?.name ?? "Não informada"}
-                      </p>
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {feedback.branch?.name ?? "-"}
+                      </td>
 
-                      <p>
-                        <span className="font-medium text-slate-800">Ambiente:</span>{" "}
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {feedback.kiosk?.name ?? "-"}
+                      </td>
+
+                      <td className="px-4 py-4 text-sm text-slate-600">
                         {getEnvironmentLabel(feedback.kiosk?.environmentType)}
-                      </p>
+                      </td>
 
-                      <p>
-                        <span className="font-medium text-slate-800">Status:</span>{" "}
-                        {feedback.active === false ? "Inativo" : "Ativo"}
-                      </p>
-                    </div>
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        <div className="max-w-[280px] whitespace-normal break-words">
+                          {feedback.comment?.trim() || "Sem comentário."}
+                        </div>
+                      </td>
 
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium text-slate-800">Comentário</p>
-                      <p className="text-sm text-slate-600">
-                        {feedback.comment?.trim() ? feedback.comment : "Sem comentário."}
-                      </p>
-                    </div>
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {hasContactInfo(feedback) ? (
+                          <div className="space-y-1">
+                            <div>
+                              <span className="font-medium text-slate-800">Nome:</span>{" "}
+                              {feedback.contactName?.trim() || "-"}
+                            </div>
+                            <div>
+                              <span className="font-medium text-slate-800">Telefone:</span>{" "}
+                              {feedback.contactPhone?.trim() || "-"}
+                            </div>
+                            <div>
+                              <span className="font-medium text-slate-800">Consentimento:</span>{" "}
+                              {feedback.contactConsent ? "Sim" : "Não"}
+                            </div>
+                          </div>
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
 
-                    {hasContactInfo(feedback) ? (
-                      <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold text-amber-900">
-                            Dados para contato
-                          </p>
+                      <td className="px-4 py-4 text-sm text-slate-600">
+                        {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
+                          <div className="flex max-w-[220px] flex-wrap gap-2">
+                            {feedback.tags!.map((item) => (
+                              <span
+                                key={item.id}
+                                className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                              >
+                                {item.tag?.name ?? "Tag"}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span>-</span>
+                        )}
+                      </td>
 
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                              feedback.contactConsent
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-slate-200 text-slate-700"
-                            }`}
+                      <td className="px-4 py-4">
+                        {canManage ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(feedback)}
+                            disabled={deletingId === feedback.id}
+                            className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {feedback.contactConsent
-                              ? "Autorizou contato"
-                              : "Sem autorização explícita"}
-                          </span>
-                        </div>
+                            {deletingId === feedback.id ? "Excluindo..." : "Excluir"}
+                          </button>
+                        ) : (
+                          <span className="text-sm text-slate-400">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-                        <div className="grid gap-2 text-sm text-slate-700 md:grid-cols-2">
-                          <p>
-                            <span className="font-medium text-slate-800">Nome:</span>{" "}
-                            {feedback.contactName?.trim() || "Não informado"}
-                          </p>
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-slate-500">
+                Página {page} de {totalPages}
+              </p>
 
-                          <p>
-                            <span className="font-medium text-slate-800">Telefone / WhatsApp:</span>{" "}
-                            {feedback.contactPhone?.trim() || "Não informado"}
-                          </p>
-                        </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Anterior
+                </button>
 
-                        <div className="space-y-1">
-                          <p className="text-sm font-medium text-slate-800">
-                            Mensagem para contato
-                          </p>
-                          <p className="text-sm text-slate-700">
-                            {feedback.contactMessage?.trim()
-                              ? feedback.contactMessage
-                              : "Sem mensagem adicional."}
-                          </p>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-slate-800">Tags</p>
-
-                      {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {feedback.tags!.map((item) => (
-                            <span
-                              key={item.id}
-                              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-                            >
-                              {item.tag?.name ?? "Tag"}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-slate-500">Sem tags.</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <div className="rounded-2xl bg-slate-50 px-4 py-3 text-center">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">
-                        Nota
-                      </p>
-                      <p className="text-2xl font-bold text-slate-900">
-                        {feedback.rating}
-                      </p>
-                    </div>
-
-                    {canManage ? (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(feedback)}
-                        disabled={deletingId === feedback.id}
-                        className="rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {deletingId === feedback.id ? "Excluindo..." : "Excluir"}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
+                <button
+                  onClick={() =>
+                    setPage((current) => Math.min(totalPages, current + 1))
+                  }
+                  disabled={page === totalPages}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </section>

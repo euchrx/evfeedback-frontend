@@ -17,6 +17,9 @@ import {
   isSuperAdmin,
 } from "../../../utils/permissions";
 
+const PAGE_SIZE = 10;
+type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
+
 export default function BranchesPage() {
   const currentUser = getStoredUser();
 
@@ -31,8 +34,13 @@ export default function BranchesPage() {
 
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
-  const [companyId, setCompanyId] = useState(resolvedCompanyId ?? "");
-  const [showInactive, setShowInactive] = useState(true);
+  const [companyId, setCompanyId] = useState(
+    resolvedCompanyId ?? currentUser?.companyId ?? ""
+  );
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [page, setPage] = useState(1);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -40,22 +48,17 @@ export default function BranchesPage() {
   const [error, setError] = useState("");
 
   const selectedCompanyId = useMemo(() => {
-    return superAdmin ? companyId || undefined : resolvedCompanyId;
-  }, [superAdmin, companyId, resolvedCompanyId]);
-
-  const visibleBranches = useMemo(() => {
-    if (showInactive) return branches;
-    return branches.filter((branch) => branch.active);
-  }, [branches, showInactive]);
+    return superAdmin
+      ? companyId || currentUser?.companyId || undefined
+      : resolvedCompanyId;
+  }, [superAdmin, companyId, resolvedCompanyId, currentUser?.companyId]);
 
   async function load() {
     try {
       setError("");
       setLoading(true);
 
-      const requests: Promise<unknown>[] = [
-        getBranches(selectedCompanyId),
-      ];
+      const requests: Promise<unknown>[] = [getBranches(selectedCompanyId)];
 
       if (superAdmin) {
         requests.push(getCompanies());
@@ -100,10 +103,12 @@ export default function BranchesPage() {
 
       setName("");
       setCode("");
+
       if (superAdmin) {
         setCompanyId("");
       }
 
+      setPage(1);
       await load();
     } catch {
       setError("Não foi possível criar a filial.");
@@ -182,6 +187,38 @@ export default function BranchesPage() {
     }
   }
 
+  function handleClearFilters() {
+    setSearch("");
+    setStatusFilter("ALL");
+    setPage(1);
+  }
+
+  const filteredBranches = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    return branches.filter((branch) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        branch.name.toLowerCase().includes(normalizedSearch) ||
+        (branch.code ?? "").toLowerCase().includes(normalizedSearch) ||
+        (branch.company?.name ?? "").toLowerCase().includes(normalizedSearch);
+
+      const matchesStatus =
+        statusFilter === "ALL" ||
+        (statusFilter === "ACTIVE" && branch.active) ||
+        (statusFilter === "INACTIVE" && !branch.active);
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [branches, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredBranches.length / PAGE_SIZE));
+
+  const paginatedBranches = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredBranches.slice(start, start + PAGE_SIZE);
+  }, [filteredBranches, page]);
+
   useEffect(() => {
     if (canView) {
       void load();
@@ -189,6 +226,16 @@ export default function BranchesPage() {
       setLoading(false);
     }
   }, [canView, selectedCompanyId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, selectedCompanyId]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   if (!canView) {
     return (
@@ -275,93 +322,161 @@ export default function BranchesPage() {
       ) : null}
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">
-              Filiais cadastradas
-            </h2>
-            <p className="text-sm text-slate-500">
-              {visibleBranches.length} item(ns)
-            </p>
-          </div>
+        <div className="mb-4 grid gap-3 md:grid-cols-3">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome, código ou empresa"
+            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+          />
 
-          <label className="inline-flex items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-            />
-            Mostrar inativas
-          </label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+          >
+            <option value="ALL">Todos os status</option>
+            <option value="ACTIVE">Ativas</option>
+            <option value="INACTIVE">Inativas</option>
+          </select>
+
+          <button
+            onClick={handleClearFilters}
+            className="rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
+          >
+            Limpar filtros
+          </button>
+        </div>
+
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold text-slate-900">
+            Filiais cadastradas
+          </h2>
+          <p className="text-sm text-slate-500">
+            {loading ? "Carregando..." : `${filteredBranches.length} item(ns)`}
+          </p>
         </div>
 
         {loading ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Carregando filiais...
           </div>
-        ) : visibleBranches.length === 0 ? (
+        ) : filteredBranches.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-            Nenhuma filial cadastrada.
+            Nenhuma filial encontrada.
           </div>
         ) : (
-          <div className="grid gap-4">
-            {visibleBranches.map((branch) => {
-              const isProcessing = processingId === branch.id;
+          <>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr className="text-left text-sm text-slate-600">
+                    <th className="px-4 py-3 font-semibold">Nome</th>
+                    <th className="px-4 py-3 font-semibold">Código</th>
+                    <th className="px-4 py-3 font-semibold">Empresa</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Ações</th>
+                  </tr>
+                </thead>
 
-              return (
-                <article
-                  key={branch.id}
-                  className="rounded-2xl border border-slate-200 p-5"
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {paginatedBranches.map((branch) => {
+                    const isProcessing = processingId === branch.id;
+
+                    return (
+                      <tr key={branch.id} className="align-top">
+                        <td className="px-4 py-4 font-medium text-slate-900">
+                          {branch.name}
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          {branch.code || "-"}
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          {branch.company?.name ?? "-"}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              branch.active
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {branch.active ? "Ativa" : "Inativa"}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4">
+                          {canManage ? (
+                            <div className="flex flex-wrap gap-2">
+                              {branch.active ? (
+                                <button
+                                  onClick={() => handleDeactivate(branch)}
+                                  disabled={isProcessing}
+                                  className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-60"
+                                >
+                                  Desativar
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleActivate(branch)}
+                                  disabled={isProcessing}
+                                  className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-200 disabled:opacity-60"
+                                >
+                                  Reativar
+                                </button>
+                              )}
+
+                              {canDeletePermanently ? (
+                                <button
+                                  onClick={() => handleHardDelete(branch)}
+                                  disabled={isProcessing}
+                                  className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                                >
+                                  Excluir
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-slate-400">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-slate-500">
+                Página {page} de {totalPages}
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
                 >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {branch.name}
-                      </h3>
+                  Anterior
+                </button>
 
-                      <div className="space-y-1 text-sm text-slate-600">
-                        <p>Código: {branch.code || "-"}</p>
-                        <p>Empresa: {branch.company?.name ?? "-"}</p>
-                        <p>Status: {branch.active ? "Ativa" : "Inativa"}</p>
-                      </div>
-                    </div>
-
-                    {canManage ? (
-                      <div className="flex flex-wrap gap-2">
-                        {branch.active ? (
-                          <button
-                            onClick={() => handleDeactivate(branch)}
-                            disabled={isProcessing}
-                            className="rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Desativar
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleActivate(branch)}
-                            disabled={isProcessing}
-                            className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Reativar
-                          </button>
-                        )}
-
-                        {canDeletePermanently ? (
-                          <button
-                            onClick={() => handleHardDelete(branch)}
-                            disabled={isProcessing}
-                            className="rounded-xl bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            Excluir definitivo
-                          </button>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                <button
+                  onClick={() =>
+                    setPage((current) => Math.min(totalPages, current + 1))
+                  }
+                  disabled={page === totalPages}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </section>

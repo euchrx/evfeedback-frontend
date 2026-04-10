@@ -6,21 +6,42 @@ export type DashboardFilters = {
   dateTo?: string;
 };
 
-export type RatingSummaryItem = {
+export type DashboardRatingItem = {
   rating: number;
   count: number;
 };
 
-export type TopTagItem = {
+export type DashboardTagItem = {
   name: string;
   count: number;
+};
+
+export type DashboardEnvironmentType = "POSTO" | "CONVENIENCIA" | "RESTAURANTE";
+
+export type DashboardEnvironmentItem = {
+  environmentType: DashboardEnvironmentType;
+  total: number;
+  averageRating: number;
+};
+
+export type DashboardRecentFeedbackItem = {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  createdAt: string;
+  branchName?: string | null;
+  kioskName?: string | null;
+  environmentType?: DashboardEnvironmentType | null;
+  tags: string[];
 };
 
 export type DashboardSummary = {
   total: number;
   averageRating: number;
-  ratings: RatingSummaryItem[];
-  topTags: TopTagItem[];
+  ratings: DashboardRatingItem[];
+  topTags: DashboardTagItem[];
+  byEnvironment: DashboardEnvironmentItem[];
+  recentFeedbacks: DashboardRecentFeedbackItem[];
 };
 
 export type BranchDashboardItem = {
@@ -37,14 +58,7 @@ export async function getDashboardSummary(
     params: filters,
   });
 
-  const data = response.data ?? {};
-
-  return {
-    total: data.total ?? 0,
-    averageRating: data.averageRating ?? 0,
-    ratings: Array.isArray(data.ratings) ? data.ratings : [],
-    topTags: Array.isArray(data.topTags) ? data.topTags : [],
-  };
+  return response.data;
 }
 
 export async function getDashboardByBranch(

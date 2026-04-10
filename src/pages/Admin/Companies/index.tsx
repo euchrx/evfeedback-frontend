@@ -13,6 +13,21 @@ import {
   canHardDelete,
 } from "../../../utils/permissions";
 
+const PAGE_SIZE = 10;
+type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
+
+function formatDate(value?: string) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default function CompaniesPage() {
   const currentUser = getStoredUser();
 
@@ -21,17 +36,15 @@ export default function CompaniesPage() {
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [name, setName] = useState("");
-  const [showInactive, setShowInactive] = useState(true);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [page, setPage] = useState(1);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState("");
-
-  const visibleCompanies = useMemo(() => {
-    if (showInactive) return companies;
-    return companies.filter((company) => company.active);
-  }, [companies, showInactive]);
 
   async function load() {
     try {
@@ -64,6 +77,7 @@ export default function CompaniesPage() {
       });
 
       setName("");
+      setPage(1);
       await load();
     } catch {
       setError("Não foi possível criar a empresa.");
@@ -126,6 +140,36 @@ export default function CompaniesPage() {
     }
   }
 
+  function handleClearFilters() {
+    setSearch("");
+    setStatusFilter("ALL");
+    setPage(1);
+  }
+
+  const filteredCompanies = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    return companies.filter((company) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        company.name.toLowerCase().includes(normalizedSearch);
+
+      const matchesStatus =
+        statusFilter === "ALL" ||
+        (statusFilter === "ACTIVE" && company.active) ||
+        (statusFilter === "INACTIVE" && !company.active);
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [companies, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / PAGE_SIZE));
+
+  const paginatedCompanies = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredCompanies.slice(start, start + PAGE_SIZE);
+  }, [filteredCompanies, page]);
+
   useEffect(() => {
     if (canView) {
       void load();
@@ -133,6 +177,16 @@ export default function CompaniesPage() {
       setLoading(false);
     }
   }, [canView]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   if (!canView) {
     return (
@@ -190,93 +244,152 @@ export default function CompaniesPage() {
       </div>
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">
-              Empresas cadastradas
-            </h2>
-            <p className="text-sm text-slate-500">
-              {visibleCompanies.length} item(ns)
-            </p>
-          </div>
+        <div className="mb-4 grid gap-3 md:grid-cols-3">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por nome"
+            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+          />
 
-          <label className="inline-flex items-center gap-2 text-sm text-slate-600">
-            <input
-              type="checkbox"
-              checked={showInactive}
-              onChange={(e) => setShowInactive(e.target.checked)}
-            />
-            Mostrar inativas
-          </label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+          >
+            <option value="ALL">Todos os status</option>
+            <option value="ACTIVE">Ativas</option>
+            <option value="INACTIVE">Inativas</option>
+          </select>
+
+          <button
+            onClick={handleClearFilters}
+            className="rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
+          >
+            Limpar filtros
+          </button>
+        </div>
+
+        <div className="mb-4">
+          <h2 className="text-xl font-semibold text-slate-900">
+            Empresas cadastradas
+          </h2>
+          <p className="text-sm text-slate-500">
+            {loading ? "Carregando..." : `${filteredCompanies.length} item(ns)`}
+          </p>
         </div>
 
         {loading ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
             Carregando empresas...
           </div>
-        ) : visibleCompanies.length === 0 ? (
+        ) : filteredCompanies.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-            Nenhuma empresa cadastrada.
+            Nenhuma empresa encontrada.
           </div>
         ) : (
-          <div className="grid gap-4">
-            {visibleCompanies.map((company) => {
-              const isProcessing = processingId === company.id;
+          <>
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr className="text-left text-sm text-slate-600">
+                    <th className="px-4 py-3 font-semibold">Nome</th>
+                    <th className="px-4 py-3 font-semibold">Status</th>
+                    <th className="px-4 py-3 font-semibold">Criada em</th>
+                    <th className="px-4 py-3 font-semibold">Ações</th>
+                  </tr>
+                </thead>
 
-              return (
-                <article
-                  key={company.id}
-                  className="rounded-2xl border border-slate-200 p-5"
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {paginatedCompanies.map((company) => {
+                    const isProcessing = processingId === company.id;
+
+                    return (
+                      <tr key={company.id} className="align-top">
+                        <td className="px-4 py-4 font-medium text-slate-900">
+                          {company.name}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              company.active
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {company.active ? "Ativa" : "Inativa"}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          {formatDate(company.createdAt)}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            {company.active ? (
+                              <button
+                                onClick={() => handleDeactivate(company)}
+                                disabled={isProcessing}
+                                className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 hover:bg-amber-200 disabled:opacity-60"
+                              >
+                                Desativar
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleActivate(company)}
+                                disabled={isProcessing}
+                                className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-200 disabled:opacity-60"
+                              >
+                                Reativar
+                              </button>
+                            )}
+
+                            {canDeletePermanently ? (
+                              <button
+                                onClick={() => handleHardDelete(company)}
+                                disabled={isProcessing}
+                                className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                              >
+                                Excluir
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-slate-500">
+                Página {page} de {totalPages}
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
                 >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="space-y-2">
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {company.name}
-                      </h3>
+                  Anterior
+                </button>
 
-                      <div className="space-y-1 text-sm text-slate-600">
-                        <p>Status: {company.active ? "Ativa" : "Inativa"}</p>
-                        <p>
-                          Criada em{" "}
-                          {new Date(company.createdAt).toLocaleString("pt-BR")}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {company.active ? (
-                        <button
-                          onClick={() => handleDeactivate(company)}
-                          disabled={isProcessing}
-                          className="rounded-xl bg-amber-100 px-4 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Desativar
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleActivate(company)}
-                          disabled={isProcessing}
-                          className="rounded-xl bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Reativar
-                        </button>
-                      )}
-
-                      {canDeletePermanently ? (
-                        <button
-                          onClick={() => handleHardDelete(company)}
-                          disabled={isProcessing}
-                          className="rounded-xl bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Excluir definitivo
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                <button
+                  onClick={() =>
+                    setPage((current) => Math.min(totalPages, current + 1))
+                  }
+                  disabled={page === totalPages}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Próxima
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </section>

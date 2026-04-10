@@ -3,6 +3,7 @@ import {
   getDashboardByBranch,
   getDashboardSummary,
   type BranchDashboardItem,
+  type DashboardEnvironmentType,
   type DashboardFilters,
   type DashboardSummary,
 } from "../../../services/dashboard";
@@ -16,6 +17,49 @@ import {
 
 function formatAverage(value: number) {
   return Number.isFinite(value) ? value.toFixed(1) : "0.0";
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function getEnvironmentLabel(environment?: DashboardEnvironmentType | null) {
+  switch (environment) {
+    case "POSTO":
+      return "Posto";
+    case "CONVENIENCIA":
+      return "Conveniência";
+    case "RESTAURANTE":
+      return "Restaurante";
+    default:
+      return "Não informado";
+  }
+}
+
+function getRatingLabel(rating: number) {
+  switch (rating) {
+    case 1:
+      return "Péssimo";
+    case 2:
+      return "Ruim";
+    case 3:
+      return "Ok";
+    case 4:
+      return "Bom";
+    case 5:
+      return "Excelente";
+    default:
+      return `${rating}`;
+  }
 }
 
 export default function DashboardPage() {
@@ -32,14 +76,16 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
 
   const [filters, setFilters] = useState<DashboardFilters>({
-    companyId: resolvedCompanyId ?? "",
+    companyId: resolvedCompanyId ?? currentUser?.companyId ?? "",
     dateFrom: "",
     dateTo: "",
   });
 
   const selectedCompanyId = useMemo(() => {
-    return superAdmin ? filters.companyId || undefined : resolvedCompanyId;
-  }, [superAdmin, filters.companyId, resolvedCompanyId]);
+    return superAdmin
+      ? filters.companyId || currentUser?.companyId || undefined
+      : resolvedCompanyId;
+  }, [superAdmin, filters.companyId, resolvedCompanyId, currentUser?.companyId]);
 
   async function loadDependencies() {
     if (!superAdmin) return;
@@ -61,7 +107,7 @@ export default function DashboardPage() {
 
       const sanitizedFilters: DashboardFilters = {
         companyId: superAdmin
-          ? finalFilters.companyId || undefined
+          ? finalFilters.companyId || currentUser?.companyId || undefined
           : resolvedCompanyId,
         dateFrom: finalFilters.dateFrom || undefined,
         dateTo: finalFilters.dateTo || undefined,
@@ -89,7 +135,7 @@ export default function DashboardPage() {
 
   function handleClearPeriod() {
     const cleared: DashboardFilters = {
-      companyId: superAdmin ? "" : resolvedCompanyId ?? "",
+      companyId: superAdmin ? currentUser?.companyId ?? "" : resolvedCompanyId ?? "",
       dateFrom: "",
       dateTo: "",
     };
@@ -111,7 +157,9 @@ export default function DashboardPage() {
     if (!canView) return;
 
     const initial: DashboardFilters = {
-      companyId: superAdmin ? filters.companyId || "" : resolvedCompanyId ?? "",
+      companyId: superAdmin
+        ? filters.companyId || currentUser?.companyId || ""
+        : resolvedCompanyId ?? "",
       dateFrom: filters.dateFrom || "",
       dateTo: filters.dateTo || "",
     };
@@ -143,10 +191,24 @@ export default function DashboardPage() {
   }, [branches]);
 
   const worstBranch = useMemo(() => {
-    return [...branches]
-      .filter((branch) => branch.totalFeedbacks > 0)
-      .sort((a, b) => a.averageRating - b.averageRating)[0];
-  }, [branches]);
+    const validBranches = [...branches].filter(
+      (branch) => branch.totalFeedbacks > 0
+    );
+
+    if (validBranches.length <= 1) {
+      return undefined;
+    }
+
+    const sorted = validBranches.sort((a, b) => a.averageRating - b.averageRating);
+
+    const candidate = sorted[0];
+
+    if (candidate.id === bestBranch?.id) {
+      return undefined;
+    }
+
+    return candidate;
+  }, [branches, bestBranch]);
 
   if (!canView) {
     return (
@@ -296,6 +358,25 @@ export default function DashboardPage() {
             </article>
           </div>
 
+          <div className="grid gap-4 md:grid-cols-3">
+            {(summary?.byEnvironment ?? []).map((item) => (
+              <article
+                key={item.environmentType}
+                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
+              >
+                <p className="text-sm font-medium text-slate-500">
+                  {getEnvironmentLabel(item.environmentType)}
+                </p>
+                <h3 className="mt-2 text-2xl font-bold text-slate-900">
+                  {item.total}
+                </h3>
+                <p className="mt-2 text-sm text-slate-600">
+                  Média: {formatAverage(item.averageRating)}
+                </p>
+              </article>
+            ))}
+          </div>
+
           <div className="grid gap-6 xl:grid-cols-2">
             <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-4 space-y-1">
@@ -417,11 +498,91 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-                  Ainda não há dados suficientes.
+                  Ainda não há filiais suficientes para comparação.
                 </div>
               )}
             </article>
           </div>
+
+          <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 space-y-1">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Últimos feedbacks
+              </h2>
+              <p className="text-sm text-slate-500">
+                Acompanhe os registros mais recentes.
+              </p>
+            </div>
+
+            {!summary?.recentFeedbacks?.length ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
+                Nenhum feedback recente encontrado.
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {summary.recentFeedbacks.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border border-slate-200 p-4"
+                  >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${item.rating <= 2
+                              ? "bg-rose-100 text-rose-700"
+                              : item.rating === 3
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-emerald-100 text-emerald-700"
+                              }`}
+                          >
+                            {getRatingLabel(item.rating)}
+                          </span>
+
+                          <span className="text-xs text-slate-500">
+                            {formatDate(item.createdAt)}
+                          </span>
+                        </div>
+
+                        <p className="text-sm text-slate-700">
+                          <span className="font-medium text-slate-900">Filial:</span>{" "}
+                          {item.branchName ?? "-"}
+                        </p>
+
+                        <p className="text-sm text-slate-700">
+                          <span className="font-medium text-slate-900">Kiosk:</span>{" "}
+                          {item.kioskName ?? "-"}
+                        </p>
+
+                        <p className="text-sm text-slate-700">
+                          <span className="font-medium text-slate-900">Ambiente:</span>{" "}
+                          {getEnvironmentLabel(item.environmentType)}
+                        </p>
+
+                        <p className="text-sm text-slate-700">
+                          <span className="font-medium text-slate-900">Comentário:</span>{" "}
+                          {item.comment?.trim() || "Sem comentário."}
+                        </p>
+
+                        {item.tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {item.tags.map((tag, index) => (
+                              <span
+                                key={`${tag}-${index}`}
+                                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </article>
 
           <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 space-y-1">
