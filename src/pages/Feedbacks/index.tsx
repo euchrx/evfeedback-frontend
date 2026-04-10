@@ -73,6 +73,7 @@ export default function FeedbackKiosk() {
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
   const [contactNameError, setContactNameError] = useState("");
   const [contactPhoneError, setContactPhoneError] = useState("");
+  const [commentError, setCommentError] = useState("");
 
   const inactivityTimerRef = useRef<number | null>(null);
 
@@ -133,6 +134,7 @@ export default function FeedbackKiosk() {
       setRating(null);
       setTagIds([]);
       setComment("");
+      setCommentError("");
       setContactName("");
       setContactPhone("");
       setContactNameError("");
@@ -188,6 +190,24 @@ export default function FeedbackKiosk() {
   }
 
   function handleAdvanceFromComment() {
+    if (isNegativeRating) {
+      setStep("contact");
+      return;
+    }
+
+    void handleSubmit(false);
+  }
+
+  function handleSubmitCommentStep() {
+    const trimmedComment = comment.trim();
+
+    if (!trimmedComment) {
+      setCommentError("Informe seu comentário para continuar.");
+      return;
+    }
+
+    setCommentError("");
+
     if (isNegativeRating) {
       setStep("contact");
       return;
@@ -600,14 +620,20 @@ export default function FeedbackKiosk() {
               </h2>
 
               <p className="mt-4 text-lg opacity-90">
-                Essa etapa é opcional.
+                Essa etapa é obrigatória.
               </p>
 
               <textarea
                 value={comment}
-                onChange={(e) => setComment(e.target.value)}
+                onChange={(e) => {
+                  setComment(e.target.value);
+                  if (e.target.value.trim()) {
+                    setCommentError("");
+                  }
+                }}
                 placeholder="Escreva aqui sua opinião..."
-                className="mt-8 w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-lg outline-none min-h-[140px] resize-none"
+                className={`mt-8 w-full rounded-2xl border bg-black/10 px-5 py-4 text-base outline-none min-h-[140px] resize-none ${commentError ? "border-rose-400" : "border-white/10"
+                  }`}
                 style={{ color: textColor }}
                 maxLength={500}
               />
@@ -615,6 +641,9 @@ export default function FeedbackKiosk() {
               <div className="mt-3 text-right text-sm opacity-70">
                 {comment.length}/500
               </div>
+              {commentError ? (
+                <p className="mt-2 text-left text-sm text-rose-300">{commentError}</p>
+              ) : null}
 
               <div className="mt-8 flex flex-col md:flex-row gap-4 justify-center">
                 <button
@@ -627,53 +656,31 @@ export default function FeedbackKiosk() {
                 </button>
 
                 {isNegativeRating ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit(false)}
-                      disabled={isSubmitting}
-                      className="rounded-2xl bg-black/25 hover:bg-black/35 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
-                    >
-                      {isSubmitting ? "Enviando..." : "Enviar agora"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleAdvanceFromComment}
-                      disabled={isSubmitting}
-                      className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
-                      style={{
-                        backgroundColor: primaryColor,
-                        color: buttonTextColor,
-                      }}
-                    >
-                      Próximo
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    onClick={handleSubmitCommentStep}
+                    disabled={isSubmitting}
+                    className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                    style={{
+                      backgroundColor: primaryColor,
+                      color: buttonTextColor,
+                    }}
+                  >
+                    Próximo
+                  </button>
                 ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit(true)}
-                      disabled={isSubmitting}
-                      className="rounded-2xl bg-black/25 hover:bg-black/35 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
-                    >
-                      Pular
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleSubmit(false)}
-                      disabled={isSubmitting}
-                      className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
-                      style={{
-                        backgroundColor: primaryColor,
-                        color: buttonTextColor,
-                      }}
-                    >
-                      {isSubmitting ? "Enviando..." : "Enviar"}
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    onClick={handleSubmitCommentStep}
+                    disabled={isSubmitting}
+                    className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                    style={{
+                      backgroundColor: primaryColor,
+                      color: buttonTextColor,
+                    }}
+                  >
+                    {isSubmitting ? "Enviando..." : "Enviar"}
+                  </button>
                 )}
               </div>
             </section>
