@@ -456,20 +456,20 @@ export default function DashboardPage() {
               </div>
 
               {bestBranch ? (
-                <div className="rounded-2xl bg-emerald-50 px-5 py-4">
-                  <h3 className="text-lg font-semibold text-emerald-900">
+                <div className="rounded-2xl bg-rose-50 px-5 py-4">
+                  <h3 className="text-lg font-semibold text-rose-900">
                     {bestBranch.name}
                   </h3>
-                  <p className="mt-2 text-sm text-emerald-800">
+                  <p className="mt-2 text-sm text-rose-800">
                     Média: {formatAverage(bestBranch.averageRating)}
                   </p>
-                  <p className="text-sm text-emerald-800">
+                  <p className="text-sm text-rose-800">
                     Feedbacks: {bestBranch.totalFeedbacks}
                   </p>
                 </div>
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-                  Ainda não há dados suficientes.
+                  Ainda não há filiais suficientes para comparação.
                 </div>
               )}
             </article>
