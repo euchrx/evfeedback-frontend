@@ -328,7 +328,7 @@ export default function SettingsPage() {
                   checked={dailyNotificationEnabled}
                   onChange={(e) => setDailyNotificationEnabled(e.target.checked)}
                 />
-                Enviar resumo diário com os feedbacks de ontem
+                Enviar resumo diário com os feedbacks do dia anterior
               </label>
 
               <label className="inline-flex items-center gap-3 text-sm text-slate-700">
