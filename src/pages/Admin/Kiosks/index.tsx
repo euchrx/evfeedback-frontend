@@ -376,11 +376,7 @@ export default function KiosksPage() {
     const link = `${feedbackBaseUrl}?token=${token}`;
     setSelectedQrLink(link);
   }
-
-  function handleCloseQr() {
-    setSelectedQrLink(null);
-  }
-
+  
   function handleClearFilters() {
     setSearch("");
     setEnvironmentFilter("ALL");
