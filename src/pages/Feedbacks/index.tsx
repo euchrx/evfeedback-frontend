@@ -177,8 +177,11 @@ export default function FeedbackKiosk() {
     setRating(value);
     setTagIds([]);
     setComment("");
+    setCommentError("");
     setContactName("");
     setContactPhone("");
+    setContactNameError("");
+    setContactPhoneError("");
     setContactMessage("");
     setContactConsent(false);
     setStep("tags");
@@ -642,7 +645,10 @@ export default function FeedbackKiosk() {
               <div className="mt-8 flex flex-col md:flex-row gap-4 justify-center">
                 <button
                   type="button"
-                  onClick={() => setStep("tags")}
+                  onClick={() => {
+                    setCommentError("");
+                    setStep("tags");
+                  }}
                   disabled={isSubmitting}
                   className="rounded-2xl bg-black/15 hover:bg-black/25 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
                 >
@@ -785,7 +791,11 @@ export default function FeedbackKiosk() {
               <div className="mt-8 flex flex-col md:flex-row gap-4 justify-center">
                 <button
                   type="button"
-                  onClick={() => setStep("comment")}
+                  onClick={() => {
+                    setContactNameError("");
+                    setContactPhoneError("");
+                    setStep("comment");
+                  }}
                   disabled={isSubmitting}
                   className="rounded-2xl bg-black/15 hover:bg-black/25 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
                 >
