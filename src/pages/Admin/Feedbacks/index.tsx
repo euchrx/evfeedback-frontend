@@ -53,9 +53,9 @@ function formatDate(value: string) {
 function hasContactInfo(feedback: FeedbackItem) {
   return Boolean(
     feedback.contactName?.trim() ||
-      feedback.contactPhone?.trim() ||
-      feedback.contactMessage?.trim() ||
-      feedback.contactConsent
+    feedback.contactPhone?.trim() ||
+    feedback.contactMessage?.trim() ||
+    feedback.contactConsent
   );
 }
 
@@ -197,9 +197,9 @@ export default function FeedbacksPage() {
       [field]: value,
       ...(field === "companyId"
         ? {
-            branchId: "",
-            kioskId: "",
-          }
+          branchId: "",
+          kioskId: "",
+        }
         : {}),
     }));
   }
@@ -503,21 +503,20 @@ export default function FeedbacksPage() {
 
                         <td className="px-4 py-4">
                           <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                              feedback.rating <= 2
-                                ? "bg-rose-100 text-rose-700"
-                                : feedback.rating === 3
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${feedback.rating <= 2
+                              ? "bg-rose-100 text-rose-700"
+                              : feedback.rating === 3
                                 ? "bg-amber-100 text-amber-700"
                                 : "bg-emerald-100 text-emerald-700"
-                            }`}
+                              }`}
                           >
                             {feedback.rating} - {getRatingLabel(feedback.rating)}
                           </span>
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          <div className="max-w-[140px] break-words">
-                            {superAdmin ? feedback.company?.name ?? "-" : "-"}
+                          <div className="max-w-[160px] break-words">
+                            {feedback.company?.name ?? "-"}
                           </div>
                         </td>
 
@@ -560,12 +559,12 @@ export default function FeedbacksPage() {
                           )}
                         </td>
 
-                        <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => setSelectedFeedback(feedback)}
-                              className="inline-flex items-center justify-center rounded-lg bg-slate-100 p-2 text-slate-700 transition hover:bg-slate-200"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition hover:bg-slate-200 shrink-0"
                               title="Ver detalhes"
                             >
                               <Eye className="h-4 w-4" />
@@ -576,7 +575,7 @@ export default function FeedbacksPage() {
                                 type="button"
                                 onClick={() => handleDelete(feedback)}
                                 disabled={deletingId === feedback.id}
-                                className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex h-9 items-center justify-center rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60 shrink-0"
                               >
                                 {deletingId === feedback.id ? "Excluindo..." : "Excluir"}
                               </button>
