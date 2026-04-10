@@ -150,8 +150,11 @@ export default function FeedbackKiosk() {
     setRating(null);
     setTagIds([]);
     setComment("");
+    setCommentError("");
     setContactName("");
     setContactPhone("");
+    setContactNameError("");
+    setContactPhoneError("");
     setContactMessage("");
     setContactConsent(false);
     setIsSubmitting(false);
