@@ -1,50 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  getCompanySettings,
-  getMySettings,
-  updateCompanySettings,
-  updateMySettings,
-  type CompanySettings,
-  type UpdateCompanySettingsInput,
-} from "../../../services/settings";
-import { getCompanies, type Company } from "../../../services/companies";
 import { getStoredUser } from "../../../services/auth";
+import { getCompanies, type Company } from "../../../services/companies";
+import {
+  getMySettings,
+  updateMySettings,
+} from "../../../services/settings";
 import {
   canManageOperationalModules,
   canViewOperationalModules,
   getResolvedCompanyId,
   isSuperAdmin,
 } from "../../../utils/permissions";
-
-function buildPayload(params: {
-  companyName: string;
-  logoUrl: string;
-  thankYouMessage: string;
-  primaryColor: string;
-  kioskResetSeconds: string;
-  heroTitle: string;
-  heroSubtitle: string;
-  backgroundColor: string;
-  backgroundImageUrl: string;
-  cardBackgroundColor: string;
-  textColor: string;
-  buttonTextColor: string;
-}): UpdateCompanySettingsInput {
-  return {
-    companyName: params.companyName.trim() || undefined,
-    logoUrl: params.logoUrl.trim() || undefined,
-    thankYouMessage: params.thankYouMessage.trim() || undefined,
-    primaryColor: params.primaryColor.trim() || undefined,
-    kioskResetSeconds: Number(params.kioskResetSeconds) || 5,
-    heroTitle: params.heroTitle.trim() || undefined,
-    heroSubtitle: params.heroSubtitle.trim() || undefined,
-    backgroundColor: params.backgroundColor.trim() || undefined,
-    backgroundImageUrl: params.backgroundImageUrl.trim() || undefined,
-    cardBackgroundColor: params.cardBackgroundColor.trim() || undefined,
-    textColor: params.textColor.trim() || undefined,
-    buttonTextColor: params.buttonTextColor.trim() || undefined,
-  };
-}
 
 export default function SettingsPage() {
   const currentUser = getStoredUser();
@@ -54,83 +20,75 @@ export default function SettingsPage() {
   const superAdmin = isSuperAdmin(currentUser);
   const resolvedCompanyId = getResolvedCompanyId(currentUser);
 
-  const [settings, setSettings] = useState<CompanySettings | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [selectedCompanyId, setSelectedCompanyId] = useState(
-    resolvedCompanyId ?? ""
-  );
+  const [companyId, setCompanyId] = useState(resolvedCompanyId ?? "");
+
+  const selectedCompanyId = useMemo(() => {
+    return superAdmin ? companyId || undefined : resolvedCompanyId;
+  }, [superAdmin, companyId, resolvedCompanyId]);
 
   const [companyName, setCompanyName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [thankYouMessage, setThankYouMessage] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#0ea5e9");
-  const [kioskResetSeconds, setKioskResetSeconds] = useState("5");
+  const [kioskResetSeconds, setKioskResetSeconds] = useState(5);
   const [heroTitle, setHeroTitle] = useState("");
   const [heroSubtitle, setHeroSubtitle] = useState("");
   const [backgroundColor, setBackgroundColor] = useState("#020617");
   const [backgroundImageUrl, setBackgroundImageUrl] = useState("");
-  const [cardBackgroundColor, setCardBackgroundColor] = useState(
-    "rgba(15,23,42,0.72)"
-  );
+  const [cardBackgroundColor, setCardBackgroundColor] = useState("rgba(15,23,42,0.72)");
   const [textColor, setTextColor] = useState("#ffffff");
   const [buttonTextColor, setButtonTextColor] = useState("#0f172a");
+  const [notificationEmails, setNotificationEmails] = useState("");
+  const [dailyNotificationEnabled, setDailyNotificationEnabled] = useState(true);
+  const [monthlyNotificationEnabled, setMonthlyNotificationEnabled] = useState(true);
 
   const [loading, setLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  const effectiveCompanyId = useMemo(() => {
-    return superAdmin ? selectedCompanyId || undefined : resolvedCompanyId;
-  }, [superAdmin, selectedCompanyId, resolvedCompanyId]);
-
-  function hydrateForm(data: CompanySettings) {
-    setSettings(data);
-    setCompanyName(data.companyName ?? "");
-    setLogoUrl(data.logoUrl ?? "");
-    setThankYouMessage(data.thankYouMessage ?? "");
-    setPrimaryColor(data.primaryColor ?? "#0ea5e9");
-    setKioskResetSeconds(String(data.kioskResetSeconds ?? 5));
-    setHeroTitle(data.heroTitle ?? "");
-    setHeroSubtitle(data.heroSubtitle ?? "");
-    setBackgroundColor(data.backgroundColor ?? "#020617");
-    setBackgroundImageUrl(data.backgroundImageUrl ?? "");
-    setCardBackgroundColor(data.cardBackgroundColor ?? "rgba(15,23,42,0.72)");
-    setTextColor(data.textColor ?? "#ffffff");
-    setButtonTextColor(data.buttonTextColor ?? "#0f172a");
-  }
-
-  async function loadCompanies() {
-    if (!superAdmin) return;
-
-    try {
-      const data = await getCompanies();
-      setCompanies(Array.isArray(data) ? data : []);
-    } catch {
-      setCompanies([]);
+  useEffect(() => {
+    if (!canView) {
+      setLoading(false);
+      return;
     }
-  }
 
-  async function loadSettings() {
+    void load();
+  }, [canView, selectedCompanyId]);
+
+  async function load() {
     try {
       setLoading(true);
       setError("");
+      setSuccess("");
 
       if (superAdmin) {
-        if (!effectiveCompanyId) {
-          setSettings(null);
-          return;
-        }
-
-        const data = await getCompanySettings(effectiveCompanyId);
-        hydrateForm(data);
-        return;
+        const companiesData = await getCompanies();
+        setCompanies(Array.isArray(companiesData) ? companiesData : []);
       }
 
-      const data = await getMySettings();
-      hydrateForm(data);
+      const settings = await getMySettings(selectedCompanyId);
+
+      setCompanyName(settings.companyName ?? "");
+      setLogoUrl(settings.logoUrl ?? "");
+      setThankYouMessage(settings.thankYouMessage ?? "");
+      setPrimaryColor(settings.primaryColor ?? "#0ea5e9");
+      setKioskResetSeconds(settings.kioskResetSeconds ?? 5);
+      setHeroTitle(settings.heroTitle ?? "");
+      setHeroSubtitle(settings.heroSubtitle ?? "");
+      setBackgroundColor(settings.backgroundColor ?? "#020617");
+      setBackgroundImageUrl(settings.backgroundImageUrl ?? "");
+      setCardBackgroundColor(
+        settings.cardBackgroundColor ?? "rgba(15,23,42,0.72)"
+      );
+      setTextColor(settings.textColor ?? "#ffffff");
+      setButtonTextColor(settings.buttonTextColor ?? "#0f172a");
+      setNotificationEmails(settings.notificationEmails ?? "");
+      setDailyNotificationEnabled(settings.dailyNotificationEnabled ?? true);
+      setMonthlyNotificationEnabled(settings.monthlyNotificationEnabled ?? true);
     } catch {
       setError("Não foi possível carregar as configurações.");
-      setSettings(null);
     } finally {
       setLoading(false);
     }
@@ -139,52 +97,47 @@ export default function SettingsPage() {
   async function handleSave() {
     if (!canManage) return;
 
-    try {
-      setIsSaving(true);
-      setError("");
-
-      const payload = buildPayload({
-        companyName,
-        logoUrl,
-        thankYouMessage,
-        primaryColor,
-        kioskResetSeconds,
-        heroTitle,
-        heroSubtitle,
-        backgroundColor,
-        backgroundImageUrl,
-        cardBackgroundColor,
-        textColor,
-        buttonTextColor,
-      });
-
-      const data =
-        superAdmin && effectiveCompanyId
-          ? await updateCompanySettings(effectiveCompanyId, payload)
-          : await updateMySettings(payload);
-
-      hydrateForm(data);
-      window.alert("Configurações salvas com sucesso.");
-    } catch {
-      setError("Não foi possível salvar as configurações.");
-    } finally {
-      setIsSaving(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!canView) {
-      setLoading(false);
+    if (superAdmin && !selectedCompanyId) {
+      setError("Selecione uma empresa.");
       return;
     }
 
-    void loadCompanies();
-  }, [canView, superAdmin]);
+    try {
+      setSaving(true);
+      setError("");
+      setSuccess("");
 
-  useEffect(() => {
-    if (!canView) return;
-    void loadSettings();
-  }, [canView, effectiveCompanyId]);
+      await updateMySettings(
+        {
+          companyName: companyName.trim() || null,
+          logoUrl: logoUrl.trim() || null,
+          thankYouMessage: thankYouMessage.trim() || null,
+          primaryColor: primaryColor.trim() || null,
+          kioskResetSeconds,
+          heroTitle: heroTitle.trim() || null,
+          heroSubtitle: heroSubtitle.trim() || null,
+          backgroundColor: backgroundColor.trim() || null,
+          backgroundImageUrl: backgroundImageUrl.trim() || null,
+          cardBackgroundColor: cardBackgroundColor.trim() || null,
+          textColor: textColor.trim() || null,
+          buttonTextColor: buttonTextColor.trim() || null,
+          notificationEmails: notificationEmails.trim() || null,
+          dailyNotificationEnabled,
+          monthlyNotificationEnabled,
+        },
+        selectedCompanyId
+      );
+
+      setSuccess("Configurações salvas com sucesso.");
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          "Não foi possível salvar as configurações."
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (!canView) {
     return (
@@ -193,7 +146,7 @@ export default function SettingsPage() {
           Acesso negado
         </h1>
         <p className="text-slate-600">
-          Você não tem permissão para acessar as configurações.
+          Você não tem permissão para acessar a página de configurações.
         </p>
       </section>
     );
@@ -206,7 +159,7 @@ export default function SettingsPage() {
           Configurações
         </h1>
         <p className="text-slate-600">
-          Personalize o branding e a experiência do kiosk.
+          Personalize o kiosk e configure notificações por e-mail.
         </p>
       </div>
 
@@ -216,272 +169,184 @@ export default function SettingsPage() {
         </div>
       ) : null}
 
-      {superAdmin ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 space-y-1">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Empresa alvo
-            </h2>
-            <p className="text-sm text-slate-500">
-              Selecione a empresa que terá o branding editado.
-            </p>
-          </div>
-
-          <select
-            value={selectedCompanyId}
-            onChange={(e) => setSelectedCompanyId(e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            <option value="">Selecione uma empresa</option>
-            {companies.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
+      {success ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {success}
         </div>
       ) : null}
 
       {loading ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-slate-500 shadow-sm">
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-slate-500 shadow-sm">
           Carregando configurações...
-        </div>
-      ) : superAdmin && !effectiveCompanyId ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-slate-500 shadow-sm">
-          Selecione uma empresa para editar as configurações.
         </div>
       ) : (
         <>
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-6 space-y-1">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 space-y-1">
               <h2 className="text-xl font-semibold text-slate-900">
-                Branding do kiosk
+                Identidade e layout
+              </h2>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {superAdmin ? (
+                <select
+                  value={companyId}
+                  onChange={(e) => setCompanyId(e.target.value)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+                >
+                  <option value="">Selecione a empresa</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+
+              <input
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Nome exibido da empresa"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+
+              <input
+                value={logoUrl}
+                onChange={(e) => setLogoUrl(e.target.value)}
+                placeholder="URL da logo"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+
+              <input
+                value={heroTitle}
+                onChange={(e) => setHeroTitle(e.target.value)}
+                placeholder="Título principal"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+
+              <input
+                value={heroSubtitle}
+                onChange={(e) => setHeroSubtitle(e.target.value)}
+                placeholder="Subtítulo"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+
+              <input
+                value={thankYouMessage}
+                onChange={(e) => setThankYouMessage(e.target.value)}
+                placeholder="Mensagem de agradecimento"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+
+              <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={(e) => setPrimaryColor(e.target.value)}
+                  className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
+                />
+                <span className="text-sm text-slate-600">Cor principal</span>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+                <input
+                  type="color"
+                  value={backgroundColor}
+                  onChange={(e) => setBackgroundColor(e.target.value)}
+                  className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
+                />
+                <span className="text-sm text-slate-600">Cor de fundo</span>
+              </div>
+
+              <input
+                value={backgroundImageUrl}
+                onChange={(e) => setBackgroundImageUrl(e.target.value)}
+                placeholder="URL da imagem de fundo"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+
+              <input
+                value={cardBackgroundColor}
+                onChange={(e) => setCardBackgroundColor(e.target.value)}
+                placeholder="Cor do card"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+
+              <input
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                placeholder="Cor do texto"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+
+              <input
+                value={buttonTextColor}
+                onChange={(e) => setButtonTextColor(e.target.value)}
+                placeholder="Cor do texto do botão"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+
+              <input
+                type="number"
+                min={1}
+                value={kioskResetSeconds}
+                onChange={(e) => setKioskResetSeconds(Number(e.target.value) || 5)}
+                placeholder="Tempo de reset"
+                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+              />
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 space-y-1">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Notificações por e-mail
               </h2>
               <p className="text-sm text-slate-500">
-                Ajuste os textos, cores e aparência do kiosk público.
+                Informe um ou mais e-mails separados por vírgula.
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Nome da empresa
-                </label>
-                <input
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
+            <div className="grid gap-4">
+              <textarea
+                value={notificationEmails}
+                onChange={(e) => setNotificationEmails(e.target.value)}
+                placeholder="exemplo1@empresa.com, exemplo2@empresa.com"
+                className="min-h-[120px] rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500 resize-none"
+              />
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  URL da logo
-                </label>
+              <label className="inline-flex items-center gap-3 text-sm text-slate-700">
                 <input
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                  type="checkbox"
+                  checked={dailyNotificationEnabled}
+                  onChange={(e) => setDailyNotificationEnabled(e.target.checked)}
                 />
-              </div>
+                Enviar resumo diário com os feedbacks de ontem
+              </label>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Título principal
-                </label>
+              <label className="inline-flex items-center gap-3 text-sm text-slate-700">
                 <input
-                  value={heroTitle}
-                  onChange={(e) => setHeroTitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                  type="checkbox"
+                  checked={monthlyNotificationEnabled}
+                  onChange={(e) => setMonthlyNotificationEnabled(e.target.checked)}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Subtítulo
-                </label>
-                <input
-                  value={heroSubtitle}
-                  onChange={(e) => setHeroSubtitle(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor principal
-                </label>
-                <input
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  placeholder="#0ea5e9"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Tempo de reset (segundos)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={kioskResetSeconds}
-                  onChange={(e) => setKioskResetSeconds(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor de fundo
-                </label>
-                <input
-                  value={backgroundColor}
-                  onChange={(e) => setBackgroundColor(e.target.value)}
-                  placeholder="#020617"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  URL da imagem de fundo
-                </label>
-                <input
-                  value={backgroundImageUrl}
-                  onChange={(e) => setBackgroundImageUrl(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor do card
-                </label>
-                <input
-                  value={cardBackgroundColor}
-                  onChange={(e) => setCardBackgroundColor(e.target.value)}
-                  placeholder="rgba(15,23,42,0.72)"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor do texto
-                </label>
-                <input
-                  value={textColor}
-                  onChange={(e) => setTextColor(e.target.value)}
-                  placeholder="#ffffff"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor do texto do botão
-                </label>
-                <input
-                  value={buttonTextColor}
-                  onChange={(e) => setButtonTextColor(e.target.value)}
-                  placeholder="#0f172a"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Mensagem de agradecimento
-                </label>
-                <textarea
-                  value={thankYouMessage}
-                  onChange={(e) => setThankYouMessage(e.target.value)}
-                  className="min-h-[120px] w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
+                Enviar resumo mensal com os feedbacks do mês anterior
+              </label>
             </div>
+          </div>
 
-            {canManage ? (
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className="rounded-xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {isSaving ? "Salvando..." : "Salvar branding"}
-                </button>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Preview visual
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Prévia simplificada do kiosk com seu branding.
-            </p>
-
-            <div
-              className="relative mt-6 overflow-hidden rounded-3xl p-8"
-              style={{
-                backgroundColor,
-                color: textColor,
-                backgroundImage: backgroundImageUrl
-                  ? `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImageUrl})`
-                  : undefined,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            >
-              <div
-                className="rounded-3xl border border-white/10 p-8"
-                style={{ backgroundColor: cardBackgroundColor }}
+          {canManage ? (
+            <div className="flex justify-end">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="rounded-xl bg-sky-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt="Logo"
-                    className="mb-4 h-16 object-contain"
-                  />
-                ) : null}
-
-                <p
-                  className="mb-3 text-sm font-semibold uppercase tracking-[0.25em]"
-                  style={{ color: primaryColor }}
-                >
-                  {companyName || settings?.companyName || "Sua empresa"}
-                </p>
-
-                <h3 className="text-4xl font-bold">
-                  {heroTitle || "Como foi sua experiência hoje?"}
-                </h3>
-
-                <p className="mt-3 text-lg opacity-90">
-                  {heroSubtitle ||
-                    "Toque em uma opção para avaliar rapidamente."}
-                </p>
-
-                <div className="mt-8">
-                  <button
-                    className="rounded-2xl px-6 py-3 font-semibold"
-                    style={{
-                      backgroundColor: primaryColor,
-                      color: buttonTextColor,
-                    }}
-                  >
-                    Exemplo de botão
-                  </button>
-                </div>
-
-                <p className="mt-8 text-base opacity-90">
-                  {thankYouMessage || "Obrigado pela sua avaliação!"}
-                </p>
-              </div>
+                {saving ? "Salvando..." : "Salvar configurações"}
+              </button>
             </div>
-          </section>
+          ) : null}
         </>
       )}
     </section>
