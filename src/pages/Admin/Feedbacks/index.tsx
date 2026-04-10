@@ -501,13 +501,13 @@ export default function FeedbacksPage() {
                           {formatDate(feedback.createdAt)}
                         </td>
 
-                        <td className="px-4 py-4">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${feedback.rating <= 2
-                              ? "bg-rose-100 text-rose-700"
-                              : feedback.rating === 3
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-emerald-100 text-emerald-700"
+                            className={`inline-flex min-w-fit whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${feedback.rating <= 2
+                                ? "bg-rose-100 text-rose-700"
+                                : feedback.rating === 3
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-emerald-100 text-emerald-700"
                               }`}
                           >
                             {feedback.rating} - {getRatingLabel(feedback.rating)}
