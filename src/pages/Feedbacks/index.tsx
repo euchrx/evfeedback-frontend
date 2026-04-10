@@ -192,6 +192,23 @@ export default function FeedbackKiosk() {
     void handleSubmit(false);
   }
 
+  function handleSubmitWithContact() {
+    if (!isNegativeRating) {
+      void handleSubmit(false);
+      return;
+    }
+
+    const trimmedName = contactName.trim();
+    const trimmedPhone = contactPhone.trim();
+
+    if (!trimmedName || !trimmedPhone) {
+      window.alert("Preencha nome e telefone para enviar com identificação.");
+      return;
+    }
+
+    void handleSubmit(false);
+  }
+
   async function handleSubmit(skipComment = false) {
     if (!rating || !kioskToken || isSubmitting) return;
 
@@ -668,7 +685,7 @@ export default function FeedbackKiosk() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Nome
+                      Nome *
                     </label>
                     <input
                       type="text"
@@ -683,7 +700,7 @@ export default function FeedbackKiosk() {
 
                   <div>
                     <label className="block text-sm font-medium mb-2">
-                      Telefone / WhatsApp
+                      Telefone / WhatsApp *
                     </label>
                     <input
                       type="text"
@@ -748,7 +765,7 @@ export default function FeedbackKiosk() {
 
                 <button
                   type="button"
-                  onClick={() => handleSubmit(false)}
+                  onClick={handleSubmitWithContact}
                   disabled={isSubmitting}
                   className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
                   style={{
