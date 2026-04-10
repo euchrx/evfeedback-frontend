@@ -71,6 +71,8 @@ export default function FeedbackKiosk() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
+  const [contactNameError, setContactNameError] = useState("");
+  const [contactPhoneError, setContactPhoneError] = useState("");
 
   const inactivityTimerRef = useRef<number | null>(null);
 
@@ -133,6 +135,8 @@ export default function FeedbackKiosk() {
       setComment("");
       setContactName("");
       setContactPhone("");
+      setContactNameError("");
+      setContactPhoneError("");
       setContactMessage("");
       setContactConsent(false);
       setIsSubmitting(false);
@@ -201,8 +205,23 @@ export default function FeedbackKiosk() {
     const trimmedName = contactName.trim();
     const trimmedPhone = contactPhone.trim();
 
-    if (!trimmedName || !trimmedPhone) {
-      window.alert("Preencha nome e telefone para enviar com identificação.");
+    let hasError = false;
+
+    if (!trimmedName) {
+      setContactNameError("Informe seu nome.");
+      hasError = true;
+    } else {
+      setContactNameError("");
+    }
+
+    if (!trimmedPhone) {
+      setContactPhoneError("Informe seu telefone ou WhatsApp.");
+      hasError = true;
+    } else {
+      setContactPhoneError("");
+    }
+
+    if (hasError) {
       return;
     }
 
@@ -690,12 +709,21 @@ export default function FeedbackKiosk() {
                     <input
                       type="text"
                       value={contactName}
-                      onChange={(e) => setContactName(e.target.value)}
+                      onChange={(e) => {
+                        setContactName(e.target.value);
+                        if (e.target.value.trim()) {
+                          setContactNameError("");
+                        }
+                      }}
                       placeholder="Seu nome"
-                      className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none"
+                      className={`w-full rounded-2xl border bg-black/10 px-4 py-3 text-base outline-none ${contactNameError ? "border-rose-400" : "border-white/10"
+                        }`}
                       style={{ color: textColor }}
                       maxLength={120}
                     />
+                    {contactNameError ? (
+                      <p className="mt-2 text-sm text-rose-300">{contactNameError}</p>
+                    ) : null}
                   </div>
 
                   <div>
@@ -705,12 +733,21 @@ export default function FeedbackKiosk() {
                     <input
                       type="text"
                       value={contactPhone}
-                      onChange={(e) => setContactPhone(e.target.value)}
+                      onChange={(e) => {
+                        setContactPhone(e.target.value);
+                        if (e.target.value.trim()) {
+                          setContactPhoneError("");
+                        }
+                      }}
                       placeholder="(00) 00000-0000"
-                      className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none"
+                      className={`w-full rounded-2xl border bg-black/10 px-4 py-3 text-base outline-none ${contactPhoneError ? "border-rose-400" : "border-white/10"
+                        }`}
                       style={{ color: textColor }}
                       maxLength={30}
                     />
+                    {contactPhoneError ? (
+                      <p className="mt-2 text-sm text-rose-300">{contactPhoneError}</p>
+                    ) : null}
                   </div>
                 </div>
 
