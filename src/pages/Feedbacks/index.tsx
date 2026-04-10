@@ -226,7 +226,16 @@ export default function FeedbackKiosk() {
     return () => {
       clearInactivityTimer();
     };
-  }, [step, rating]);
+  }, [
+    step,
+    rating,
+    tagIds,
+    comment,
+    contactName,
+    contactPhone,
+    contactMessage,
+    contactConsent,
+  ]);
 
   useEffect(() => {
     if (step !== "done") return;
@@ -484,8 +493,8 @@ export default function FeedbackKiosk() {
                         type="button"
                         onClick={() => handleToggleTag(tag.id)}
                         className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${active
-                            ? ""
-                            : "border-white/10 bg-black/10 hover:bg-black/20"
+                          ? ""
+                          : "border-white/10 bg-black/10 hover:bg-black/20"
                           }`}
                         style={
                           active

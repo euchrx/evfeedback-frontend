@@ -28,6 +28,7 @@ function formatDate(value?: string) {
   }).format(date);
 }
 
+
 export default function CompaniesPage() {
   const currentUser = getStoredUser();
 

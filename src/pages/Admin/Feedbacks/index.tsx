@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Eye } from "lucide-react";
 import {
   deleteFeedback,
   getFeedbacks,
@@ -87,6 +88,7 @@ export default function FeedbacksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackItem | null>(null);
 
   const [filters, setFilters] = useState<FeedbackFilters>({
     companyId: resolvedCompanyId ?? currentUser?.companyId ?? "",
@@ -246,6 +248,10 @@ export default function FeedbacksPage() {
       await deleteFeedback(feedback.id, companyId);
 
       setFeedbacks((current) => current.filter((item) => item.id !== feedback.id));
+
+      if (selectedFeedback?.id === feedback.id) {
+        setSelectedFeedback(null);
+      }
     } catch {
       setError("Não foi possível excluir o feedback.");
     } finally {
@@ -310,313 +316,466 @@ export default function FeedbacksPage() {
   }
 
   return (
-    <section className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Feedbacks
-        </h1>
-        <p className="text-slate-600">
-          Acompanhe as avaliações enviadas pelos clientes.
-        </p>
-      </div>
-
-      {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 space-y-1">
-          <h2 className="text-xl font-semibold text-slate-900">Filtros</h2>
-          <p className="text-sm text-slate-500">
-            Refine os resultados por empresa, ambiente, nota, filial, kiosk, período e status.
+    <>
+      <section className="space-y-8">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Feedbacks
+          </h1>
+          <p className="text-slate-600">
+            Acompanhe as avaliações enviadas pelos clientes.
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {superAdmin ? (
+        {error ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {error}
+          </div>
+        ) : null}
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 space-y-1">
+            <h2 className="text-xl font-semibold text-slate-900">Filtros</h2>
+            <p className="text-sm text-slate-500">
+              Refine os resultados por empresa, ambiente, nota, filial, kiosk, período e status.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {superAdmin ? (
+              <select
+                value={filters.companyId ?? ""}
+                onChange={(e) => handleChangeFilter("companyId", e.target.value)}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+              >
+                <option value="">Todas as empresas</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+
             <select
-              value={filters.companyId ?? ""}
-              onChange={(e) => handleChangeFilter("companyId", e.target.value)}
+              value={filters.environmentType ?? ""}
+              onChange={(e) => handleChangeFilter("environmentType", e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
             >
-              <option value="">Todas as empresas</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
+              <option value="">Todos os ambientes</option>
+              <option value="POSTO">Posto</option>
+              <option value="CONVENIENCIA">Conveniência</option>
+              <option value="RESTAURANTE">Restaurante</option>
+            </select>
+
+            <select
+              value={filters.rating ?? ""}
+              onChange={(e) => handleChangeFilter("rating", e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+            >
+              <option value="">Todas as notas</option>
+              <option value="1">1 - Péssimo</option>
+              <option value="2">2 - Ruim</option>
+              <option value="3">3 - Ok</option>
+              <option value="4">4 - Bom</option>
+              <option value="5">5 - Excelente</option>
+            </select>
+
+            <select
+              value={filters.branchId ?? ""}
+              onChange={(e) => handleChangeFilter("branchId", e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+            >
+              <option value="">Todas as filiais</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
                 </option>
               ))}
             </select>
-          ) : null}
 
-          <select
-            value={filters.environmentType ?? ""}
-            onChange={(e) => handleChangeFilter("environmentType", e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            <option value="">Todos os ambientes</option>
-            <option value="POSTO">Posto</option>
-            <option value="CONVENIENCIA">Conveniência</option>
-            <option value="RESTAURANTE">Restaurante</option>
-          </select>
+            <select
+              value={filters.kioskId ?? ""}
+              onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+            >
+              <option value="">Todos os kiosks</option>
+              {kiosks.map((kiosk) => (
+                <option key={kiosk.id} value={kiosk.id}>
+                  {kiosk.name}
+                </option>
+              ))}
+            </select>
 
-          <select
-            value={filters.rating ?? ""}
-            onChange={(e) => handleChangeFilter("rating", e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            <option value="">Todas as notas</option>
-            <option value="1">1 - Péssimo</option>
-            <option value="2">2 - Ruim</option>
-            <option value="3">3 - Ok</option>
-            <option value="4">4 - Bom</option>
-            <option value="5">5 - Excelente</option>
-          </select>
+            <select
+              value={filters.active ?? ""}
+              onChange={(e) => handleChangeFilter("active", e.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+            >
+              <option value="">Todos os status</option>
+              <option value="true">Ativos</option>
+              <option value="false">Inativos</option>
+            </select>
 
-          <select
-            value={filters.branchId ?? ""}
-            onChange={(e) => handleChangeFilter("branchId", e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            <option value="">Todas as filiais</option>
-            {branches.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
+            <input
+              type="date"
+              value={filters.startDate ?? ""}
+              onChange={(e) => handleChangeFilter("startDate", e.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+            />
 
-          <select
-            value={filters.kioskId ?? ""}
-            onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            <option value="">Todos os kiosks</option>
-            {kiosks.map((kiosk) => (
-              <option key={kiosk.id} value={kiosk.id}>
-                {kiosk.name}
-              </option>
-            ))}
-          </select>
+            <input
+              type="date"
+              value={filters.endDate ?? ""}
+              onChange={(e) => handleChangeFilter("endDate", e.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+            />
+          </div>
 
-          <select
-            value={filters.active ?? ""}
-            onChange={(e) => handleChangeFilter("active", e.target.value)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            <option value="">Todos os status</option>
-            <option value="true">Ativos</option>
-            <option value="false">Inativos</option>
-          </select>
+          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
+              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+            />
 
-          <input
-            type="date"
-            value={filters.startDate ?? ""}
-            onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-          />
+            <button
+              onClick={handleApplyFilters}
+              className="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
+            >
+              Aplicar filtros
+            </button>
 
-          <input
-            type="date"
-            value={filters.endDate ?? ""}
-            onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-          />
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
-            className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-          />
-
-          <button
-            onClick={handleApplyFilters}
-            className="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
-          >
-            Aplicar filtros
-          </button>
-
-          <button
-            onClick={handleClearFilters}
-            className="rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
-          >
-            Limpar
-          </button>
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Lista de feedbacks
-            </h2>
-            <p className="text-sm text-slate-500">
-              {loading ? "Carregando..." : `${filteredFeedbacks.length} item(ns)`}
-            </p>
+            <button
+              onClick={handleClearFilters}
+              className="rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
+            >
+              Limpar
+            </button>
           </div>
         </div>
 
-        {loading ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-            Carregando feedbacks...
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Lista de feedbacks
+              </h2>
+              <p className="text-sm text-slate-500">
+                {loading ? "Carregando..." : `${filteredFeedbacks.length} item(ns)`}
+              </p>
+            </div>
           </div>
-        ) : filteredFeedbacks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-            Nenhum feedback encontrado.
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto rounded-2xl border border-slate-200">
-              <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50">
-                  <tr className="text-left text-sm text-slate-600">
-                    <th className="px-4 py-3 font-semibold">Data</th>
-                    <th className="px-4 py-3 font-semibold">Nota</th>
-                    <th className="px-4 py-3 font-semibold">Empresa</th>
-                    <th className="px-4 py-3 font-semibold">Filial</th>
-                    <th className="px-4 py-3 font-semibold">Kiosk</th>
-                    <th className="px-4 py-3 font-semibold">Ambiente</th>
-                    <th className="px-4 py-3 font-semibold">Comentário</th>
-                    <th className="px-4 py-3 font-semibold">Contato</th>
-                    <th className="px-4 py-3 font-semibold">Tags</th>
-                    <th className="px-4 py-3 font-semibold">Ações</th>
-                  </tr>
-                </thead>
 
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {paginatedFeedbacks.map((feedback) => (
-                    <tr key={feedback.id} className="align-top">
-                      <td className="px-4 py-4 text-sm text-slate-600 whitespace-nowrap">
-                        {formatDate(feedback.createdAt)}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            feedback.rating <= 2
-                              ? "bg-rose-100 text-rose-700"
-                              : feedback.rating === 3
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-emerald-100 text-emerald-700"
-                          }`}
-                        >
-                          {feedback.rating} - {getRatingLabel(feedback.rating)}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-4 text-sm text-slate-600">
-                        {superAdmin ? feedback.company?.name ?? "-" : "-"}
-                      </td>
-
-                      <td className="px-4 py-4 text-sm text-slate-600">
-                        {feedback.branch?.name ?? "-"}
-                      </td>
-
-                      <td className="px-4 py-4 text-sm text-slate-600">
-                        {feedback.kiosk?.name ?? "-"}
-                      </td>
-
-                      <td className="px-4 py-4 text-sm text-slate-600">
-                        {getEnvironmentLabel(feedback.kiosk?.environmentType)}
-                      </td>
-
-                      <td className="px-4 py-4 text-sm text-slate-600">
-                        <div className="max-w-[280px] whitespace-normal break-words">
-                          {feedback.comment?.trim() || "Sem comentário."}
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-4 text-sm text-slate-600">
-                        {hasContactInfo(feedback) ? (
-                          <div className="space-y-1">
-                            <div>
-                              <span className="font-medium text-slate-800">Nome:</span>{" "}
-                              {feedback.contactName?.trim() || "-"}
-                            </div>
-                            <div>
-                              <span className="font-medium text-slate-800">Telefone:</span>{" "}
-                              {feedback.contactPhone?.trim() || "-"}
-                            </div>
-                            <div>
-                              <span className="font-medium text-slate-800">Consentimento:</span>{" "}
-                              {feedback.contactConsent ? "Sim" : "Não"}
-                            </div>
-                          </div>
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-4 text-sm text-slate-600">
-                        {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
-                          <div className="flex max-w-[220px] flex-wrap gap-2">
-                            {feedback.tags!.map((item) => (
-                              <span
-                                key={item.id}
-                                className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
-                              >
-                                {item.tag?.name ?? "Tag"}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span>-</span>
-                        )}
-                      </td>
-
-                      <td className="px-4 py-4">
-                        {canManage ? (
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(feedback)}
-                            disabled={deletingId === feedback.id}
-                            className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {deletingId === feedback.id ? "Excluindo..." : "Excluir"}
-                          </button>
-                        ) : (
-                          <span className="text-sm text-slate-400">-</span>
-                        )}
-                      </td>
+          {loading ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
+              Carregando feedbacks...
+            </div>
+          ) : filteredFeedbacks.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
+              Nenhum feedback encontrado.
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr className="text-left text-sm text-slate-600">
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Data</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Nota</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Empresa</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Filial</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Kiosk</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Ambiente</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Comentário</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Tags</th>
+                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {paginatedFeedbacks.map((feedback) => (
+                      <tr key={feedback.id} className="align-top">
+                        <td className="px-4 py-4 text-sm text-slate-600 whitespace-nowrap">
+                          {formatDate(feedback.createdAt)}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                              feedback.rating <= 2
+                                ? "bg-rose-100 text-rose-700"
+                                : feedback.rating === 3
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-emerald-100 text-emerald-700"
+                            }`}
+                          >
+                            {feedback.rating} - {getRatingLabel(feedback.rating)}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          <div className="max-w-[140px] break-words">
+                            {superAdmin ? feedback.company?.name ?? "-" : "-"}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          <div className="max-w-[120px] break-words">
+                            {feedback.branch?.name ?? "-"}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          <div className="max-w-[120px] break-words">
+                            {feedback.kiosk?.name ?? "-"}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600 whitespace-nowrap">
+                          {getEnvironmentLabel(feedback.kiosk?.environmentType)}
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          <div className="max-w-[220px] whitespace-normal break-words">
+                            {feedback.comment?.trim() || "Sem comentário."}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
+                            <div className="flex max-w-[180px] flex-wrap gap-2">
+                              {feedback.tags!.map((item) => (
+                                <span
+                                  key={item.id}
+                                  className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                                >
+                                  {item.tag?.name ?? "Tag"}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span>-</span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedFeedback(feedback)}
+                              className="inline-flex items-center justify-center rounded-lg bg-slate-100 p-2 text-slate-700 transition hover:bg-slate-200"
+                              title="Ver detalhes"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+
+                            {canManage ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(feedback)}
+                                disabled={deletingId === feedback.id}
+                                className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {deletingId === feedback.id ? "Excluindo..." : "Excluir"}
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <p className="text-sm text-slate-500">
+                  Página {page} de {totalPages}
+                </p>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page === 1}
+                    className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+
+                  <button
+                    onClick={() =>
+                      setPage((current) => Math.min(totalPages, current + 1))
+                    }
+                    disabled={page === totalPages}
+                    className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </section>
+
+      {selectedFeedback ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6">
+          <div className="w-full max-w-3xl rounded-3xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">
+                  Detalhes do feedback
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Visualize todas as informações do registro.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedFeedback(null)}
+                className="rounded-xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+              >
+                Fechar
+              </button>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p className="text-sm text-slate-500">
-                Página {page} de {totalPages}
-              </p>
+            <div className="max-h-[80vh] overflow-y-auto px-6 py-6">
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                      Dados gerais
+                    </h3>
+                    <div className="space-y-2 text-sm text-slate-700">
+                      <p>
+                        <span className="font-semibold text-slate-900">Data:</span>{" "}
+                        {formatDate(selectedFeedback.createdAt)}
+                      </p>
+                      <p>
+                        <span className="font-semibold text-slate-900">Nota:</span>{" "}
+                        {selectedFeedback.rating} - {getRatingLabel(selectedFeedback.rating)}
+                      </p>
+                      <p>
+                        <span className="font-semibold text-slate-900">Ambiente:</span>{" "}
+                        {getEnvironmentLabel(selectedFeedback.kiosk?.environmentType)}
+                      </p>
+                      {superAdmin ? (
+                        <p>
+                          <span className="font-semibold text-slate-900">Empresa:</span>{" "}
+                          {selectedFeedback.company?.name ?? "-"}
+                        </p>
+                      ) : null}
+                      <p>
+                        <span className="font-semibold text-slate-900">Filial:</span>{" "}
+                        {selectedFeedback.branch?.name ?? "-"}
+                      </p>
+                      <p>
+                        <span className="font-semibold text-slate-900">Kiosk:</span>{" "}
+                        {selectedFeedback.kiosk?.name ?? "-"}
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={page === 1}
-                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-                >
-                  Anterior
-                </button>
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                      Comentário
+                    </h3>
+                    <p className="text-sm leading-6 text-slate-700 break-words">
+                      {selectedFeedback.comment?.trim() || "Sem comentário."}
+                    </p>
+                  </div>
 
-                <button
-                  onClick={() =>
-                    setPage((current) => Math.min(totalPages, current + 1))
-                  }
-                  disabled={page === totalPages}
-                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-                >
-                  Próxima
-                </button>
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                      Tags
+                    </h3>
+
+                    {(selectedFeedback.tags ?? []).length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedFeedback.tags!.map((item) => (
+                          <span
+                            key={item.id}
+                            className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                          >
+                            {item.tag?.name ?? "Tag"}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">Nenhuma tag marcada.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                      Contato
+                    </h3>
+
+                    {hasContactInfo(selectedFeedback) ? (
+                      <div className="space-y-2 text-sm text-slate-700">
+                        <p>
+                          <span className="font-semibold text-slate-900">Nome:</span>{" "}
+                          {selectedFeedback.contactName?.trim() || "-"}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-slate-900">Telefone:</span>{" "}
+                          {selectedFeedback.contactPhone?.trim() || "-"}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-slate-900">Mensagem:</span>{" "}
+                          {selectedFeedback.contactMessage?.trim() || "-"}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-slate-900">Consentimento:</span>{" "}
+                          {selectedFeedback.contactConsent ? "Sim" : "Não"}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">
+                        O cliente não deixou dados de contato.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                      Identificadores
+                    </h3>
+                    <div className="space-y-2 text-sm text-slate-700 break-all">
+                      <p>
+                        <span className="font-semibold text-slate-900">Feedback ID:</span>{" "}
+                        {selectedFeedback.id}
+                      </p>
+                      {selectedFeedback.companyId ? (
+                        <p>
+                          <span className="font-semibold text-slate-900">Company ID:</span>{" "}
+                          {selectedFeedback.companyId}
+                        </p>
+                      ) : null}
+                      {selectedFeedback.branchId ? (
+                        <p>
+                          <span className="font-semibold text-slate-900">Branch ID:</span>{" "}
+                          {selectedFeedback.branchId}
+                        </p>
+                      ) : null}
+                      {selectedFeedback.kioskId ? (
+                        <p>
+                          <span className="font-semibold text-slate-900">Kiosk ID:</span>{" "}
+                          {selectedFeedback.kioskId}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </>
-        )}
-      </div>
-    </section>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
