@@ -21,11 +21,17 @@ export default function SettingsPage() {
   const resolvedCompanyId = getResolvedCompanyId(currentUser);
 
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [companyId, setCompanyId] = useState(resolvedCompanyId ?? "");
+  const [companyId, setCompanyId] = useState(
+    resolvedCompanyId ?? currentUser?.companyId ?? ""
+  );
 
   const selectedCompanyId = useMemo(() => {
-    return superAdmin ? companyId || undefined : resolvedCompanyId;
-  }, [superAdmin, companyId, resolvedCompanyId]);
+    if (superAdmin) {
+      return companyId || currentUser?.companyId || undefined;
+    }
+
+    return resolvedCompanyId;
+  }, [superAdmin, companyId, resolvedCompanyId, currentUser?.companyId]);
 
   const [companyName, setCompanyName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -132,7 +138,7 @@ export default function SettingsPage() {
     } catch (err: any) {
       setError(
         err?.response?.data?.message ||
-          "Não foi possível salvar as configurações."
+        "Não foi possível salvar as configurações."
       );
     } finally {
       setSaving(false);
