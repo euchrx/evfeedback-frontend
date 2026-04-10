@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react"; 
-import QRCode from "react-qr-code";
+import { useEffect, useMemo, useState } from "react";
+import * as QRCodeModule from "react-qr-code";
 import { getStoredUser } from "../../../services/auth";
 import { getCompanies, type Company } from "../../../services/companies";
 import { getBranches, type Branch } from "../../../services/branches";
@@ -70,6 +70,9 @@ export default function KiosksPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const QRCodeComponent =
+    (QRCodeModule as unknown as { default?: React.ComponentType<any> }).default ??
+    (QRCodeModule as unknown as React.ComponentType<any>);
 
   const feedbackBaseUrl = useMemo(() => {
     return `${window.location.origin}/feedback`;
@@ -376,7 +379,7 @@ export default function KiosksPage() {
     const link = `${feedbackBaseUrl}?token=${token}`;
     setSelectedQrLink(link);
   }
-  
+
   function handleClearFilters() {
     setSearch("");
     setEnvironmentFilter("ALL");
@@ -891,7 +894,7 @@ export default function KiosksPage() {
             </div>
 
             <div className="flex justify-center rounded-3xl bg-white p-6">
-              <QRCode value={selectedQrLink} size={220} />
+              <QRCodeComponent value={selectedQrLink} size={220} />
             </div>
 
             <div className="mt-4 rounded-2xl bg-slate-50 p-4">
