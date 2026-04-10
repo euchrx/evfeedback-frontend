@@ -308,6 +308,50 @@ export default function FeedbackKiosk() {
     };
   }, []);
 
+  useEffect(() => {
+    const preventGesture = (event: Event) => {
+      event.preventDefault();
+    };
+
+    const preventMultiTouchZoom = (event: TouchEvent) => {
+      if (event.touches.length > 1) {
+        event.preventDefault();
+      }
+    };
+
+    const preventDoubleTapZoom = (() => {
+      let lastTouchEnd = 0;
+
+      return (event: TouchEvent) => {
+        const now = Date.now();
+
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+        }
+
+        lastTouchEnd = now;
+      };
+    })();
+
+    document.addEventListener("gesturestart", preventGesture, { passive: false });
+    document.addEventListener("gesturechange", preventGesture, { passive: false });
+    document.addEventListener("gestureend", preventGesture, { passive: false });
+    document.addEventListener("touchstart", preventMultiTouchZoom, {
+      passive: false,
+    });
+    document.addEventListener("touchend", preventDoubleTapZoom, {
+      passive: false,
+    });
+
+    return () => {
+      document.removeEventListener("gesturestart", preventGesture);
+      document.removeEventListener("gesturechange", preventGesture);
+      document.removeEventListener("gestureend", preventGesture);
+      document.removeEventListener("touchstart", preventMultiTouchZoom);
+      document.removeEventListener("touchend", preventDoubleTapZoom);
+    };
+  }, []);
+
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
 
   function getErrorTitle() {
@@ -353,6 +397,7 @@ export default function FeedbackKiosk() {
           : undefined,
         backgroundSize: "cover",
         backgroundPosition: "center",
+        touchAction: "manipulation",
       }}
     >
       <div className="w-full max-w-5xl">
@@ -438,21 +483,20 @@ export default function FeedbackKiosk() {
                         key={tag.id}
                         type="button"
                         onClick={() => handleToggleTag(tag.id)}
-                        className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${
-                          active
+                        className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${active
                             ? ""
                             : "border-white/10 bg-black/10 hover:bg-black/20"
-                        }`}
+                          }`}
                         style={
                           active
                             ? {
-                                borderColor: primaryColor,
-                                backgroundColor: primaryColor,
-                                color: buttonTextColor,
-                              }
+                              borderColor: primaryColor,
+                              backgroundColor: primaryColor,
+                              color: buttonTextColor,
+                            }
                             : {
-                                color: textColor,
-                              }
+                              color: textColor,
+                            }
                         }
                       >
                         {tag.name}
