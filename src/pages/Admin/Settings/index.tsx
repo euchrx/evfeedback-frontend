@@ -13,6 +13,25 @@ import {
   isSuperAdmin,
 } from "../../../utils/permissions";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "response" in error &&
+    typeof error.response === "object" &&
+    error.response !== null &&
+    "data" in error.response &&
+    typeof error.response.data === "object" &&
+    error.response.data !== null &&
+    "message" in error.response.data &&
+    typeof error.response.data.message === "string"
+  ) {
+    return error.response.data.message;
+  }
+
+  return fallback;
+}
+
 export default function SettingsPage() {
   const currentUser = getStoredUser();
 
@@ -23,7 +42,7 @@ export default function SettingsPage() {
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyId, setCompanyId] = useState(
-    resolvedCompanyId ?? currentUser?.companyId ?? ""
+    resolvedCompanyId ?? currentUser?.companyId ?? "",
   );
 
   const selectedCompanyId = useMemo(() => {
@@ -43,17 +62,38 @@ export default function SettingsPage() {
   const [heroSubtitle, setHeroSubtitle] = useState("");
   const [backgroundColor, setBackgroundColor] = useState("#020617");
   const [backgroundImageUrl, setBackgroundImageUrl] = useState("");
-  const [cardBackgroundColor, setCardBackgroundColor] = useState("rgba(15,23,42,0.72)");
+  const [cardBackgroundColor, setCardBackgroundColor] = useState(
+    "rgba(15,23,42,0.72)",
+  );
   const [textColor, setTextColor] = useState("#ffffff");
   const [buttonTextColor, setButtonTextColor] = useState("#0f172a");
   const [notificationEmails, setNotificationEmails] = useState("");
   const [dailyNotificationEnabled, setDailyNotificationEnabled] = useState(true);
-  const [monthlyNotificationEnabled, setMonthlyNotificationEnabled] = useState(true);
+  const [monthlyNotificationEnabled, setMonthlyNotificationEnabled] =
+    useState(true);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const previewCompanyName = companyName.trim() || "EvFeedback";
+  const previewHeroTitle = heroTitle.trim() || "Como foi sua experiência hoje?";
+  const previewHeroSubtitle =
+    heroSubtitle.trim() || "Toque em uma opção para avaliar rapidamente.";
+  const previewThankYouMessage =
+    thankYouMessage.trim() || "Sua opinião é muito importante para nós.";
+  const previewResetSeconds = kioskResetSeconds > 0 ? kioskResetSeconds : 5;
+  const previewBackgroundStyle = backgroundImageUrl.trim()
+    ? {
+        backgroundColor: backgroundColor.trim() || "#020617",
+        backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.78)), url(${backgroundImageUrl.trim()})`,
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+      }
+    : {
+        backgroundColor: backgroundColor.trim() || "#020617",
+      };
 
   useEffect(() => {
     if (!canView) {
@@ -87,7 +127,7 @@ export default function SettingsPage() {
       setBackgroundColor(settings.backgroundColor ?? "#020617");
       setBackgroundImageUrl(settings.backgroundImageUrl ?? "");
       setCardBackgroundColor(
-        settings.cardBackgroundColor ?? "rgba(15,23,42,0.72)"
+        settings.cardBackgroundColor ?? "rgba(15,23,42,0.72)",
       );
       setTextColor(settings.textColor ?? "#ffffff");
       setButtonTextColor(settings.buttonTextColor ?? "#0f172a");
@@ -116,13 +156,10 @@ export default function SettingsPage() {
       const result = await sendTestEmail(selectedCompanyId);
 
       setSuccess(
-        `E-mail de teste enviado com sucesso para: ${result.recipients.join(", ")}`
+        `E-mail de teste enviado com sucesso para: ${result.recipients.join(", ")}`,
       );
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.message ||
-        "Não foi possível enviar o e-mail de teste."
-      );
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Não foi possível enviar o e-mail de teste."));
     }
   }
 
@@ -157,15 +194,12 @@ export default function SettingsPage() {
           dailyNotificationEnabled,
           monthlyNotificationEnabled,
         },
-        selectedCompanyId
+        selectedCompanyId,
       );
 
       setSuccess("Configurações salvas com sucesso.");
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.message ||
-        "Não foi possível salvar as configurações."
-      );
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Não foi possível salvar as configurações."));
     } finally {
       setSaving(false);
     }
@@ -332,6 +366,104 @@ export default function SettingsPage() {
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 space-y-1">
+              <h2 className="text-xl font-semibold text-slate-900">Preview</h2>
+              <p className="text-sm text-slate-500">
+                Veja em tempo real como a configuração aparece no kiosk.
+              </p>
+            </div>
+
+            <div
+              className="overflow-hidden rounded-[32px] border border-slate-200 p-4 shadow-inner"
+              style={previewBackgroundStyle}
+            >
+              <div className="mx-auto max-w-4xl rounded-[28px] border border-white/10 p-4 backdrop-blur-sm sm:p-6">
+                <div
+                  className="mx-auto flex min-h-[440px] max-w-2xl flex-col justify-between rounded-[28px] border border-white/10 p-6 shadow-2xl"
+                  style={{
+                    background: cardBackgroundColor.trim() || "rgba(15,23,42,0.72)",
+                    color: textColor.trim() || "#ffffff",
+                  }}
+                >
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      {logoUrl.trim() ? (
+                        <img
+                          src={logoUrl.trim()}
+                          alt={previewCompanyName}
+                          className="h-16 w-16 rounded-2xl border border-white/15 bg-white/10 object-cover p-2"
+                        />
+                      ) : (
+                        <div
+                          className="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-bold"
+                          style={{ backgroundColor: primaryColor.trim() || "#0ea5e9" }}
+                        >
+                          {previewCompanyName.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.3em] opacity-70">
+                          Kiosk Preview
+                        </p>
+                        <h3 className="text-2xl font-bold">{previewCompanyName}</h3>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-3xl font-bold leading-tight">
+                        {previewHeroTitle}
+                      </h4>
+                      <p className="max-w-xl text-sm opacity-80">
+                        {previewHeroSubtitle}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                      {[
+                        { label: "Péssimo", emoji: "😠" },
+                        { label: "Ruim", emoji: "🙁" },
+                        { label: "Ok", emoji: "😐" },
+                        { label: "Bom", emoji: "🙂" },
+                        { label: "Excelente", emoji: "🤩" },
+                      ].map((option) => (
+                        <button
+                          key={option.label}
+                          type="button"
+                          className="rounded-2xl px-4 py-4 text-center text-sm font-semibold shadow-sm transition"
+                          style={{
+                            backgroundColor: primaryColor.trim() || "#0ea5e9",
+                            color: buttonTextColor.trim() || "#0f172a",
+                          }}
+                        >
+                          <span className="block text-2xl">{option.emoji}</span>
+                          <span className="mt-2 block">{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-8 grid gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
+                    <div>
+                      <p className="font-semibold">Mensagem final</p>
+                      <p className="mt-1 opacity-80">{previewThankYouMessage}</p>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-center">
+                      <p className="text-xs uppercase tracking-[0.24em] opacity-70">
+                        Reset
+                      </p>
+                      <p className="mt-1 text-lg font-bold">
+                        {previewResetSeconds}s
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 space-y-1">
               <h2 className="text-xl font-semibold text-slate-900">
                 Notificações por e-mail
               </h2>
@@ -345,7 +477,7 @@ export default function SettingsPage() {
                 value={notificationEmails}
                 onChange={(e) => setNotificationEmails(e.target.value)}
                 placeholder="exemplo1@empresa.com, exemplo2@empresa.com"
-                className="min-h-[120px] rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500 resize-none"
+                className="min-h-[120px] resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
               />
 
               <label className="inline-flex items-center gap-3 text-sm text-slate-700">
@@ -379,6 +511,7 @@ export default function SettingsPage() {
               </button>
             </div>
           ) : null}
+
           {canManage ? (
             <div className="flex justify-end">
               <button
