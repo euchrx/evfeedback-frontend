@@ -779,7 +779,7 @@ export default function FeedbackKiosk() {
           className="text-[10px] font-medium uppercase tracking-[0.22em] opacity-40 md:text-xs"
           style={{ color: textColor }}
         >
-          Powered by EvFeedback
+          Powered by EvSystem
         </span>
       </div>
     </main>
