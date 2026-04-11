@@ -4,18 +4,10 @@ import { api } from "../../services/api";
 import {
   getPublicKioskConfig,
   getPublicKioskTags,
-  type PublicEnvironmentType,
   type PublicKioskConfig,
 } from "../../services/publicKiosk";
 
-type Step =
-  | "rating"
-  | "tags"
-  | "comment"
-  | "contact"
-  | "done"
-  | "error";
-
+type Step = "rating" | "tags" | "comment" | "contact" | "done" | "error";
 type KioskErrorType = "missing_token" | "invalid_token" | "request_error" | null;
 
 type RatingOption = {
@@ -30,14 +22,14 @@ type TagOption = {
 };
 
 const RATING_OPTIONS: RatingOption[] = [
-  { value: 1, emoji: "😡", label: "Péssimo" },
-  { value: 2, emoji: "😐", label: "Ruim" },
-  { value: 3, emoji: "🙂", label: "Ok" },
-  { value: 4, emoji: "😃", label: "Bom" },
+  { value: 1, emoji: "😠", label: "Péssimo" },
+  { value: 2, emoji: "🙁", label: "Ruim" },
+  { value: 3, emoji: "😐", label: "Ok" },
+  { value: 4, emoji: "🙂", label: "Bom" },
   { value: 5, emoji: "🤩", label: "Excelente" },
 ];
 
-const DEFAULT_RESET_DELAY_MS = 3000;
+const RESET_DELAY_MS = 5000;
 const INACTIVITY_TIMEOUT_MS = 30000;
 
 function getKioskTokenFromUrl() {
@@ -45,78 +37,52 @@ function getKioskTokenFromUrl() {
   return params.get("token")?.trim() || "";
 }
 
-function getEnvironmentLabel(environment?: PublicEnvironmentType) {
-  switch (environment) {
-    case "POSTO":
-      return "Posto";
-    case "CONVENIENCIA":
-      return "Conveniência";
-    case "RESTAURANTE":
-      return "Restaurante";
-    default:
-      return "Atendimento";
-  }
-}
-
 export default function FeedbackKiosk() {
   const [step, setStep] = useState<Step>("rating");
   const [kioskErrorType, setKioskErrorType] = useState<KioskErrorType>(null);
+
   const [rating, setRating] = useState<number | null>(null);
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [comment, setComment] = useState("");
+
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactMessage, setContactMessage] = useState("");
   const [contactConsent, setContactConsent] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
+
   const [contactNameError, setContactNameError] = useState("");
   const [contactPhoneError, setContactPhoneError] = useState("");
   const [commentError, setCommentError] = useState("");
 
   const inactivityTimerRef = useRef<number | null>(null);
 
-  const kioskToken = useMemo(() => {
-    return getKioskTokenFromUrl();
-  }, []);
+  const kioskToken = useMemo(() => getKioskTokenFromUrl(), []);
 
   const settings = config?.settings;
-
   const companyName =
     settings?.companyName?.trim() || config?.company?.name || "EvFeedback";
-
   const logoUrl = settings?.logoUrl?.trim() || "";
-
   const thankYouMessage =
-    settings?.thankYouMessage?.trim() ||
-    "Sua opinião é muito importante para nós.";
-
+    settings?.thankYouMessage?.trim() || "Sua opinião é muito importante para nós.";
   const primaryColor = settings?.primaryColor?.trim() || "#0ea5e9";
-
   const heroTitle =
     settings?.heroTitle?.trim() || "Como foi sua experiência hoje?";
-
   const heroSubtitle =
     settings?.heroSubtitle?.trim() ||
     "Toque em uma opção para avaliar rapidamente.";
-
   const backgroundColor = settings?.backgroundColor?.trim() || "#020617";
-
   const backgroundImageUrl = settings?.backgroundImageUrl?.trim() || "";
-
   const cardBackgroundColor =
     settings?.cardBackgroundColor?.trim() || "rgba(15,23,42,0.72)";
-
   const textColor = settings?.textColor?.trim() || "#ffffff";
-
   const buttonTextColor = settings?.buttonTextColor?.trim() || "#0f172a";
 
-  const resetDelayMs =
-    ((settings?.kioskResetSeconds ?? 5) * 1000) || DEFAULT_RESET_DELAY_MS;
-
   const isNegativeRating = rating === 1 || rating === 2;
-  const environmentLabel = getEnvironmentLabel(config?.kiosk?.environmentType);
+  const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
 
   function clearInactivityTimer() {
     if (inactivityTimerRef.current) {
@@ -191,7 +157,7 @@ export default function FeedbackKiosk() {
     setTagIds((current) =>
       current.includes(id)
         ? current.filter((item) => item !== id)
-        : [...current, id]
+        : [...current, id],
     );
   }
 
@@ -295,13 +261,14 @@ export default function FeedbackKiosk() {
 
     const timer = window.setTimeout(() => {
       resetFlow();
-    }, resetDelayMs);
+    }, RESET_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [step, resetDelayMs]);
+  }, [step]);
 
   useEffect(() => {
     if (step !== "error") return;
+
     if (kioskErrorType === "missing_token" || kioskErrorType === "invalid_token") {
       return;
     }
@@ -315,6 +282,7 @@ export default function FeedbackKiosk() {
 
   useEffect(() => {
     if (kioskToken) return;
+
     setKioskErrorType("missing_token");
     setStep("error");
   }, [kioskToken]);
@@ -344,7 +312,7 @@ export default function FeedbackKiosk() {
       }
     }
 
-    loadConfig();
+    void loadConfig();
   }, [kioskToken]);
 
   useEffect(() => {
@@ -361,7 +329,7 @@ export default function FeedbackKiosk() {
       }
     }
 
-    loadTags();
+    void loadTags();
   }, [kioskToken, config]);
 
   useEffect(() => {
@@ -386,11 +354,9 @@ export default function FeedbackKiosk() {
 
       return (event: TouchEvent) => {
         const now = Date.now();
-
         if (now - lastTouchEnd <= 300) {
           event.preventDefault();
         }
-
         lastTouchEnd = now;
       };
     })();
@@ -413,8 +379,6 @@ export default function FeedbackKiosk() {
       document.removeEventListener("touchend", preventDoubleTapZoom);
     };
   }, []);
-
-  const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
 
   function getErrorTitle() {
     switch (kioskErrorType) {
@@ -450,66 +414,57 @@ export default function FeedbackKiosk() {
 
   return (
     <main
-      className="min-h-screen flex items-center justify-center px-4 py-8 select-none"
+      className="relative min-h-screen overflow-hidden px-4 py-6 md:px-8 md:py-10"
       style={{
         backgroundColor,
         color: textColor,
         backgroundImage: backgroundImageUrl
-          ? `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${backgroundImageUrl})`
+          ? `linear-gradient(rgba(2,6,23,0.55), rgba(2,6,23,0.75)), url(${backgroundImageUrl})`
           : undefined,
         backgroundSize: "cover",
         backgroundPosition: "center",
-        touchAction: "manipulation",
-        WebkitUserSelect: "none",
-        userSelect: "none",
-        WebkitTouchCallout: "none",
       }}
     >
-      <div className="w-full max-w-5xl">
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl items-center justify-center">
         <div
-          className="mx-auto max-w-4xl rounded-3xl border border-white/10 backdrop-blur p-6 md:p-10 shadow-2xl"
+          className="w-full rounded-[32px] border border-white/10 p-6 shadow-2xl backdrop-blur md:p-10"
           style={{ backgroundColor: cardBackgroundColor }}
         >
-          {step === "rating" && (
-            <section className="text-center">
+          {step !== "error" ? (
+            <header className="mb-8 text-center">
               {logoUrl ? (
                 <img
                   src={logoUrl}
                   alt={companyName}
-                  className="h-16 md:h-20 object-contain mx-auto mb-4 pointer-events-none"
-                  draggable={false}
+                  className="mx-auto mb-5 h-16 w-auto object-contain md:h-20"
                 />
               ) : null}
 
-              <p
-                className="text-sm md:text-base font-semibold tracking-[0.25em] uppercase"
-                style={{ color: primaryColor }}
-              >
+              <p className="text-sm uppercase tracking-[0.28em] opacity-70">
                 {companyName}
               </p>
 
-              <div className="mt-4 inline-flex items-center rounded-full border border-white/10 bg-black/15 px-4 py-2 text-sm md:text-base font-medium">
-                Ambiente: {environmentLabel}
-              </div>
+            </header>
+          ) : null}
 
-              <h1 className="mt-4 text-4xl md:text-6xl font-bold leading-tight">
-                {heroTitle}
-              </h1>
+          {step === "rating" && (
+            <section className="text-center">
+              <h1 className="text-3xl font-bold md:text-5xl">{heroTitle}</h1>
 
-              <p className="mt-4 text-lg md:text-xl opacity-90">
+              <p className="mx-auto mt-4 max-w-2xl text-base opacity-90 md:text-xl">
                 {heroSubtitle}
               </p>
 
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-10">
+              <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
                 {RATING_OPTIONS.map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => handleSelectRating(option.value)}
-                    className="rounded-3xl border border-white/10 bg-black/10 hover:bg-black/20 active:scale-95 transition p-6 md:p-8 flex flex-col items-center justify-center min-h-[140px] md:min-h-[180px]"
+                    className="flex min-h-[150px] flex-col items-center justify-center rounded-3xl border border-white/10 bg-black/10 p-6 transition hover:bg-black/20 active:scale-95 md:min-h-[190px] md:p-8"
                   >
                     <span className="text-5xl md:text-6xl">{option.emoji}</span>
-                    <span className="mt-3 text-sm md:text-base font-medium">
+                    <span className="mt-4 text-base font-semibold md:text-lg">
                       {option.label}
                     </span>
                   </button>
@@ -527,11 +482,7 @@ export default function FeedbackKiosk() {
                 </span>
               </p>
 
-              <p className="mt-3 text-sm md:text-base opacity-80">
-                Ambiente: <span className="font-semibold">{environmentLabel}</span>
-              </p>
-
-              <h2 className="mt-4 text-3xl md:text-5xl font-bold">
+              <h2 className="mt-4 text-3xl font-bold md:text-5xl">
                 O que mais influenciou sua experiência?
               </h2>
 
@@ -540,7 +491,7 @@ export default function FeedbackKiosk() {
               </p>
 
               {tagOptions.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-10">
+                <div className="mt-8 grid gap-4 md:grid-cols-2">
                   {tagOptions.map((tag) => {
                     const active = tagIds.includes(tag.id);
 
@@ -549,20 +500,19 @@ export default function FeedbackKiosk() {
                         key={tag.id}
                         type="button"
                         onClick={() => handleToggleTag(tag.id)}
-                        className={`rounded-2xl border px-4 py-5 md:px-6 md:py-6 text-base md:text-lg font-medium transition active:scale-95 ${active
-                          ? ""
-                          : "border-white/10 bg-black/10 hover:bg-black/20"
-                          }`}
+                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
+                          active
+                            ? ""
+                            : "border-white/10 bg-black/10 hover:bg-black/20"
+                        }`}
                         style={
                           active
                             ? {
-                              borderColor: primaryColor,
-                              backgroundColor: primaryColor,
-                              color: buttonTextColor,
-                            }
-                            : {
-                              color: textColor,
-                            }
+                                borderColor: primaryColor,
+                                backgroundColor: primaryColor,
+                                color: buttonTextColor,
+                              }
+                            : { color: textColor }
                         }
                       >
                         {tag.name}
@@ -571,19 +521,19 @@ export default function FeedbackKiosk() {
                   })}
                 </div>
               ) : (
-                <p className="mt-10 opacity-80">
+                <p className="mt-8 text-base opacity-75">
                   Nenhuma opção cadastrada no momento.
                 </p>
               )}
 
-              <div className="mt-10 flex flex-col md:flex-row gap-4 justify-center">
+              <div className="mt-10 flex flex-col gap-3 md:flex-row md:justify-center">
                 <button
                   type="button"
                   onClick={() => {
                     setStep("rating");
                     clearInactivityTimer();
                   }}
-                  className="rounded-2xl bg-black/15 hover:bg-black/25 px-8 py-4 text-lg font-semibold transition"
+                  className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
                 >
                   Voltar
                 </button>
@@ -612,84 +562,50 @@ export default function FeedbackKiosk() {
                 </span>
               </p>
 
-              <p className="mt-3 text-sm md:text-base opacity-80">
-                Ambiente: <span className="font-semibold">{environmentLabel}</span>
-              </p>
-
-              <h2 className="mt-4 text-3xl md:text-5xl font-bold">
+              <h2 className="mt-4 text-3xl font-bold md:text-5xl">
                 Deseja deixar um comentário?
               </h2>
 
-              <p className="mt-4 text-lg opacity-90">
-                Essa etapa é obrigatória.
-              </p>
+              <p className="mt-4 text-lg opacity-90">Essa etapa é obrigatória.</p>
 
-              <textarea
-                value={comment}
-                onChange={(e) => {
-                  setComment(e.target.value);
-                  if (e.target.value.trim()) {
-                    setCommentError("");
-                  }
-                }}
-                placeholder="Escreva aqui sua opinião..."
-                className={`mt-8 w-full rounded-2xl border bg-black/10 px-5 py-4 text-base outline-none min-h-[140px] resize-none ${commentError ? "border-rose-400" : "border-white/10"
-                  }`}
-                style={{
-                  color: textColor,
-                  WebkitUserSelect: "text",
-                  userSelect: "text",
-                }}
-                maxLength={500}
-              />
+              <div className="mx-auto mt-8 max-w-3xl">
+                <textarea
+                  value={comment}
+                  onChange={(e) => {
+                    setComment(e.target.value);
+                    if (commentError) setCommentError("");
+                  }}
+                  placeholder="Escreva aqui sua experiência..."
+                  className="min-h-[180px] w-full rounded-3xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
+                  style={{ color: textColor }}
+                />
 
-              <div className="mt-3 text-right text-sm opacity-70">
-                {comment.length}/500
+                {commentError ? (
+                  <p className="mt-3 text-sm text-rose-300">{commentError}</p>
+                ) : null}
               </div>
-              {commentError ? (
-                <p className="mt-2 text-left text-sm text-rose-300">{commentError}</p>
-              ) : null}
 
-              <div className="mt-8 flex flex-col md:flex-row gap-4 justify-center">
+              <div className="mt-10 flex flex-col gap-3 md:flex-row md:justify-center">
                 <button
                   type="button"
-                  onClick={() => {
-                    setCommentError("");
-                    setStep("tags");
-                  }}
-                  disabled={isSubmitting}
-                  className="rounded-2xl bg-black/15 hover:bg-black/25 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                  onClick={() => setStep("tags")}
+                  className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
                 >
                   Voltar
                 </button>
 
-                {isNegativeRating ? (
-                  <button
-                    type="button"
-                    onClick={handleSubmitCommentStep}
-                    disabled={isSubmitting}
-                    className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
-                    style={{
-                      backgroundColor: primaryColor,
-                      color: buttonTextColor,
-                    }}
-                  >
-                    Próximo
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSubmitCommentStep}
-                    disabled={isSubmitting}
-                    className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
-                    style={{
-                      backgroundColor: primaryColor,
-                      color: buttonTextColor,
-                    }}
-                  >
-                    {isSubmitting ? "Enviando..." : "Enviar"}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleSubmitCommentStep}
+                  disabled={isSubmitting}
+                  className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
+                  style={{
+                    backgroundColor: primaryColor,
+                    color: buttonTextColor,
+                  }}
+                >
+                  {isNegativeRating ? "Continuar" : isSubmitting ? "Enviando..." : "Enviar"}
+                </button>
               </div>
             </section>
           )}
@@ -703,188 +619,136 @@ export default function FeedbackKiosk() {
                 </span>
               </p>
 
-              <p className="mt-3 text-sm md:text-base opacity-80">
-                Ambiente: <span className="font-semibold">{environmentLabel}</span>
-              </p>
-
-              <h2 className="mt-4 text-3xl md:text-5xl font-bold">
+              <h2 className="mt-4 text-3xl font-bold md:text-5xl">
                 Deseja se identificar?
               </h2>
 
               <p className="mt-4 text-lg opacity-90">
-                Se quiser, deixe seus dados para que a equipe possa entrar em contato sobre sua experiência.
+                Se quiser, deixe seus dados para que a equipe possa entrar em contato
+                sobre sua experiência.
               </p>
 
-              <div className="mt-10 rounded-3xl border border-white/10 bg-black/10 p-5 md:p-6 text-left">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Nome *
-                    </label>
-                    <input
-                      type="text"
-                      value={contactName}
-                      onChange={(e) => {
-                        setContactName(e.target.value);
-                        if (e.target.value.trim()) {
-                          setContactNameError("");
-                        }
-                      }}
-                      placeholder="Seu nome"
-                      className={`w-full rounded-2xl border bg-black/10 px-4 py-3 text-base outline-none ${contactNameError ? "border-rose-400" : "border-white/10"
-                        }`}
-                      style={{
-                        color: textColor,
-                        WebkitUserSelect: "text",
-                        userSelect: "text",
-                      }}
-                      maxLength={120}
-                    />
-                    {contactNameError ? (
-                      <p className="mt-2 text-sm text-rose-300">{contactNameError}</p>
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-2">
-                      Telefone / WhatsApp *
-                    </label>
-                    <input
-                      type="text"
-                      value={contactPhone}
-                      onChange={(e) => {
-                        setContactPhone(e.target.value);
-                        if (e.target.value.trim()) {
-                          setContactPhoneError("");
-                        }
-                      }}
-                      placeholder="(00) 00000-0000"
-                      className={`w-full rounded-2xl border bg-black/10 px-4 py-3 text-base outline-none ${contactPhoneError ? "border-rose-400" : "border-white/10"
-                        }`}
-                      style={{
-                        color: textColor,
-                        WebkitUserSelect: "text",
-                        userSelect: "text",
-                      }}
-                      maxLength={30}
-                    />
-                    {contactPhoneError ? (
-                      <p className="mt-2 text-sm text-rose-300">{contactPhoneError}</p>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium mb-2">
-                    Mensagem para contato
-                  </label>
-                  <textarea
-                    value={contactMessage}
-                    onChange={(e) => setContactMessage(e.target.value)}
-                    placeholder="Se quiser, informe mais detalhes para contato."
-                    className="w-full rounded-2xl border border-white/10 bg-black/10 px-4 py-3 outline-none min-h-[120px] resize-none"
-                    style={{
-                      color: textColor,
-                      WebkitUserSelect: "text",
-                      userSelect: "text",
+              <div className="mx-auto mt-8 grid max-w-3xl gap-4">
+                <div>
+                  <input
+                    value={contactName}
+                    onChange={(e) => {
+                      setContactName(e.target.value);
+                      if (contactNameError) setContactNameError("");
                     }}
-                    maxLength={500}
+                    placeholder="Seu nome"
+                    className="w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
+                    style={{ color: textColor }}
                   />
-                  <div className="mt-2 text-right text-sm opacity-70">
-                    {contactMessage.length}/500
-                  </div>
+                  {contactNameError ? (
+                    <p className="mt-2 text-left text-sm text-rose-300">
+                      {contactNameError}
+                    </p>
+                  ) : null}
                 </div>
 
-                <label className="mt-5 flex items-start gap-3 cursor-pointer">
+                <div>
+                  <input
+                    value={contactPhone}
+                    onChange={(e) => {
+                      setContactPhone(e.target.value);
+                      if (contactPhoneError) setContactPhoneError("");
+                    }}
+                    placeholder="Telefone ou WhatsApp"
+                    className="w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
+                    style={{ color: textColor }}
+                  />
+                  {contactPhoneError ? (
+                    <p className="mt-2 text-left text-sm text-rose-300">
+                      {contactPhoneError}
+                    </p>
+                  ) : null}
+                </div>
+
+                <textarea
+                  value={contactMessage}
+                  onChange={(e) => setContactMessage(e.target.value)}
+                  placeholder="Mensagem adicional (opcional)"
+                  className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
+                  style={{ color: textColor }}
+                />
+
+                <label className="mt-1 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-4 text-left">
                   <input
                     type="checkbox"
                     checked={contactConsent}
                     onChange={(e) => setContactConsent(e.target.checked)}
-                    className="mt-1 h-5 w-5 rounded border-white/20 bg-black/10"
+                    className="mt-1 h-5 w-5 rounded border-white/20"
                   />
-                  <span className="text-sm md:text-base leading-relaxed opacity-90">
-                    Autorizo que a empresa entre em contato comigo sobre este atendimento.
+                  <span className="text-sm opacity-90 md:text-base">
+                    Autorizo o contato da equipe sobre este atendimento.
                   </span>
                 </label>
               </div>
 
-              <div className="mt-8 flex flex-col md:flex-row gap-4 justify-center">
+              <div className="mt-10 flex flex-col gap-3 md:flex-row md:justify-center">
                 <button
                   type="button"
-                  onClick={() => {
-                    setContactNameError("");
-                    setContactPhoneError("");
-                    setStep("comment");
-                  }}
-                  disabled={isSubmitting}
-                  className="rounded-2xl bg-black/15 hover:bg-black/25 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                  onClick={() => setStep("comment")}
+                  className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
                 >
                   Voltar
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleSubmit(false)}
-                  disabled={isSubmitting}
-                  className="rounded-2xl bg-black/25 hover:bg-black/35 disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
-                >
-                  {isSubmitting ? "Enviando..." : "Pular e enviar"}
-                </button>
-
-                <button
-                  type="button"
                   onClick={handleSubmitWithContact}
                   disabled={isSubmitting}
-                  className="rounded-2xl disabled:opacity-60 px-8 py-4 text-lg font-semibold transition"
+                  className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
                   style={{
                     backgroundColor: primaryColor,
                     color: buttonTextColor,
                   }}
                 >
-                  {isSubmitting ? "Enviando..." : "Enviar"}
+                  {isSubmitting ? "Enviando..." : "Enviar feedback"}
                 </button>
               </div>
             </section>
           )}
 
           {step === "done" && (
-            <section className="text-center py-10">
-              <div className="text-7xl md:text-8xl">🙏</div>
+            <section className="text-center">
+              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/15 text-5xl">
+                ✅
+              </div>
 
-              <h2 className="mt-6 text-4xl md:text-6xl font-bold">
-                Obrigado!
+              <h2 className="mt-6 text-3xl font-bold md:text-5xl">
+                Obrigado pela sua avaliação
               </h2>
 
-              <p className="mt-3 text-sm md:text-base opacity-80">
-                Ambiente: <span className="font-semibold">{environmentLabel}</span>
-              </p>
-
-              <p className="mt-4 text-lg md:text-2xl opacity-90">
+              <p className="mx-auto mt-4 max-w-2xl text-lg opacity-90">
                 {thankYouMessage}
               </p>
 
-              <p className="mt-6 text-sm md:text-base opacity-70">
-                A tela será reiniciada automaticamente.
+              <p className="mt-6 text-sm opacity-70 md:text-base">
+                Esta tela será reiniciada automaticamente em 5 segundos.
               </p>
             </section>
           )}
 
           {step === "error" && (
-            <section className="text-center py-10">
-              <div className="text-7xl md:text-8xl">{getErrorEmoji()}</div>
+            <section className="text-center">
+              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-rose-500/15 text-5xl">
+                {getErrorEmoji()}
+              </div>
 
-              <h2 className="mt-6 text-3xl md:text-5xl font-bold">
+              <h2 className="mt-6 text-3xl font-bold md:text-5xl">
                 {getErrorTitle()}
               </h2>
 
-              <p className="mt-4 text-lg opacity-90">
+              <p className="mx-auto mt-4 max-w-2xl text-lg opacity-90">
                 {getErrorDescription()}
               </p>
 
-              {kioskErrorType === "request_error" && (
+              {kioskErrorType === "request_error" ? (
                 <button
                   type="button"
-                  onClick={resetFlow}
+                  onClick={() => resetFlow()}
                   className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold transition"
                   style={{
                     backgroundColor: primaryColor,
@@ -893,10 +757,19 @@ export default function FeedbackKiosk() {
                 >
                   Tentar novamente
                 </button>
-              )}
+              ) : null}
             </section>
           )}
         </div>
+      </div>
+
+      <div className="pointer-events-none fixed bottom-3 left-1/2 z-10 -translate-x-1/2">
+        <span
+          className="text-[10px] font-medium uppercase tracking-[0.22em] opacity-40 md:text-xs"
+          style={{ color: textColor }}
+        >
+          Powered by EvFeedback
+        </span>
       </div>
     </main>
   );

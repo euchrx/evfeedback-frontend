@@ -3,7 +3,6 @@ import {
   getDashboardByBranch,
   getDashboardSummary,
   type BranchDashboardItem,
-  type DashboardEnvironmentType,
   type DashboardFilters,
   type DashboardSummary,
 } from "../../../services/dashboard";
@@ -30,19 +29,6 @@ function formatDate(value: string) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
-}
-
-function getEnvironmentLabel(environment?: DashboardEnvironmentType | null) {
-  switch (environment) {
-    case "POSTO":
-      return "Posto";
-    case "CONVENIENCIA":
-      return "Conveniência";
-    case "RESTAURANTE":
-      return "Restaurante";
-    default:
-      return "Não informado";
-  }
 }
 
 function getRatingLabel(rating: number) {
@@ -192,7 +178,7 @@ export default function DashboardPage() {
 
   const worstBranch = useMemo(() => {
     const validBranches = [...branches].filter(
-      (branch) => branch.totalFeedbacks > 0
+      (branch) => branch.totalFeedbacks > 0,
     );
 
     if (validBranches.length <= 1) {
@@ -200,7 +186,6 @@ export default function DashboardPage() {
     }
 
     const sorted = validBranches.sort((a, b) => a.averageRating - b.averageRating);
-
     const candidate = sorted[0];
 
     if (candidate.id === bestBranch?.id) {
@@ -358,25 +343,6 @@ export default function DashboardPage() {
             </article>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {(summary?.byEnvironment ?? []).map((item) => (
-              <article
-                key={item.environmentType}
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-              >
-                <p className="text-sm font-medium text-slate-500">
-                  {getEnvironmentLabel(item.environmentType)}
-                </p>
-                <h3 className="mt-2 text-2xl font-bold text-slate-900">
-                  {item.total}
-                </h3>
-                <p className="mt-2 text-sm text-slate-600">
-                  Média: {formatAverage(item.averageRating)}
-                </p>
-              </article>
-            ))}
-          </div>
-
           <div className="grid gap-6 xl:grid-cols-2">
             <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-4 space-y-1">
@@ -529,12 +495,13 @@ export default function DashboardPage() {
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${item.rating <= 2
-                              ? "bg-rose-100 text-rose-700"
-                              : item.rating === 3
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-emerald-100 text-emerald-700"
-                              }`}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              item.rating <= 2
+                                ? "bg-rose-100 text-rose-700"
+                                : item.rating === 3
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                            }`}
                           >
                             {getRatingLabel(item.rating)}
                           </span>
@@ -552,11 +519,6 @@ export default function DashboardPage() {
                         <p className="text-sm text-slate-700">
                           <span className="font-medium text-slate-900">Kiosk:</span>{" "}
                           {item.kioskName ?? "-"}
-                        </p>
-
-                        <p className="text-sm text-slate-700">
-                          <span className="font-medium text-slate-900">Ambiente:</span>{" "}
-                          {getEnvironmentLabel(item.environmentType)}
                         </p>
 
                         <p className="text-sm text-slate-700">

@@ -5,7 +5,6 @@ import {
   getFeedbacks,
   type FeedbackFilters,
   type FeedbackItem,
-  type FeedbackEnvironmentType,
 } from "../../../services/feedbacks";
 import { getBranches, type Branch } from "../../../services/branches";
 import { getKiosks, type Kiosk } from "../../../services/kiosks";
@@ -39,10 +38,7 @@ function getRatingLabel(rating: number) {
 
 function formatDate(value: string) {
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
+  if (Number.isNaN(date.getTime())) return value;
 
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "short",
@@ -53,28 +49,14 @@ function formatDate(value: string) {
 function hasContactInfo(feedback: FeedbackItem) {
   return Boolean(
     feedback.contactName?.trim() ||
-    feedback.contactPhone?.trim() ||
-    feedback.contactMessage?.trim() ||
-    feedback.contactConsent
+      feedback.contactPhone?.trim() ||
+      feedback.contactMessage?.trim() ||
+      feedback.contactConsent,
   );
-}
-
-function getEnvironmentLabel(environment?: FeedbackEnvironmentType) {
-  switch (environment) {
-    case "POSTO":
-      return "Posto";
-    case "CONVENIENCIA":
-      return "Conveniência";
-    case "RESTAURANTE":
-      return "Restaurante";
-    default:
-      return "Não informado";
-  }
 }
 
 export default function FeedbacksPage() {
   const currentUser = getStoredUser();
-
   const canView = canViewOperationalModules(currentUser);
   const canManage = canManageOperationalModules(currentUser);
   const superAdmin = isSuperAdmin(currentUser);
@@ -88,14 +70,15 @@ export default function FeedbacksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackItem | null>(null);
+  const [selectedFeedback, setSelectedFeedback] = useState<FeedbackItem | null>(
+    null,
+  );
 
   const [filters, setFilters] = useState<FeedbackFilters>({
     companyId: resolvedCompanyId ?? currentUser?.companyId ?? "",
     branchId: "",
     kioskId: "",
     rating: "",
-    environmentType: "",
     startDate: "",
     endDate: "",
     active: "",
@@ -103,6 +86,8 @@ export default function FeedbacksPage() {
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const selectedCompanyId = useMemo(() => {
     return superAdmin
@@ -121,7 +106,6 @@ export default function FeedbacksPage() {
 
   useEffect(() => {
     if (!canView) return;
-
     void loadFeedbacks(filters);
   }, [canView]);
 
@@ -147,6 +131,7 @@ export default function FeedbacksPage() {
         setKiosks(Array.isArray(kiosksData) ? (kiosksData as Kiosk[]) : []);
       } else {
         const [branchesData, kiosksData] = results;
+        setCompanies([]);
         setBranches(Array.isArray(branchesData) ? (branchesData as Branch[]) : []);
         setKiosks(Array.isArray(kiosksData) ? (kiosksData as Kiosk[]) : []);
       }
@@ -172,7 +157,6 @@ export default function FeedbacksPage() {
         branchId: finalFilters.branchId || undefined,
         kioskId: finalFilters.kioskId || undefined,
         rating: finalFilters.rating || undefined,
-        environmentType: finalFilters.environmentType || undefined,
         startDate: finalFilters.startDate || undefined,
         endDate: finalFilters.endDate || undefined,
         active: finalFilters.active || undefined,
@@ -190,22 +174,23 @@ export default function FeedbacksPage() {
 
   function handleChangeFilter<K extends keyof FeedbackFilters>(
     field: K,
-    value: FeedbackFilters[K]
+    value: FeedbackFilters[K],
   ) {
     setFilters((prev) => ({
       ...prev,
       [field]: value,
       ...(field === "companyId"
         ? {
-          branchId: "",
-          kioskId: "",
-        }
+            branchId: "",
+            kioskId: "",
+          }
         : {}),
     }));
   }
 
   function handleApplyFilters() {
     setPage(1);
+    setSelectedIds([]);
     void loadFeedbacks(filters);
   }
 
@@ -215,7 +200,6 @@ export default function FeedbacksPage() {
       branchId: "",
       kioskId: "",
       rating: "",
-      environmentType: "",
       startDate: "",
       endDate: "",
       active: "",
@@ -224,6 +208,7 @@ export default function FeedbacksPage() {
     setFilters(cleared);
     setSearch("");
     setPage(1);
+    setSelectedIds([]);
     void loadDependencies();
     void loadFeedbacks(cleared);
   }
@@ -232,9 +217,8 @@ export default function FeedbacksPage() {
     if (!canManage) return;
 
     const confirmed = window.confirm(
-      "Tem certeza que deseja excluir este feedback? Esta ação não pode ser desfeita."
+      "Tem certeza que deseja excluir este feedback? Esta ação não pode ser desfeita.",
     );
-
     if (!confirmed) return;
 
     try {
@@ -252,6 +236,8 @@ export default function FeedbacksPage() {
       if (selectedFeedback?.id === feedback.id) {
         setSelectedFeedback(null);
       }
+
+      setSelectedIds((current) => current.filter((id) => id !== feedback.id));
     } catch {
       setError("Não foi possível excluir o feedback.");
     } finally {
@@ -262,9 +248,7 @@ export default function FeedbacksPage() {
   const filteredFeedbacks = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    if (!normalizedSearch) {
-      return feedbacks;
-    }
+    if (!normalizedSearch) return feedbacks;
 
     return feedbacks.filter((feedback) => {
       const tagsText = (feedback.tags ?? [])
@@ -292,9 +276,47 @@ export default function FeedbacksPage() {
     return filteredFeedbacks.slice(start, start + PAGE_SIZE);
   }, [filteredFeedbacks, page]);
 
+  const currentPageIds = useMemo(
+    () => paginatedFeedbacks.map((feedback) => feedback.id),
+    [paginatedFeedbacks],
+  );
+
+  const allCurrentPageSelected =
+    currentPageIds.length > 0 &&
+    currentPageIds.every((id) => selectedIds.includes(id));
+
+  const someCurrentPageSelected =
+    currentPageIds.some((id) => selectedIds.includes(id)) &&
+    !allCurrentPageSelected;
+
+  function handleToggleOne(id: string) {
+    setSelectedIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  }
+
+  function handleTogglePage(ids: string[]) {
+    const allSelected = ids.every((id) => selectedIds.includes(id));
+
+    setSelectedIds((current) => {
+      if (allSelected) {
+        return current.filter((id) => !ids.includes(id));
+      }
+
+      const merged = new Set([...current, ...ids]);
+      return Array.from(merged);
+    });
+  }
+
   useEffect(() => {
     setPage(1);
   }, [search]);
+
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [search, page]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -304,7 +326,7 @@ export default function FeedbacksPage() {
 
   if (!canView) {
     return (
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h1 className="text-3xl font-bold tracking-tight text-slate-900">
           Acesso negado
         </h1>
@@ -318,14 +340,14 @@ export default function FeedbacksPage() {
   return (
     <>
       <section className="space-y-8">
-        <div className="space-y-2">
+        <header className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
             Feedbacks
           </h1>
           <p className="text-slate-600">
             Acompanhe as avaliações enviadas pelos clientes.
           </p>
-        </div>
+        </header>
 
         {error ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -333,15 +355,15 @@ export default function FeedbacksPage() {
           </div>
         ) : null}
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 space-y-1">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="space-y-2">
             <h2 className="text-xl font-semibold text-slate-900">Filtros</h2>
             <p className="text-sm text-slate-500">
-              Refine os resultados por empresa, ambiente, nota, filial, kiosk, período e status.
+              Refine os resultados por empresa, nota, filial, kiosk, período e status.
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {superAdmin ? (
               <select
                 value={filters.companyId ?? ""}
@@ -356,17 +378,6 @@ export default function FeedbacksPage() {
                 ))}
               </select>
             ) : null}
-
-            <select
-              value={filters.environmentType ?? ""}
-              onChange={(e) => handleChangeFilter("environmentType", e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-            >
-              <option value="">Todos os ambientes</option>
-              <option value="POSTO">Posto</option>
-              <option value="CONVENIENCIA">Conveniência</option>
-              <option value="RESTAURANTE">Restaurante</option>
-            </select>
 
             <select
               value={filters.rating ?? ""}
@@ -432,7 +443,7 @@ export default function FeedbacksPage() {
             />
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -441,110 +452,148 @@ export default function FeedbacksPage() {
             />
 
             <button
+              type="button"
               onClick={handleApplyFilters}
-              className="rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
+              className="rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
             >
               Aplicar filtros
             </button>
 
             <button
+              type="button"
               onClick={handleClearFilters}
-              className="rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
+              className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Limpar
             </button>
           </div>
-        </div>
+        </section>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-1">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
               <h2 className="text-xl font-semibold text-slate-900">
                 Lista de feedbacks
               </h2>
-              <p className="text-sm text-slate-500">
+              <p className="mt-1 text-sm text-slate-500">
                 {loading ? "Carregando..." : `${filteredFeedbacks.length} item(ns)`}
               </p>
             </div>
           </div>
 
-          {loading ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-              Carregando feedbacks...
+          {selectedIds.length > 0 ? (
+            <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-sm font-medium text-slate-700">
+                {selectedIds.length} selecionado(s)
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Limpar seleção
+              </button>
             </div>
-          ) : filteredFeedbacks.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
-              Nenhum feedback encontrado.
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                <table className="min-w-full divide-y divide-slate-200">
+          ) : null}
+
+          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+            {loading ? (
+              <div className="px-6 py-10 text-center text-slate-500">
+                Carregando feedbacks...
+              </div>
+            ) : filteredFeedbacks.length === 0 ? (
+              <div className="px-6 py-10 text-center text-slate-500">
+                Nenhum feedback encontrado.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-[1100px] divide-y divide-slate-200">
                   <thead className="bg-slate-50">
-                    <tr className="text-left text-sm text-slate-600">
-                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Data</th>
-                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Nota</th>
-                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Empresa</th>
-                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Filial</th>
-                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Kiosk</th>
-                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Ambiente</th>
-                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Comentário</th>
-                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Tags</th>
-                      <th className="px-4 py-3 font-semibold whitespace-nowrap">Ações</th>
+                    <tr>
+                      <th className="px-4 py-3 text-left">
+                        <input
+                          ref={(el) => {
+                            if (el) {
+                              el.indeterminate = someCurrentPageSelected;
+                            }
+                          }}
+                          type="checkbox"
+                          checked={allCurrentPageSelected}
+                          onChange={() => handleTogglePage(currentPageIds)}
+                          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                        />
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Data
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Nota
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Empresa
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Filial
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Kiosk
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Comentário
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Tags
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Ações
+                      </th>
                     </tr>
                   </thead>
 
                   <tbody className="divide-y divide-slate-200 bg-white">
                     {paginatedFeedbacks.map((feedback) => (
-                      <tr key={feedback.id} className="align-top">
-                        <td className="px-4 py-4 text-sm text-slate-600 whitespace-nowrap">
+                      <tr key={feedback.id} className="hover:bg-slate-50/70">
+                        <td className="px-4 py-4">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(feedback.id)}
+                            onChange={() => handleToggleOne(feedback.id)}
+                            className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                          />
+                        </td>
+
+                        <td className="px-4 py-4 text-sm text-slate-600">
                           {formatDate(feedback.createdAt)}
                         </td>
 
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex min-w-fit whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${feedback.rating <= 2
-                                ? "bg-rose-100 text-rose-700"
-                                : feedback.rating === 3
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-emerald-100 text-emerald-700"
-                              }`}
-                          >
+                        <td className="px-4 py-4 text-sm text-slate-600">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
                             {feedback.rating} - {getRatingLabel(feedback.rating)}
                           </span>
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          <div className="max-w-[160px] break-words">
-                            {feedback.company?.name ?? "-"}
-                          </div>
+                          {feedback.company?.name ?? "-"}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          <div className="max-w-[120px] break-words">
-                            {feedback.branch?.name ?? "-"}
-                          </div>
+                          {feedback.branch?.name ?? "-"}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          <div className="max-w-[120px] break-words">
-                            {feedback.kiosk?.name ?? "-"}
-                          </div>
+                          {feedback.kiosk?.name ?? "-"}
                         </td>
 
-                        <td className="px-4 py-4 text-sm text-slate-600 whitespace-nowrap">
-                          {getEnvironmentLabel(feedback.kiosk?.environmentType)}
-                        </td>
-
-                        <td className="px-4 py-4 text-sm text-slate-600">
-                          <div className="max-w-[220px] whitespace-normal break-words">
+                        <td className="max-w-[260px] px-4 py-4 text-sm text-slate-600">
+                          <span className="line-clamp-2">
                             {feedback.comment?.trim() || "Sem comentário."}
-                          </div>
+                          </span>
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
                           {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
-                            <div className="flex max-w-[180px] flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2">
                               {feedback.tags!.map((item) => (
                                 <span
                                   key={item.id}
@@ -555,19 +604,19 @@ export default function FeedbacksPage() {
                               ))}
                             </div>
                           ) : (
-                            <span>-</span>
+                            "-"
                           )}
                         </td>
 
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2 whitespace-nowrap">
+                        <td className="px-4 py-4">
+                          <div className="flex justify-end gap-2">
                             <button
                               type="button"
                               onClick={() => setSelectedFeedback(feedback)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition hover:bg-slate-200 shrink-0"
+                              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700 transition hover:bg-slate-200"
                               title="Ver detalhes"
                             >
-                              <Eye className="h-4 w-4" />
+                              <Eye size={18} />
                             </button>
 
                             {canManage ? (
@@ -575,7 +624,7 @@ export default function FeedbacksPage() {
                                 type="button"
                                 onClick={() => handleDelete(feedback)}
                                 disabled={deletingId === feedback.id}
-                                className="inline-flex h-9 items-center justify-center rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60 shrink-0"
+                                className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {deletingId === feedback.id ? "Excluindo..." : "Excluir"}
                               </button>
@@ -587,41 +636,45 @@ export default function FeedbacksPage() {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
 
-              <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <p className="text-sm text-slate-500">
-                  Página {page} de {totalPages}
-                </p>
+          {!loading && filteredFeedbacks.length > 0 ? (
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-500">
+                Página {page} de {totalPages}
+              </p>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    disabled={page === 1}
-                    className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-                  >
-                    Anterior
-                  </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  disabled={page === 1}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Anterior
+                </button>
 
-                  <button
-                    onClick={() =>
-                      setPage((current) => Math.min(totalPages, current + 1))
-                    }
-                    disabled={page === totalPages}
-                    className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
-                  >
-                    Próxima
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage((current) => Math.min(totalPages, current + 1))
+                  }
+                  disabled={page === totalPages}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Próxima
+                </button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          ) : null}
+        </section>
       </section>
 
       {selectedFeedback ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6">
-          <div className="w-full max-w-3xl rounded-3xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-slate-900">
                   Detalhes do feedback
@@ -640,136 +693,100 @@ export default function FeedbacksPage() {
               </button>
             </div>
 
-            <div className="max-h-[80vh] overflow-y-auto px-6 py-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-4">
-                  <div className="rounded-2xl border border-slate-200 p-4">
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                      Dados gerais
-                    </h3>
-                    <div className="space-y-2 text-sm text-slate-700">
-                      <p>
-                        <span className="font-semibold text-slate-900">Data:</span>{" "}
-                        {formatDate(selectedFeedback.createdAt)}
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-900">Nota:</span>{" "}
-                        {selectedFeedback.rating} - {getRatingLabel(selectedFeedback.rating)}
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-900">Ambiente:</span>{" "}
-                        {getEnvironmentLabel(selectedFeedback.kiosk?.environmentType)}
-                      </p>
-                      {superAdmin ? (
-                        <p>
-                          <span className="font-semibold text-slate-900">Empresa:</span>{" "}
-                          {selectedFeedback.company?.name ?? "-"}
-                        </p>
-                      ) : null}
-                      <p>
-                        <span className="font-semibold text-slate-900">Filial:</span>{" "}
-                        {selectedFeedback.branch?.name ?? "-"}
-                      </p>
-                      <p>
-                        <span className="font-semibold text-slate-900">Kiosk:</span>{" "}
-                        {selectedFeedback.kiosk?.name ?? "-"}
-                      </p>
-                    </div>
-                  </div>
+            <div className="mt-6 grid gap-6 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Dados gerais
+                </h3>
 
-                  <div className="rounded-2xl border border-slate-200 p-4">
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                      Comentário
-                    </h3>
-                    <p className="text-sm leading-6 text-slate-700 break-words">
-                      {selectedFeedback.comment?.trim() || "Sem comentário."}
+                <div className="mt-4 space-y-3 text-sm text-slate-700">
+                  <p>
+                    <span className="font-semibold">Data:</span>{" "}
+                    {formatDate(selectedFeedback.createdAt)}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Nota:</span>{" "}
+                    {selectedFeedback.rating} -{" "}
+                    {getRatingLabel(selectedFeedback.rating)}
+                  </p>
+                  {superAdmin ? (
+                    <p>
+                      <span className="font-semibold">Empresa:</span>{" "}
+                      {selectedFeedback.company?.name ?? "-"}
+                    </p>
+                  ) : null}
+                  <p>
+                    <span className="font-semibold">Filial:</span>{" "}
+                    {selectedFeedback.branch?.name ?? "-"}
+                  </p>
+                  <p>
+                    <span className="font-semibold">Kiosk:</span>{" "}
+                    {selectedFeedback.kiosk?.name ?? "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 p-4">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Contato
+                </h3>
+
+                {hasContactInfo(selectedFeedback) ? (
+                  <div className="mt-4 space-y-3 text-sm text-slate-700">
+                    <p>
+                      <span className="font-semibold">Nome:</span>{" "}
+                      {selectedFeedback.contactName?.trim() || "-"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Telefone:</span>{" "}
+                      {selectedFeedback.contactPhone?.trim() || "-"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Mensagem:</span>{" "}
+                      {selectedFeedback.contactMessage?.trim() || "-"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Consentimento:</span>{" "}
+                      {selectedFeedback.contactConsent ? "Sim" : "Não"}
                     </p>
                   </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-500">
+                    Nenhuma informação de contato registrada.
+                  </p>
+                )}
+              </div>
 
-                  <div className="rounded-2xl border border-slate-200 p-4">
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                      Tags
-                    </h3>
+              <div className="rounded-2xl border border-slate-200 p-4 md:col-span-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Comentário
+                </h3>
+                <p className="mt-4 whitespace-pre-wrap text-sm text-slate-700">
+                  {selectedFeedback.comment?.trim() || "Sem comentário."}
+                </p>
+              </div>
 
-                    {(selectedFeedback.tags ?? []).length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedFeedback.tags!.map((item) => (
-                          <span
-                            key={item.id}
-                            className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-                          >
-                            {item.tag?.name ?? "Tag"}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-500">Nenhuma tag marcada.</p>
-                    )}
+              <div className="rounded-2xl border border-slate-200 p-4 md:col-span-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Tags
+                </h3>
+
+                {(selectedFeedback.tags ?? []).length > 0 ? (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {selectedFeedback.tags!.map((item) => (
+                      <span
+                        key={item.id}
+                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700"
+                      >
+                        {item.tag?.name ?? "Tag"}
+                      </span>
+                    ))}
                   </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="rounded-2xl border border-slate-200 p-4">
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                      Contato
-                    </h3>
-
-                    {hasContactInfo(selectedFeedback) ? (
-                      <div className="space-y-2 text-sm text-slate-700">
-                        <p>
-                          <span className="font-semibold text-slate-900">Nome:</span>{" "}
-                          {selectedFeedback.contactName?.trim() || "-"}
-                        </p>
-                        <p>
-                          <span className="font-semibold text-slate-900">Telefone:</span>{" "}
-                          {selectedFeedback.contactPhone?.trim() || "-"}
-                        </p>
-                        <p>
-                          <span className="font-semibold text-slate-900">Mensagem:</span>{" "}
-                          {selectedFeedback.contactMessage?.trim() || "-"}
-                        </p>
-                        <p>
-                          <span className="font-semibold text-slate-900">Consentimento:</span>{" "}
-                          {selectedFeedback.contactConsent ? "Sim" : "Não"}
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-500">
-                        O cliente não deixou dados de contato.
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 p-4">
-                    <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-                      Identificadores
-                    </h3>
-                    <div className="space-y-2 text-sm text-slate-700 break-all">
-                      <p>
-                        <span className="font-semibold text-slate-900">Feedback ID:</span>{" "}
-                        {selectedFeedback.id}
-                      </p>
-                      {selectedFeedback.companyId ? (
-                        <p>
-                          <span className="font-semibold text-slate-900">Company ID:</span>{" "}
-                          {selectedFeedback.companyId}
-                        </p>
-                      ) : null}
-                      {selectedFeedback.branchId ? (
-                        <p>
-                          <span className="font-semibold text-slate-900">Branch ID:</span>{" "}
-                          {selectedFeedback.branchId}
-                        </p>
-                      ) : null}
-                      {selectedFeedback.kioskId ? (
-                        <p>
-                          <span className="font-semibold text-slate-900">Kiosk ID:</span>{" "}
-                          {selectedFeedback.kioskId}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-500">
+                    Nenhuma tag marcada.
+                  </p>
+                )}
               </div>
             </div>
           </div>
