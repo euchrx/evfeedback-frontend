@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { getStoredUser } from "../../../services/auth";
 import { getCompanies, type Company } from "../../../services/companies";
 import {
+  getAppApkInfo,
   getMySettings,
   sendTestEmail,
+  type AppApkInfo,
+  uploadAppApk,
   updateMySettings,
 } from "../../../services/settings";
 import {
@@ -30,6 +33,24 @@ function getErrorMessage(error: unknown, fallback: string) {
   }
 
   return fallback;
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return "-";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
 }
 
 export default function SettingsPage() {
@@ -71,9 +92,11 @@ export default function SettingsPage() {
   const [dailyNotificationEnabled, setDailyNotificationEnabled] = useState(true);
   const [monthlyNotificationEnabled, setMonthlyNotificationEnabled] =
     useState(true);
+  const [appApkInfo, setAppApkInfo] = useState<AppApkInfo>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingApk, setUploadingApk] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -91,6 +114,11 @@ export default function SettingsPage() {
     : {
         backgroundColor: backgroundColor.trim() || "#020617",
       };
+  const appApkQrCodeUrl = appApkInfo?.downloadUrl
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
+        appApkInfo.downloadUrl,
+      )}`
+    : "";
 
   useEffect(() => {
     if (!canView) {
@@ -107,12 +135,25 @@ export default function SettingsPage() {
       setError("");
       setSuccess("");
 
+      const requests: Promise<unknown>[] = [
+        getMySettings(selectedCompanyId),
+        getAppApkInfo().catch(() => null),
+      ];
+
       if (superAdmin) {
-        const companiesData = await getCompanies();
-        setCompanies(Array.isArray(companiesData) ? companiesData : []);
+        requests.unshift(getCompanies());
       }
 
-      const settings = await getMySettings(selectedCompanyId);
+      const results = await Promise.all(requests);
+      const offset = superAdmin ? 1 : 0;
+
+      if (superAdmin) {
+        const companiesData = results[0];
+        setCompanies(Array.isArray(companiesData) ? (companiesData as Company[]) : []);
+      }
+
+      const settings = results[offset] as Awaited<ReturnType<typeof getMySettings>>;
+      const apkInfo = results[offset + 1] as AppApkInfo;
 
       setCompanyName(settings.companyName ?? "");
       setLogoUrl(settings.logoUrl ?? "");
@@ -131,6 +172,7 @@ export default function SettingsPage() {
       setNotificationEmails(settings.notificationEmails ?? "");
       setDailyNotificationEnabled(settings.dailyNotificationEnabled ?? true);
       setMonthlyNotificationEnabled(settings.monthlyNotificationEnabled ?? true);
+      setAppApkInfo(apkInfo ?? null);
     } catch {
       setError("Não foi possível carregar as configurações.");
     } finally {
@@ -202,6 +244,31 @@ export default function SettingsPage() {
     }
   }
 
+  async function handleUploadApk(file: File | null) {
+    if (!file) return;
+
+    try {
+      setUploadingApk(true);
+      setError("");
+      setSuccess("");
+
+      const apkInfo = await uploadAppApk(file);
+      setAppApkInfo(apkInfo);
+      setSuccess("APK enviado com sucesso.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Não foi possível enviar o APK."));
+    } finally {
+      setUploadingApk(false);
+    }
+  }
+
+  async function handleCopyApkLink() {
+    if (!appApkInfo?.downloadUrl) return;
+
+    await navigator.clipboard.writeText(appApkInfo.downloadUrl);
+    setSuccess("Link do APK copiado com sucesso.");
+  }
+
   if (!canView) {
     return (
       <section className="space-y-3">
@@ -222,7 +289,7 @@ export default function SettingsPage() {
           Configurações
         </h1>
         <p className="text-slate-600">
-          Personalize o kiosk e configure notificações por e-mail.
+          Personalize o kiosk, configure notificações e distribua o APK.
         </p>
       </div>
 
@@ -489,6 +556,128 @@ export default function SettingsPage() {
                 />
                 Enviar resumo mensal com os feedbacks do mês anterior
               </label>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 space-y-1">
+              <h2 className="text-xl font-semibold text-slate-900">
+                Aplicativo Android
+              </h2>
+              <p className="text-sm text-slate-500">
+                Envie o APK e use o QR code para baixar diretamente no tablet.
+              </p>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[1.1fr_320px]">
+              <div className="space-y-4">
+                {superAdmin ? (
+                  <label className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600 transition hover:border-sky-400 hover:bg-sky-50">
+                    <span className="font-medium text-slate-800">
+                      {uploadingApk ? "Enviando APK..." : "Selecionar APK"}
+                    </span>
+                    <span>Escolha um arquivo `.apk` para substituir a versão atual.</span>
+                    <input
+                      type="file"
+                      accept=".apk,application/vnd.android.package-archive"
+                      disabled={uploadingApk}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        void handleUploadApk(file);
+                        e.currentTarget.value = "";
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                ) : null}
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  {appApkInfo ? (
+                    <div className="space-y-3 text-sm text-slate-700">
+                      <div>
+                        <p className="font-semibold text-slate-900">APK atual</p>
+                        <p className="mt-1 break-all">{appApkInfo.originalName}</p>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-slate-500">
+                            Tamanho
+                          </p>
+                          <p className="mt-1 font-medium">
+                            {formatFileSize(appApkInfo.size)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-slate-500">
+                            Enviado em
+                          </p>
+                          <p className="mt-1 font-medium">
+                            {formatDateTime(appApkInfo.uploadedAt)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">
+                          Link público
+                        </p>
+                        <a
+                          href={appApkInfo.downloadUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 block break-all text-sky-700 hover:text-sky-800"
+                        >
+                          {appApkInfo.downloadUrl}
+                        </a>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href={appApkInfo.downloadUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                        >
+                          Abrir link
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyApkLink()}
+                          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          Copiar link
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      Nenhum APK enviado ainda.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                {appApkInfo?.downloadUrl ? (
+                  <div className="space-y-3 text-center">
+                    <img
+                      src={appApkQrCodeUrl}
+                      alt="QR code para download do APK"
+                      className="mx-auto h-72 w-72 rounded-2xl border border-slate-200 bg-white p-3"
+                    />
+                    <p className="text-sm text-slate-600">
+                      Escaneie com o tablet para abrir o download do APK.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex min-h-[320px] items-center justify-center text-center text-sm text-slate-500">
+                    O QR code aparecerá aqui assim que um APK for enviado.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
