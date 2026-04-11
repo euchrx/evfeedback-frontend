@@ -44,6 +44,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -167,6 +168,51 @@ export default function UsersPage() {
       setError("Não foi possível excluir definitivamente o usuário.");
     } finally {
       setProcessingId(null);
+    }
+  }
+
+  const selectedUsers = useMemo(
+    () =>
+      users.filter((user) => {
+        const canDelete = canDeletePermanently && currentUser?.id !== user.id;
+        return selectedIds.includes(user.id) && canDelete;
+      }),
+    [users, canDeletePermanently, currentUser?.id, selectedIds],
+  );
+
+  async function handleBulkDelete() {
+    if (selectedUsers.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Excluir definitivamente ${selectedUsers.length} usuário(s) selecionado(s)? Essa ação não poderá ser desfeita.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setBulkDeleting(true);
+      setError("");
+
+      const results = await Promise.allSettled(
+        selectedUsers.map((user) => hardDeleteUser(user.id, user.companyId)),
+      );
+
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+
+      await load();
+
+      if (failedCount > 0) {
+        const successCount = selectedUsers.length - failedCount;
+        setError(
+          successCount > 0
+            ? `${failedCount} de ${selectedUsers.length} usuário(s) selecionado(s) não puderam ser excluídos.`
+            : `Não foi possível excluir os ${selectedUsers.length} usuário(s) selecionado(s).`,
+        );
+      }
+    } catch {
+      setError("Não foi possível concluir a exclusão em massa dos usuários.");
+    } finally {
+      setBulkDeleting(false);
+      setSelectedIds([]);
     }
   }
 
@@ -416,13 +462,27 @@ export default function UsersPage() {
               {selectedIds.length} selecionado(s)
             </span>
 
-            <button
-              type="button"
-              onClick={() => setSelectedIds([])}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Limpar seleção
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {selectedUsers.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => void handleBulkDelete()}
+                  disabled={bulkDeleting}
+                  className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                >
+                  {bulkDeleting ? "Excluindo..." : "Excluir selecionados"}
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                disabled={bulkDeleting}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                Limpar seleção
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -547,7 +607,7 @@ export default function UsersPage() {
                               <button
                                 type="button"
                                 onClick={() => handleHardDelete(user)}
-                                disabled={isProcessing}
+                                disabled={isProcessing || bulkDeleting}
                                 className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
                               >
                                 Excluir

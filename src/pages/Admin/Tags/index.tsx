@@ -55,6 +55,7 @@ export default function TagsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -238,6 +239,47 @@ export default function TagsPage() {
       setError("Não foi possível excluir definitivamente a tag.");
     } finally {
       setProcessingId(null);
+    }
+  }
+
+  const selectedTags = useMemo(
+    () => tags.filter((tag) => selectedIds.includes(tag.id)),
+    [tags, selectedIds],
+  );
+
+  async function handleBulkDelete() {
+    if (!canDeletePermanently || selectedTags.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Deseja excluir definitivamente ${selectedTags.length} tag(s) selecionada(s)?\n\nEssa ação não poderá ser desfeita.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setBulkDeleting(true);
+      setError("");
+
+      const results = await Promise.allSettled(
+        selectedTags.map((tag) => hardDeleteTag(tag.id, tag.companyId ?? undefined)),
+      );
+
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+
+      await load();
+
+      if (failedCount > 0) {
+        const successCount = selectedTags.length - failedCount;
+        setError(
+          successCount > 0
+            ? `${failedCount} de ${selectedTags.length} tag(s) selecionada(s) não puderam ser excluídas.`
+            : `Não foi possível excluir as ${selectedTags.length} tag(s) selecionada(s).`,
+        );
+      }
+    } catch {
+      setError("Não foi possível concluir a exclusão em massa das tags.");
+    } finally {
+      setBulkDeleting(false);
+      setSelectedIds([]);
     }
   }
 
@@ -458,13 +500,27 @@ export default function TagsPage() {
               {selectedIds.length} selecionado(s)
             </span>
 
-            <button
-              type="button"
-              onClick={() => setSelectedIds([])}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Limpar seleção
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {canDeletePermanently ? (
+                <button
+                  type="button"
+                  onClick={() => void handleBulkDelete()}
+                  disabled={bulkDeleting}
+                  className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-200 disabled:opacity-60"
+                >
+                  {bulkDeleting ? "Excluindo..." : "Excluir selecionados"}
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                disabled={bulkDeleting}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                Limpar seleção
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -645,7 +701,7 @@ export default function TagsPage() {
                                   <button
                                     type="button"
                                     onClick={() => handleHardDelete(tag)}
-                                    disabled={isProcessing}
+                                    disabled={isProcessing || bulkDeleting}
                                     className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-200 disabled:opacity-60"
                                   >
                                     Excluir

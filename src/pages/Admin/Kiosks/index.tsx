@@ -62,6 +62,7 @@ export default function KiosksPage() {
   const [submitting, setSubmitting] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -347,6 +348,49 @@ export default function KiosksPage() {
     }
   }
 
+  const selectedKiosks = useMemo(
+    () => kiosks.filter((kiosk) => selectedIds.includes(kiosk.id)),
+    [kiosks, selectedIds],
+  );
+
+  async function handleBulkDelete() {
+    if (!canDeletePermanently || selectedKiosks.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Excluir definitivamente ${selectedKiosks.length} kiosk(s) selecionado(s)? Essa ação não poderá ser desfeita.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setBulkDeleting(true);
+      setError("");
+
+      const results = await Promise.allSettled(
+        selectedKiosks.map((kiosk) =>
+          hardDeleteKiosk(kiosk.id, superAdmin ? kiosk.companyId : undefined),
+        ),
+      );
+
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+
+      await load();
+
+      if (failedCount > 0) {
+        const successCount = selectedKiosks.length - failedCount;
+        setError(
+          successCount > 0
+            ? `${failedCount} de ${selectedKiosks.length} kiosk(s) selecionado(s) não puderam ser excluídos.`
+            : `Não foi possível excluir os ${selectedKiosks.length} kiosk(s) selecionado(s).`,
+        );
+      }
+    } catch {
+      setError("Não foi possível concluir a exclusão em massa dos kiosks.");
+    } finally {
+      setBulkDeleting(false);
+      setSelectedIds([]);
+    }
+  }
+
   async function handleCopyToken(token: string) {
     await navigator.clipboard.writeText(token);
     window.alert("Token copiado com sucesso.");
@@ -563,13 +607,27 @@ export default function KiosksPage() {
                 {selectedIds.length} selecionado(s)
               </span>
 
-              <button
-                type="button"
-                onClick={() => setSelectedIds([])}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Limpar seleção
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {canDeletePermanently ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkDelete()}
+                    disabled={bulkDeleting}
+                    className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-200 disabled:opacity-60"
+                  >
+                    {bulkDeleting ? "Excluindo..." : "Excluir selecionados"}
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  disabled={bulkDeleting}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Limpar seleção
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -823,7 +881,7 @@ export default function KiosksPage() {
                                     <button
                                       type="button"
                                       onClick={() => handleHardDelete(kiosk)}
-                                      disabled={isProcessing}
+                                      disabled={isProcessing || bulkDeleting}
                                       className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-200 disabled:opacity-60"
                                     >
                                       Excluir

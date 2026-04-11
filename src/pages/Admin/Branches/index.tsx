@@ -52,6 +52,7 @@ export default function BranchesPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -172,6 +173,53 @@ export default function BranchesPage() {
       setError("Não foi possível excluir definitivamente a filial.");
     } finally {
       setProcessingId(null);
+    }
+  }
+
+  const selectedBranches = useMemo(
+    () =>
+      branches.filter((branch) => {
+        const canDelete = canDeletePermanently && currentUser?.id !== branch.id;
+        return selectedIds.includes(branch.id) && canDelete;
+      }),
+    [branches, canDeletePermanently, currentUser?.id, selectedIds],
+  );
+
+  async function handleBulkDelete() {
+    if (selectedBranches.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Excluir definitivamente ${selectedBranches.length} filial(is) selecionada(s)? Essa ação não poderá ser desfeita.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setBulkDeleting(true);
+      setError("");
+
+      const results = await Promise.allSettled(
+        selectedBranches.map((branch) =>
+          hardDeleteBranch(branch.id, superAdmin ? branch.companyId : undefined),
+        ),
+      );
+
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+
+      await load();
+
+      if (failedCount > 0) {
+        const successCount = selectedBranches.length - failedCount;
+        setError(
+          successCount > 0
+            ? `${failedCount} de ${selectedBranches.length} filial(is) selecionada(s) não puderam ser excluídas.`
+            : `Não foi possível excluir as ${selectedBranches.length} filial(is) selecionada(s).`,
+        );
+      }
+    } catch {
+      setError("Não foi possível concluir a exclusão em massa das filiais.");
+    } finally {
+      setBulkDeleting(false);
+      setSelectedIds([]);
     }
   }
 
@@ -388,13 +436,27 @@ export default function BranchesPage() {
               {selectedIds.length} selecionado(s)
             </span>
 
-            <button
-              type="button"
-              onClick={() => setSelectedIds([])}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Limpar seleção
-            </button>
+            <div className="flex flex-wrap gap-2">
+              {selectedBranches.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => void handleBulkDelete()}
+                  disabled={bulkDeleting}
+                  className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-200 disabled:opacity-60"
+                >
+                  {bulkDeleting ? "Excluindo..." : "Excluir selecionados"}
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => setSelectedIds([])}
+                disabled={bulkDeleting}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                Limpar seleção
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -512,7 +574,7 @@ export default function BranchesPage() {
                               <button
                                 type="button"
                                 onClick={() => handleHardDelete(branch)}
-                                disabled={isProcessing}
+                                disabled={isProcessing || bulkDeleting}
                                 className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-200 disabled:opacity-60"
                               >
                                 Excluir

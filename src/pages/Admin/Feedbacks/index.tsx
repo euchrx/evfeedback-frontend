@@ -70,6 +70,7 @@ export default function FeedbacksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackItem | null>(
     null,
   );
@@ -240,6 +241,60 @@ export default function FeedbacksPage() {
       setError("Não foi possível excluir o feedback.");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  const selectedFeedbacks = useMemo(
+    () => feedbacks.filter((feedback) => selectedIds.includes(feedback.id)),
+    [feedbacks, selectedIds],
+  );
+
+  async function handleBulkDelete() {
+    if (!canManage || selectedFeedbacks.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Tem certeza que deseja excluir ${selectedFeedbacks.length} feedback(s) selecionado(s)? Esta ação não pode ser desfeita.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setBulkDeleting(true);
+      setError("");
+
+      const results = await Promise.allSettled(
+        selectedFeedbacks.map((feedback) => {
+          const companyId = superAdmin
+            ? feedback.companyId || filters.companyId || undefined
+            : resolvedCompanyId || undefined;
+
+          return deleteFeedback(feedback.id, companyId);
+        }),
+      );
+
+      const failedCount = results.filter((result) => result.status === "rejected").length;
+      const successIds = selectedFeedbacks
+        .filter((_, index) => results[index]?.status === "fulfilled")
+        .map((feedback) => feedback.id);
+
+      if (successIds.includes(selectedFeedback?.id ?? "")) {
+        setSelectedFeedback(null);
+      }
+
+      await loadFeedbacks(filters);
+
+      if (failedCount > 0) {
+        const successCount = selectedFeedbacks.length - failedCount;
+        setError(
+          successCount > 0
+            ? `${failedCount} de ${selectedFeedbacks.length} feedback(s) selecionado(s) não puderam ser excluídos.`
+            : `Não foi possível excluir os ${selectedFeedbacks.length} feedback(s) selecionado(s).`,
+        );
+      }
+    } catch {
+      setError("Não foi possível concluir a exclusão em massa dos feedbacks.");
+    } finally {
+      setBulkDeleting(false);
+      setSelectedIds([]);
     }
   }
 
@@ -485,13 +540,27 @@ export default function FeedbacksPage() {
                 {selectedIds.length} selecionado(s)
               </span>
 
-              <button
-                type="button"
-                onClick={() => setSelectedIds([])}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Limpar seleção
-              </button>
+              <div className="flex flex-wrap gap-2">
+                {canManage ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleBulkDelete()}
+                    disabled={bulkDeleting}
+                    className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {bulkDeleting ? "Excluindo..." : "Excluir selecionados"}
+                  </button>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds([])}
+                  disabled={bulkDeleting}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                >
+                  Limpar seleção
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -621,7 +690,7 @@ export default function FeedbacksPage() {
                               <button
                                 type="button"
                                 onClick={() => handleDelete(feedback)}
-                                disabled={deletingId === feedback.id}
+                                disabled={deletingId === feedback.id || bulkDeleting}
                                 className="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-rose-600 px-3 text-sm font-semibold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {deletingId === feedback.id ? "Excluindo..." : "Excluir"}
