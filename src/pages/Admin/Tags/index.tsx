@@ -41,8 +41,8 @@ export default function TagsPage() {
 
   const [name, setName] = useState("");
   const [color, setColor] = useState("#0ea5e9");
-  const [companyId, setCompanyId] = useState(
-    resolvedCompanyId ?? currentUser?.companyId ?? "",
+  const [createCompanyId, setCreateCompanyId] = useState(
+    superAdmin ? "" : resolvedCompanyId ?? "",
   );
 
   const [search, setSearch] = useState("");
@@ -59,11 +59,10 @@ export default function TagsPage() {
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Listagem global para SUPER_ADMIN; escopo fixo só para usuários vinculados.
   const selectedCompanyId = useMemo(() => {
-    return superAdmin
-      ? companyId || currentUser?.companyId || undefined
-      : resolvedCompanyId;
-  }, [superAdmin, companyId, resolvedCompanyId, currentUser?.companyId]);
+    return superAdmin ? undefined : resolvedCompanyId;
+  }, [superAdmin, resolvedCompanyId]);
 
   async function load() {
     try {
@@ -94,6 +93,9 @@ export default function TagsPage() {
   function resetForm() {
     setName("");
     setColor("#0ea5e9");
+    if (superAdmin) {
+      setCreateCompanyId("");
+    }
   }
 
   async function handleCreate() {
@@ -106,7 +108,9 @@ export default function TagsPage() {
       return;
     }
 
-    if (superAdmin && !selectedCompanyId) {
+    const targetCompanyId = superAdmin ? createCompanyId : resolvedCompanyId ?? "";
+
+    if (!targetCompanyId) {
       setError("Selecione a empresa da tag.");
       return;
     }
@@ -118,7 +122,7 @@ export default function TagsPage() {
       await createTag({
         name: trimmedName,
         color: color?.trim() || null,
-        companyId: superAdmin ? selectedCompanyId : resolvedCompanyId,
+        companyId: targetCompanyId,
       });
 
       resetForm();
@@ -161,7 +165,7 @@ export default function TagsPage() {
       await updateTag(tag.id, {
         name: trimmedName,
         color: editing.color?.trim() || null,
-        companyId: superAdmin ? tag.companyId ?? selectedCompanyId : resolvedCompanyId,
+        companyId: superAdmin ? tag.companyId ?? undefined : resolvedCompanyId,
       });
 
       setEditing(null);
@@ -184,7 +188,7 @@ export default function TagsPage() {
       setError("");
       await deactivateTag(
         tag.id,
-        superAdmin ? tag.companyId ?? selectedCompanyId : resolvedCompanyId,
+        superAdmin ? tag.companyId ?? undefined : resolvedCompanyId,
       );
       await load();
       setSelectedIds((current) => current.filter((id) => id !== tag.id));
@@ -206,7 +210,7 @@ export default function TagsPage() {
       setError("");
       await activateTag(
         tag.id,
-        superAdmin ? tag.companyId ?? selectedCompanyId : resolvedCompanyId,
+        superAdmin ? tag.companyId ?? undefined : resolvedCompanyId,
       );
       await load();
     } catch {
@@ -227,7 +231,7 @@ export default function TagsPage() {
     try {
       setProcessingId(tag.id);
       setError("");
-      await hardDeleteTag(tag.id, tag.companyId ?? selectedCompanyId);
+      await hardDeleteTag(tag.id, tag.companyId ?? undefined);
       await load();
       setSelectedIds((current) => current.filter((id) => id !== tag.id));
     } catch {
@@ -315,11 +319,11 @@ export default function TagsPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, selectedCompanyId]);
+  }, [search, statusFilter]);
 
   useEffect(() => {
     setSelectedIds([]);
-  }, [search, statusFilter, page, selectedCompanyId]);
+  }, [search, statusFilter, page]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -382,8 +386,8 @@ export default function TagsPage() {
 
             {superAdmin ? (
               <select
-                value={companyId}
-                onChange={(e) => setCompanyId(e.target.value)}
+                value={createCompanyId}
+                onChange={(e) => setCreateCompanyId(e.target.value)}
                 className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-sky-500"
               >
                 <option value="">Selecione a empresa</option>
@@ -573,11 +577,10 @@ export default function TagsPage() {
 
                         <td className="px-4 py-4 align-top text-sm">
                           <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                              tag.active === false
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${tag.active === false
                                 ? "bg-amber-100 text-amber-700"
                                 : "bg-emerald-100 text-emerald-700"
-                            }`}
+                              }`}
                           >
                             {tag.active === false ? "Inativa" : "Ativa"}
                           </span>

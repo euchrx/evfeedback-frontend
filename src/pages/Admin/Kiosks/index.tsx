@@ -47,7 +47,9 @@ export default function KiosksPage() {
   const [name, setName] = useState("");
   const [branchId, setBranchId] = useState("");
   const [locationDescription, setLocationDescription] = useState("");
-  const [companyId, setCompanyId] = useState(resolvedCompanyId ?? "");
+  const [createCompanyId, setCreateCompanyId] = useState(
+    superAdmin ? "" : resolvedCompanyId ?? "",
+  );
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -68,15 +70,16 @@ export default function KiosksPage() {
     return `${window.location.origin}/feedback`;
   }, []);
 
+  // Listagem global para SUPER_ADMIN; escopo fixo só para usuários vinculados.
   const selectedCompanyId = useMemo(() => {
-    return superAdmin ? companyId || undefined : resolvedCompanyId;
-  }, [superAdmin, companyId, resolvedCompanyId]);
+    return superAdmin ? undefined : resolvedCompanyId;
+  }, [superAdmin, resolvedCompanyId]);
 
-  const filteredBranches = useMemo(() => {
+  const createBranches = useMemo(() => {
     if (!superAdmin) return branches;
-    if (!selectedCompanyId) return [];
-    return branches.filter((branch) => branch.companyId === selectedCompanyId);
-  }, [branches, selectedCompanyId, superAdmin]);
+    if (!createCompanyId) return [];
+    return branches.filter((branch) => branch.companyId === createCompanyId);
+  }, [branches, createCompanyId, superAdmin]);
 
   const editingBranches = useMemo(() => {
     if (!editing) return [];
@@ -185,7 +188,8 @@ export default function KiosksPage() {
       return;
     }
 
-    const targetCompanyId = superAdmin ? companyId : resolvedCompanyId ?? "";
+    const targetCompanyId = superAdmin ? createCompanyId : resolvedCompanyId ?? "";
+
     if (!targetCompanyId) {
       setError("Selecione uma empresa.");
       return;
@@ -208,7 +212,7 @@ export default function KiosksPage() {
       setLocationDescription("");
 
       if (superAdmin) {
-        setCompanyId("");
+        setCreateCompanyId("");
       }
 
       setPage(1);
@@ -382,12 +386,12 @@ export default function KiosksPage() {
 
   useEffect(() => {
     if (superAdmin && branchId) {
-      const branchStillExists = filteredBranches.some((branch) => branch.id === branchId);
+      const branchStillExists = createBranches.some((branch) => branch.id === branchId);
       if (!branchStillExists) {
         setBranchId("");
       }
     }
-  }, [filteredBranches, branchId, superAdmin]);
+  }, [createBranches, branchId, superAdmin]);
 
   useEffect(() => {
     if (!editing || !superAdmin) return;
@@ -405,11 +409,11 @@ export default function KiosksPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, selectedCompanyId]);
+  }, [search, statusFilter]);
 
   useEffect(() => {
     setSelectedIds([]);
-  }, [search, statusFilter, page, selectedCompanyId]);
+  }, [search, statusFilter, page]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -468,8 +472,8 @@ export default function KiosksPage() {
               />
 
               <select
-                value={companyId}
-                onChange={(e) => setCompanyId(e.target.value)}
+                value={createCompanyId}
+                onChange={(e) => setCreateCompanyId(e.target.value)}
                 disabled={!superAdmin}
                 className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500 disabled:bg-slate-100 disabled:text-slate-500"
               >
@@ -493,7 +497,7 @@ export default function KiosksPage() {
                 className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
               >
                 <option value="">Selecione a filial</option>
-                {(superAdmin ? filteredBranches : branches).map((branch) => (
+                {createBranches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
                     {branch.name}
                   </option>
@@ -662,9 +666,9 @@ export default function KiosksPage() {
                                   setEditing((prev) =>
                                     prev
                                       ? {
-                                          ...prev,
-                                          locationDescription: e.target.value,
-                                        }
+                                        ...prev,
+                                        locationDescription: e.target.value,
+                                      }
                                       : prev,
                                   )
                                 }
@@ -740,11 +744,10 @@ export default function KiosksPage() {
 
                           <td className="px-4 py-4 align-top text-sm">
                             <span
-                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                                kiosk.active
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${kiosk.active
                                   ? "bg-emerald-100 text-emerald-700"
                                   : "bg-amber-100 text-amber-700"
-                              }`}
+                                }`}
                             >
                               {kiosk.active ? "Ativo" : "Inativo"}
                             </span>
