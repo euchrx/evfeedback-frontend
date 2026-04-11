@@ -62,16 +62,14 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
 
   const [filters, setFilters] = useState<DashboardFilters>({
-    companyId: resolvedCompanyId ?? currentUser?.companyId ?? "",
+    companyId: superAdmin ? "" : resolvedCompanyId ?? "",
     dateFrom: "",
     dateTo: "",
   });
 
   const selectedCompanyId = useMemo(() => {
-    return superAdmin
-      ? filters.companyId || currentUser?.companyId || undefined
-      : resolvedCompanyId;
-  }, [superAdmin, filters.companyId, resolvedCompanyId, currentUser?.companyId]);
+    return superAdmin ? filters.companyId || undefined : resolvedCompanyId;
+  }, [superAdmin, filters.companyId, resolvedCompanyId]);
 
   async function loadDependencies() {
     if (!superAdmin) return;
@@ -93,7 +91,7 @@ export default function DashboardPage() {
 
       const sanitizedFilters: DashboardFilters = {
         companyId: superAdmin
-          ? finalFilters.companyId || currentUser?.companyId || undefined
+          ? finalFilters.companyId || undefined
           : resolvedCompanyId,
         dateFrom: finalFilters.dateFrom || undefined,
         dateTo: finalFilters.dateTo || undefined,
@@ -121,7 +119,7 @@ export default function DashboardPage() {
 
   function handleClearPeriod() {
     const cleared: DashboardFilters = {
-      companyId: superAdmin ? currentUser?.companyId ?? "" : resolvedCompanyId ?? "",
+      companyId: superAdmin ? "" : resolvedCompanyId ?? "",
       dateFrom: "",
       dateTo: "",
     };
@@ -143,9 +141,7 @@ export default function DashboardPage() {
     if (!canView) return;
 
     const initial: DashboardFilters = {
-      companyId: superAdmin
-        ? filters.companyId || currentUser?.companyId || ""
-        : resolvedCompanyId ?? "",
+      companyId: superAdmin ? filters.companyId || "" : resolvedCompanyId ?? "",
       dateFrom: filters.dateFrom || "",
       dateTo: filters.dateTo || "",
     };

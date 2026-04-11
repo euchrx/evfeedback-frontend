@@ -1,16 +1,24 @@
 import { api } from "./api";
 
+export type FeedbackFilters = {
+  companyId?: string;
+  branchId?: string;
+  kioskId?: string;
+  rating?: string;
+  startDate?: string;
+  endDate?: string;
+  active?: string;
+};
+
 export type FeedbackTagItem = {
   id: string;
-  feedbackId: string;
-  tagId: string;
+  tagId?: string;
   tag?: {
     id: string;
     name: string;
+    color?: string | null;
   } | null;
 };
-
-export type FeedbackEnvironmentType = "POSTO" | "CONVENIENCIA" | "RESTAURANTE";
 
 export type FeedbackItem = {
   id: string;
@@ -20,40 +28,28 @@ export type FeedbackItem = {
   contactPhone?: string | null;
   contactMessage?: string | null;
   contactConsent?: boolean;
-  active?: boolean;
+  companyId: string;
+  branchId: string;
+  kioskId: string;
   createdAt: string;
-  companyId?: string;
-  branchId?: string;
-  kioskId?: string;
   company?: {
+    id: string;
+    name: string;
+  } | null;
+  branch?: {
     id: string;
     name: string;
   } | null;
   kiosk?: {
     id: string;
     name: string;
-    environmentType?: FeedbackEnvironmentType;
-  } | null;
-  branch?: {
-    id: string;
-    name: string;
+    active?: boolean;
   } | null;
   tags?: FeedbackTagItem[];
 };
 
-export type FeedbackFilters = {
-  companyId?: string;
-  branchId?: string;
-  kioskId?: string;
-  rating?: string;
-  environmentType?: string;
-  startDate?: string;
-  endDate?: string;
-  active?: string;
-};
-
 export async function getFeedbacks(
-  filters?: FeedbackFilters
+  filters?: FeedbackFilters,
 ): Promise<FeedbackItem[]> {
   const response = await api.get("/feedbacks", {
     params: filters,
@@ -62,24 +58,11 @@ export async function getFeedbacks(
   return Array.isArray(response.data) ? response.data : [];
 }
 
-export async function getFeedbackById(
-  id: string,
-  companyId?: string
-): Promise<FeedbackItem> {
-  const response = await api.get(`/feedbacks/${id}`, {
-    params: companyId ? { companyId } : undefined,
-  });
-
-  return response.data;
-}
-
 export async function deleteFeedback(
   id: string,
-  companyId?: string
-): Promise<{ message: string }> {
-  const response = await api.delete(`/feedbacks/${id}`, {
+  companyId?: string,
+): Promise<void> {
+  await api.delete(`/feedbacks/${id}`, {
     params: companyId ? { companyId } : undefined,
   });
-
-  return response.data;
 }

@@ -75,7 +75,7 @@ export default function FeedbacksPage() {
   );
 
   const [filters, setFilters] = useState<FeedbackFilters>({
-    companyId: resolvedCompanyId ?? currentUser?.companyId ?? "",
+    companyId: superAdmin ? "" : resolvedCompanyId ?? "",
     branchId: "",
     kioskId: "",
     rating: "",
@@ -90,10 +90,8 @@ export default function FeedbacksPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const selectedCompanyId = useMemo(() => {
-    return superAdmin
-      ? filters.companyId || currentUser?.companyId || undefined
-      : resolvedCompanyId;
-  }, [superAdmin, filters.companyId, resolvedCompanyId, currentUser?.companyId]);
+    return superAdmin ? filters.companyId || undefined : resolvedCompanyId;
+  }, [superAdmin, filters.companyId, resolvedCompanyId]);
 
   useEffect(() => {
     if (!canView) {
@@ -152,7 +150,7 @@ export default function FeedbacksPage() {
 
       const sanitizedFilters: FeedbackFilters = {
         companyId: superAdmin
-          ? finalFilters.companyId || currentUser?.companyId || undefined
+          ? finalFilters.companyId || undefined
           : resolvedCompanyId,
         branchId: finalFilters.branchId || undefined,
         kioskId: finalFilters.kioskId || undefined,
@@ -196,7 +194,7 @@ export default function FeedbacksPage() {
 
   function handleClearFilters() {
     const cleared: FeedbackFilters = {
-      companyId: superAdmin ? currentUser?.companyId ?? "" : resolvedCompanyId ?? "",
+      companyId: superAdmin ? "" : resolvedCompanyId ?? "",
       branchId: "",
       kioskId: "",
       rating: "",
@@ -226,7 +224,7 @@ export default function FeedbacksPage() {
       setError("");
 
       const companyId = superAdmin
-        ? feedback.companyId || filters.companyId || currentUser?.companyId || undefined
+        ? feedback.companyId || filters.companyId || undefined
         : resolvedCompanyId || undefined;
 
       await deleteFeedback(feedback.id, companyId);
