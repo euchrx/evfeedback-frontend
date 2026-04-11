@@ -374,7 +374,7 @@ export default function FeedbackKiosk() {
 
     setKioskErrorType("missing_token");
     setStep("error");
-  }, [kioskToken, canApplyLiveRefresh]);
+  }, [kioskToken]);
 
   useEffect(() => {
     if (!canApplyLiveRefresh) return;
@@ -543,7 +543,6 @@ export default function FeedbackKiosk() {
               <p className="text-sm uppercase tracking-[0.28em] opacity-70">
                 {companyName}
               </p>
-
             </header>
           ) : null}
 
@@ -709,7 +708,11 @@ export default function FeedbackKiosk() {
                     color: buttonTextColor,
                   }}
                 >
-                  {isNegativeRating ? "Continuar" : isSubmitting ? "Enviando..." : "Enviar"}
+                  {isNegativeRating
+                    ? "Continuar"
+                    : isSubmitting
+                      ? "Enviando..."
+                      : "Enviar"}
                 </button>
               </div>
             </section>
@@ -729,8 +732,8 @@ export default function FeedbackKiosk() {
               </h2>
 
               <p className="mt-4 text-lg opacity-90">
-                Se quiser, deixe seus dados para que a equipe possa entrar em contato
-                sobre sua experiência.
+                Se quiser, deixe seus dados para que a equipe possa entrar em
+                contato sobre sua experiência.
               </p>
 
               <div className="mx-auto mt-8 grid max-w-3xl gap-4">
@@ -807,6 +810,15 @@ export default function FeedbackKiosk() {
 
                 <button
                   type="button"
+                  onClick={() => void handleSubmit(false)}
+                  disabled={isSubmitting}
+                  className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25 disabled:opacity-60"
+                >
+                  {isSubmitting ? "Enviando..." : "Pular e enviar"}
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleSubmitWithContact}
                   disabled={isSubmitting}
                   className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
@@ -815,7 +827,7 @@ export default function FeedbackKiosk() {
                     color: buttonTextColor,
                   }}
                 >
-                  {isSubmitting ? "Enviando..." : "Enviar feedback"}
+                  {isSubmitting ? "Enviando..." : "Enviar"}
                 </button>
               </div>
             </section>
@@ -823,9 +835,17 @@ export default function FeedbackKiosk() {
 
           {step === "done" && (
             <section className="text-center">
-              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500/15 text-5xl">
-                ✅
-              </div>
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={companyName}
+                  className="mx-auto mb-5 h-16 w-auto object-contain md:h-20"
+                />
+              ) : null}
+
+              <p className="text-sm uppercase tracking-[0.28em] opacity-70">
+                {companyName}
+              </p>
 
               <h2 className="mt-6 text-3xl font-bold md:text-5xl">
                 Obrigado pela sua avaliação
@@ -878,7 +898,7 @@ export default function FeedbackKiosk() {
           className="text-[10px] font-medium uppercase tracking-[0.22em] opacity-40 md:text-xs"
           style={{ color: textColor }}
         >
-          Powered by EvSystem
+          www.evsystem.com.br
         </span>
       </div>
     </main>
