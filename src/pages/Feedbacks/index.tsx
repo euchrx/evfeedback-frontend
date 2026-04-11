@@ -31,7 +31,25 @@ const RATING_OPTIONS: RatingOption[] = [
 
 const RESET_DELAY_MS = 5000;
 const INACTIVITY_TIMEOUT_MS = 30000;
-const AUTO_RELOAD_MS = 90000;
+const CONFIG_REFRESH_MS = 90000;
+
+function getConfigSnapshot(data: PublicKioskConfig) {
+  return JSON.stringify({
+    kiosk: data.kiosk,
+    company: data.company,
+    branch: data.branch,
+    settings: data.settings,
+  });
+}
+
+function getTagsSnapshot(tags: TagOption[]) {
+  return JSON.stringify(
+    [...tags].sort((a, b) => a.id.localeCompare(b.id)).map((tag) => ({
+      id: tag.id,
+      name: tag.name,
+    })),
+  );
+}
 
 function getKioskTokenFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -54,12 +72,17 @@ export default function FeedbackKiosk() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
+  const [apiWarning, setApiWarning] = useState("");
 
   const [contactNameError, setContactNameError] = useState("");
   const [contactPhoneError, setContactPhoneError] = useState("");
   const [commentError, setCommentError] = useState("");
 
   const inactivityTimerRef = useRef<number | null>(null);
+  const configSnapshotRef = useRef("");
+  const tagsSnapshotRef = useRef("");
+  const pendingConfigRef = useRef<PublicKioskConfig | null>(null);
+  const pendingTagsRef = useRef<TagOption[] | null>(null);
 
   const kioskToken = useMemo(() => getKioskTokenFromUrl(), []);
 
@@ -84,6 +107,7 @@ export default function FeedbackKiosk() {
 
   const isNegativeRating = rating === 1 || rating === 2;
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
+  const canApplyLiveRefresh = step === "rating" || step === "done";
 
   function clearInactivityTimer() {
     if (inactivityTimerRef.current) {
@@ -212,6 +236,70 @@ export default function FeedbackKiosk() {
     void handleSubmit(false);
   }
 
+  async function syncKioskData(options?: { initial?: boolean }) {
+    if (!kioskToken) return;
+
+    try {
+      const [configData, tagsData] = await Promise.all([
+        getPublicKioskConfig(kioskToken),
+        getPublicKioskTags(kioskToken),
+      ]);
+
+      const normalizedTags = Array.isArray(tagsData) ? tagsData : [];
+      const nextConfigSnapshot = getConfigSnapshot(configData);
+      const nextTagsSnapshot = getTagsSnapshot(normalizedTags);
+
+      const configChanged = configSnapshotRef.current !== nextConfigSnapshot;
+      const tagsChanged = tagsSnapshotRef.current !== nextTagsSnapshot;
+
+      if (options?.initial || canApplyLiveRefresh) {
+        if (options?.initial || configChanged) {
+          configSnapshotRef.current = nextConfigSnapshot;
+          setConfig(configData);
+        }
+
+        if (options?.initial || tagsChanged) {
+          tagsSnapshotRef.current = nextTagsSnapshot;
+          setTagOptions(normalizedTags);
+        }
+
+        pendingConfigRef.current = null;
+        pendingTagsRef.current = null;
+      } else if (configChanged || tagsChanged) {
+        pendingConfigRef.current = configData;
+        pendingTagsRef.current = normalizedTags;
+      }
+
+      setApiWarning("");
+
+      if (options?.initial) {
+        setKioskErrorType(null);
+        setStep("rating");
+      }
+    } catch (error) {
+      console.error("Erro ao sincronizar kiosk:", error);
+
+      if (
+        axios.isAxiosError(error) &&
+        (error.response?.status === 404 || error.response?.status === 400)
+      ) {
+        setKioskErrorType("invalid_token");
+        setStep("error");
+        return;
+      }
+
+      if (options?.initial || !configSnapshotRef.current) {
+        setKioskErrorType("request_error");
+        setStep("error");
+        return;
+      }
+
+      setApiWarning(
+        "API instável no momento. Mantendo a última configuração carregada.",
+      );
+    }
+  }
+
   async function handleSubmit(skipComment = false) {
     if (!rating || !kioskToken || isSubmitting) return;
 
@@ -286,66 +374,56 @@ export default function FeedbackKiosk() {
 
     setKioskErrorType("missing_token");
     setStep("error");
+  }, [kioskToken, canApplyLiveRefresh]);
+
+  useEffect(() => {
+    if (!canApplyLiveRefresh) return;
+
+    const pendingConfig = pendingConfigRef.current;
+    const pendingTags = pendingTagsRef.current;
+
+    if (!pendingConfig || !pendingTags) {
+      return;
+    }
+
+    configSnapshotRef.current = getConfigSnapshot(pendingConfig);
+    tagsSnapshotRef.current = getTagsSnapshot(pendingTags);
+    setConfig(pendingConfig);
+    setTagOptions(pendingTags);
+    pendingConfigRef.current = null;
+    pendingTagsRef.current = null;
+    setApiWarning("");
+  }, [canApplyLiveRefresh]);
+
+  useEffect(() => {
+    void syncKioskData({ initial: true });
   }, [kioskToken]);
 
   useEffect(() => {
-    async function loadConfig() {
-      if (!kioskToken) return;
+    if (!kioskToken) return;
 
-      try {
-        const data = await getPublicKioskConfig(kioskToken);
-        setConfig(data);
-        setKioskErrorType(null);
-        setStep("rating");
-      } catch (error) {
-        console.error("Erro ao carregar config do kiosk:", error);
+    const timer = window.setInterval(() => {
+      void syncKioskData();
+    }, CONFIG_REFRESH_MS);
 
-        if (
-          axios.isAxiosError(error) &&
-          (error.response?.status === 404 || error.response?.status === 400)
-        ) {
-          setKioskErrorType("invalid_token");
-        } else {
-          setKioskErrorType("request_error");
-        }
-
-        setStep("error");
-      }
-    }
-
-    void loadConfig();
+    return () => {
+      window.clearInterval(timer);
+    };
   }, [kioskToken]);
 
   useEffect(() => {
-    async function loadTags() {
-      if (!kioskToken) return;
-      if (!config) return;
-
-      try {
-        const data = await getPublicKioskTags(kioskToken);
-        setTagOptions(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Erro ao carregar tags:", error);
-        setTagOptions([]);
-      }
+    if (tagOptions.length === 0) {
+      setTagIds([]);
+      return;
     }
 
-    void loadTags();
-  }, [kioskToken, config]);
+    const availableIds = new Set(tagOptions.map((tag) => tag.id));
+    setTagIds((current) => current.filter((id) => availableIds.has(id)));
+  }, [tagOptions]);
 
   useEffect(() => {
     return () => {
       clearInactivityTimer();
-    };
-  }, []);
-
-  useEffect(() => {
-    const reloadTimer = window.setInterval(() => {
-      window.location.reload();
-    }, AUTO_RELOAD_MS);
-
-    return () => {
-      window.clearInterval(reloadTimer);
     };
   }, []);
 
@@ -425,7 +503,7 @@ export default function FeedbackKiosk() {
 
   return (
     <main
-      className="relative min-h-screen overflow-hidden px-4 py-6 md:px-8 md:py-10"
+      className="relative min-h-screen select-none overflow-hidden px-4 py-6 md:px-8 md:py-10"
       style={{
         backgroundColor,
         color: textColor,
@@ -434,8 +512,19 @@ export default function FeedbackKiosk() {
           : undefined,
         backgroundSize: "cover",
         backgroundPosition: "center",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        WebkitTouchCallout: "none",
       }}
     >
+      {apiWarning ? (
+        <div className="pointer-events-none absolute left-1/2 top-4 z-20 w-[min(92vw,680px)] -translate-x-1/2">
+          <div className="rounded-2xl border border-amber-300/30 bg-amber-500/15 px-4 py-3 text-center text-sm font-medium text-amber-100 backdrop-blur">
+            {apiWarning}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl items-center justify-center">
         <div
           className="w-full rounded-[32px] border border-white/10 p-6 shadow-2xl backdrop-blur md:p-10"
@@ -587,8 +676,13 @@ export default function FeedbackKiosk() {
                     if (commentError) setCommentError("");
                   }}
                   placeholder="Escreva aqui sua experiência..."
-                  className="min-h-[180px] w-full rounded-3xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
-                  style={{ color: textColor }}
+                  className="min-h-[180px] w-full resize-none rounded-3xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
+                  style={{
+                    color: textColor,
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    WebkitTouchCallout: "none",
+                  }}
                 />
 
                 {commentError ? (
@@ -680,8 +774,13 @@ export default function FeedbackKiosk() {
                   value={contactMessage}
                   onChange={(e) => setContactMessage(e.target.value)}
                   placeholder="Mensagem adicional (opcional)"
-                  className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
-                  style={{ color: textColor }}
+                  className="min-h-[120px] w-full resize-none rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
+                  style={{
+                    color: textColor,
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    WebkitTouchCallout: "none",
+                  }}
                 />
 
                 <label className="mt-1 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-4 text-left">
