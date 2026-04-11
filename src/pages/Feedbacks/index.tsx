@@ -843,10 +843,6 @@ export default function FeedbackKiosk() {
                 />
               ) : null}
 
-              <p className="text-sm uppercase tracking-[0.28em] opacity-70">
-                {companyName}
-              </p>
-
               <h2 className="mt-6 text-3xl font-bold md:text-5xl">
                 Obrigado pela sua avaliação
               </h2>
@@ -856,7 +852,7 @@ export default function FeedbackKiosk() {
               </p>
 
               <p className="mt-6 text-sm opacity-70 md:text-base">
-                Esta tela será reiniciada automaticamente em 5 segundos.
+                Esta tela será reiniciada automaticamente.
               </p>
             </section>
           )}
