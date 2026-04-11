@@ -81,9 +81,6 @@ export default function SettingsPage() {
   const previewHeroTitle = heroTitle.trim() || "Como foi sua experiência hoje?";
   const previewHeroSubtitle =
     heroSubtitle.trim() || "Toque em uma opção para avaliar rapidamente.";
-  const previewThankYouMessage =
-    thankYouMessage.trim() || "Sua opinião é muito importante para nós.";
-  const previewResetSeconds = kioskResetSeconds > 0 ? kioskResetSeconds : 5;
   const previewBackgroundStyle = backgroundImageUrl.trim()
     ? {
         backgroundColor: backgroundColor.trim() || "#020617",
@@ -372,91 +369,86 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            <div
-              className="overflow-hidden rounded-[32px] border border-slate-200 p-4 shadow-inner"
-              style={previewBackgroundStyle}
-            >
-              <div className="mx-auto max-w-4xl rounded-[28px] border border-white/10 p-4 backdrop-blur-sm sm:p-6">
-                <div
-                  className="mx-auto flex min-h-[440px] max-w-2xl flex-col justify-between rounded-[28px] border border-white/10 p-6 shadow-2xl"
-                  style={{
-                    background: cardBackgroundColor.trim() || "rgba(15,23,42,0.72)",
-                    color: textColor.trim() || "#ffffff",
-                  }}
-                >
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-4">
+            <div className="overflow-hidden rounded-[32px] border border-slate-200 shadow-inner">
+              <div
+                className="relative min-h-[720px] overflow-hidden px-4 py-6 md:px-8 md:py-10"
+                style={{
+                  ...previewBackgroundStyle,
+                  color: textColor.trim() || "#ffffff",
+                }}
+              >
+                <div className="mx-auto flex min-h-[calc(720px-3rem)] w-full max-w-5xl items-center justify-center">
+                  <div
+                    className="w-full rounded-[32px] border border-white/10 p-6 shadow-2xl backdrop-blur md:p-10"
+                    style={{
+                      backgroundColor:
+                        cardBackgroundColor.trim() || "rgba(15,23,42,0.72)",
+                    }}
+                  >
+                    <header className="mb-8 text-center">
                       {logoUrl.trim() ? (
                         <img
                           src={logoUrl.trim()}
                           alt={previewCompanyName}
-                          className="h-16 w-16 rounded-2xl border border-white/15 bg-white/10 object-cover p-2"
+                          className="mx-auto mb-5 h-16 w-auto object-contain md:h-20"
                         />
                       ) : (
                         <div
-                          className="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-bold"
-                          style={{ backgroundColor: primaryColor.trim() || "#0ea5e9" }}
+                          className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full text-2xl font-bold md:h-20 md:w-20"
+                          style={{
+                            backgroundColor: "#ffffff",
+                            color: primaryColor.trim() || "#0ea5e9",
+                          }}
                         >
-                          {previewCompanyName.slice(0, 2).toUpperCase()}
+                          {previewCompanyName.slice(0, 1).toUpperCase()}
                         </div>
                       )}
 
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.3em] opacity-70">
-                          Kiosk Preview
-                        </p>
-                        <h3 className="text-2xl font-bold">{previewCompanyName}</h3>
-                      </div>
-                    </div>
+                      <p className="text-sm uppercase tracking-[0.28em] opacity-70">
+                        {previewCompanyName}
+                      </p>
+                    </header>
 
-                    <div className="space-y-3">
-                      <h4 className="text-3xl font-bold leading-tight">
+                    <section className="text-center">
+                      <h1 className="text-3xl font-bold md:text-5xl">
                         {previewHeroTitle}
-                      </h4>
-                      <p className="max-w-xl text-sm opacity-80">
+                      </h1>
+
+                      <p className="mx-auto mt-4 max-w-2xl text-base opacity-90 md:text-xl">
                         {previewHeroSubtitle}
                       </p>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                      {[
-                        { label: "Péssimo", emoji: "😠" },
-                        { label: "Ruim", emoji: "🙁" },
-                        { label: "Ok", emoji: "😐" },
-                        { label: "Bom", emoji: "🙂" },
-                        { label: "Excelente", emoji: "🤩" },
-                      ].map((option) => (
-                        <button
-                          key={option.label}
-                          type="button"
-                          className="rounded-2xl px-4 py-4 text-center text-sm font-semibold shadow-sm transition"
-                          style={{
-                            backgroundColor: primaryColor.trim() || "#0ea5e9",
-                            color: buttonTextColor.trim() || "#0f172a",
-                          }}
-                        >
-                          <span className="block text-2xl">{option.emoji}</span>
-                          <span className="mt-2 block">{option.label}</span>
-                        </button>
-                      ))}
-                    </div>
+                      <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
+                        {[
+                          { label: "Péssimo", emoji: "😠" },
+                          { label: "Ruim", emoji: "🙁" },
+                          { label: "Ok", emoji: "😐" },
+                          { label: "Bom", emoji: "🙂" },
+                          { label: "Excelente", emoji: "🤩" },
+                        ].map((option) => (
+                          <button
+                            key={option.label}
+                            type="button"
+                            className="flex min-h-[150px] flex-col items-center justify-center rounded-3xl border border-white/10 bg-black/10 p-6 transition hover:bg-black/20 md:min-h-[190px] md:p-8"
+                          >
+                            <span className="text-5xl md:text-6xl">{option.emoji}</span>
+                            <span className="mt-4 text-base font-semibold md:text-lg">
+                              {option.label}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
                   </div>
+                </div>
 
-                  <div className="mt-8 grid gap-3 rounded-3xl border border-white/10 bg-white/5 p-4 text-sm sm:grid-cols-[1fr_auto] sm:items-center">
-                    <div>
-                      <p className="font-semibold">Mensagem final</p>
-                      <p className="mt-1 opacity-80">{previewThankYouMessage}</p>
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-center">
-                      <p className="text-xs uppercase tracking-[0.24em] opacity-70">
-                        Reset
-                      </p>
-                      <p className="mt-1 text-lg font-bold">
-                        {previewResetSeconds}s
-                      </p>
-                    </div>
-                  </div>
+                <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
+                  <span
+                    className="text-[10px] font-medium uppercase tracking-[0.22em] opacity-40 md:text-xs"
+                    style={{ color: textColor.trim() || "#ffffff" }}
+                  >
+                    Powered by EvFeedback
+                  </span>
                 </div>
               </div>
             </div>

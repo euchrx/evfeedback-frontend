@@ -31,6 +31,7 @@ const RATING_OPTIONS: RatingOption[] = [
 
 const RESET_DELAY_MS = 5000;
 const INACTIVITY_TIMEOUT_MS = 30000;
+const AUTO_RELOAD_MS = 90000;
 
 function getKioskTokenFromUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -335,6 +336,16 @@ export default function FeedbackKiosk() {
   useEffect(() => {
     return () => {
       clearInactivityTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    const reloadTimer = window.setInterval(() => {
+      window.location.reload();
+    }, AUTO_RELOAD_MS);
+
+    return () => {
+      window.clearInterval(reloadTimer);
     };
   }, []);
 
