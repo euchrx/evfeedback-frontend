@@ -106,19 +106,37 @@ export default function SettingsPage() {
     heroSubtitle.trim() || "Toque em uma opção para avaliar rapidamente.";
   const previewBackgroundStyle = backgroundImageUrl.trim()
     ? {
-      backgroundColor: backgroundColor.trim() || "#020617",
-      backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.78)), url(${backgroundImageUrl.trim()})`,
-      backgroundPosition: "center",
-      backgroundSize: "cover",
-    }
+        backgroundColor: backgroundColor.trim() || "#020617",
+        backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.78)), url(${backgroundImageUrl.trim()})`,
+        backgroundPosition: "center",
+        backgroundSize: "cover",
+      }
     : {
-      backgroundColor: backgroundColor.trim() || "#020617",
-    };
+        backgroundColor: backgroundColor.trim() || "#020617",
+      };
   const appApkQrCodeUrl = appApkInfo?.downloadUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
-      appApkInfo.downloadUrl,
-    )}`
+        appApkInfo.downloadUrl,
+      )}`
     : "";
+
+  function resetSettingsForm() {
+    setCompanyName("");
+    setLogoUrl("");
+    setThankYouMessage("");
+    setPrimaryColor("#0ea5e9");
+    setKioskResetSeconds(5);
+    setHeroTitle("");
+    setHeroSubtitle("");
+    setBackgroundColor("#020617");
+    setBackgroundImageUrl("");
+    setCardBackgroundColor("rgba(15,23,42,0.72)");
+    setTextColor("#ffffff");
+    setButtonTextColor("#0f172a");
+    setNotificationEmails("");
+    setDailyNotificationEnabled(true);
+    setMonthlyNotificationEnabled(true);
+  }
 
   useEffect(() => {
     if (!canView) {
@@ -126,61 +144,30 @@ export default function SettingsPage() {
       return;
     }
 
-    if (superAdmin && !selectedCompanyId) {
-      setLoading(false);
-      setError("");
-      setSuccess("");
-      return;
-    }
-
     void load();
   }, [canView, superAdmin, selectedCompanyId]);
 
   async function load() {
-    if (superAdmin && !selectedCompanyId) {
-      setCompanyName("");
-      setLogoUrl("");
-      setThankYouMessage("");
-      setPrimaryColor("#0ea5e9");
-      setKioskResetSeconds(5);
-      setHeroTitle("");
-      setHeroSubtitle("");
-      setBackgroundColor("#020617");
-      setBackgroundImageUrl("");
-      setCardBackgroundColor("rgba(15,23,42,0.72)");
-      setTextColor("#ffffff");
-      setButtonTextColor("#0f172a");
-      setNotificationEmails("");
-      setDailyNotificationEnabled(true);
-      setMonthlyNotificationEnabled(true);
-      setAppApkInfo(null);
-      return;
-    }
-
     try {
       setLoading(true);
       setError("");
       setSuccess("");
 
-      const requests: Promise<unknown>[] = [
+      if (superAdmin) {
+        const companiesData = await getCompanies();
+        setCompanies(Array.isArray(companiesData) ? (companiesData as Company[]) : []);
+
+        if (!selectedCompanyId) {
+          resetSettingsForm();
+          setAppApkInfo(null);
+          return;
+        }
+      }
+
+      const [settings, apkInfo] = await Promise.all([
         getMySettings(selectedCompanyId),
         getAppApkInfo().catch(() => null),
-      ];
-
-      if (superAdmin) {
-        requests.unshift(getCompanies());
-      }
-
-      const results = await Promise.all(requests);
-      const offset = superAdmin ? 1 : 0;
-
-      if (superAdmin) {
-        const companiesData = results[0];
-        setCompanies(Array.isArray(companiesData) ? (companiesData as Company[]) : []);
-      }
-
-      const settings = results[offset] as Awaited<ReturnType<typeof getMySettings>>;
-      const apkInfo = results[offset + 1] as AppApkInfo;
+      ]);
 
       setCompanyName(settings.companyName ?? "");
       setLogoUrl(settings.logoUrl ?? "");
@@ -200,8 +187,8 @@ export default function SettingsPage() {
       setDailyNotificationEnabled(settings.dailyNotificationEnabled ?? true);
       setMonthlyNotificationEnabled(settings.monthlyNotificationEnabled ?? true);
       setAppApkInfo(apkInfo ?? null);
-    } catch {
-      setError("Não foi possível carregar as configurações.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Não foi possível carregar as configurações."));
     } finally {
       setLoading(false);
     }
