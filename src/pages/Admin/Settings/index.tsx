@@ -63,16 +63,16 @@ export default function SettingsPage() {
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companyId, setCompanyId] = useState(
-    resolvedCompanyId ?? currentUser?.companyId ?? "",
+    superAdmin ? "" : resolvedCompanyId ?? "",
   );
 
   const selectedCompanyId = useMemo(() => {
     if (superAdmin) {
-      return companyId || currentUser?.companyId || undefined;
+      return companyId || undefined;
     }
 
     return resolvedCompanyId;
-  }, [superAdmin, companyId, resolvedCompanyId, currentUser?.companyId]);
+  }, [superAdmin, companyId, resolvedCompanyId]);
 
   const [companyName, setCompanyName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -106,18 +106,18 @@ export default function SettingsPage() {
     heroSubtitle.trim() || "Toque em uma opção para avaliar rapidamente.";
   const previewBackgroundStyle = backgroundImageUrl.trim()
     ? {
-        backgroundColor: backgroundColor.trim() || "#020617",
-        backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.78)), url(${backgroundImageUrl.trim()})`,
-        backgroundPosition: "center",
-        backgroundSize: "cover",
-      }
+      backgroundColor: backgroundColor.trim() || "#020617",
+      backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.78)), url(${backgroundImageUrl.trim()})`,
+      backgroundPosition: "center",
+      backgroundSize: "cover",
+    }
     : {
-        backgroundColor: backgroundColor.trim() || "#020617",
-      };
+      backgroundColor: backgroundColor.trim() || "#020617",
+    };
   const appApkQrCodeUrl = appApkInfo?.downloadUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
-        appApkInfo.downloadUrl,
-      )}`
+      appApkInfo.downloadUrl,
+    )}`
     : "";
 
   useEffect(() => {
