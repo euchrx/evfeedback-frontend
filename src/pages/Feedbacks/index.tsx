@@ -10,7 +10,6 @@ import {
 
 type Step = "rating" | "tags" | "comment" | "contact" | "done" | "error";
 type KioskErrorType = "missing_token" | "invalid_token" | "request_error" | null;
-type ActiveField = "comment" | "contactName" | "contactPhone" | null;
 
 type RatingOption = {
   value: number;
@@ -22,6 +21,13 @@ type TagOption = {
   id: string;
   name: string;
 };
+
+type ActiveField =
+  | "comment"
+  | "contactName"
+  | "contactPhone"
+  | "contactMessage"
+  | null;
 
 const RATING_OPTIONS: RatingOption[] = [
   { value: 1, emoji: "😠", label: "Péssimo" },
@@ -41,6 +47,8 @@ const KEYBOARD_ROWS = [
   ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
   [".", ",", "z", "x", "c", "v", "b", "n", "m"],
 ];
+
+const EXTRA_PUNCTUATION_KEYS = ["?", "!", ";", ":", "@"];
 
 const PHONE_KEYS = [
   ["1", "2", "3"],
@@ -93,9 +101,9 @@ export default function FeedbackKiosk() {
   const [contactMessage, setContactMessage] = useState("");
   const [contactConsent, setContactConsent] = useState(false);
 
-  const [submittingAction, setSubmittingAction] = useState<"skip" | "send" | null>(
-    null,
-  );
+  const [submittingAction, setSubmittingAction] = useState<
+    "skip" | "send" | null
+  >(null);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
   const [apiWarning, setApiWarning] = useState("");
@@ -296,6 +304,11 @@ export default function FeedbackKiosk() {
         clampText(sanitizePhoneValue(updater(current)), 25),
       );
       if (contactPhoneError) setContactPhoneError("");
+      return;
+    }
+
+    if (field === "contactMessage") {
+      setContactMessage((current) => clampText(updater(current), 300));
     }
   }
 
@@ -327,8 +340,8 @@ export default function FeedbackKiosk() {
           activeField === "contactPhone"
             ? key
             : keyboardUppercase
-            ? key.toUpperCase()
-            : key.toLowerCase();
+              ? key.toUpperCase()
+              : key.toLowerCase();
 
         updateActiveFieldValue((current) => `${current}${nextValue}`);
 
@@ -566,6 +579,19 @@ export default function FeedbackKiosk() {
   }, [step, kioskErrorType]);
 
   useEffect(() => {
+    return () => {
+      clearInactivityTimer();
+      clearDelayedResetTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (step !== "comment" && step !== "contact") {
+      closeKeyboard(false);
+    }
+  }, [step]);
+
+  useEffect(() => {
     if (kioskToken) return;
 
     setKioskErrorType("missing_token");
@@ -757,11 +783,11 @@ export default function FeedbackKiosk() {
   function renderTextKeyboard() {
     return (
       <div className="w-full">
-        <div className="space-y-3">
+        <div className="space-y-2">
           {KEYBOARD_ROWS.map((row, rowIndex) => (
             <div
               key={`row-${rowIndex}`}
-              className="flex justify-center gap-2 md:gap-3"
+              className="flex justify-center gap-2"
             >
               {row.map((key) => {
                 const label = keyboardUppercase ? key.toUpperCase() : key;
@@ -772,7 +798,7 @@ export default function FeedbackKiosk() {
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleKeyboardKey(key)}
-                    className="flex h-12 min-w-[2.35rem] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-3 text-base font-semibold transition-transform active:scale-95 md:h-14 md:min-w-[3rem] md:text-lg"
+                    className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-transform active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
                     style={{ color: resolvedTextColor }}
                   >
                     {label}
@@ -782,19 +808,19 @@ export default function FeedbackKiosk() {
             </div>
           ))}
 
-          <div className="grid grid-cols-[auto_1fr_auto_auto] items-stretch gap-2 md:gap-3">
+          <div className="grid grid-cols-[auto_1fr_auto_auto] gap-2">
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("SHIFT")}
-              className="flex h-12 min-w-[82px] items-center justify-center rounded-2xl border px-4 text-sm font-semibold transition-transform active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              className="flex h-12 min-w-[72px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[88px]"
               style={{
                 borderColor: keyboardUppercase
                   ? resolvedPrimaryColor
-                  : "rgba(255,255,255,0.1)",
+                  : "rgba(255,255,255,0.08)",
                 backgroundColor: keyboardUppercase
                   ? resolvedPrimaryColor
-                  : "rgba(255,255,255,0.08)",
+                  : "rgba(255,255,255,0.12)",
                 color: keyboardUppercase
                   ? resolvedButtonTextColor
                   : resolvedTextColor,
@@ -807,17 +833,17 @@ export default function FeedbackKiosk() {
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("SPACE")}
-              className="flex h-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-5 text-sm font-semibold transition-transform active:scale-95 md:h-14 md:text-base"
+              className="flex h-12 items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-5 text-sm font-medium transition-transform active:scale-95 md:h-14"
               style={{ color: resolvedTextColor }}
             >
-              Espaço
+              espaço
             </button>
 
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("BACKSPACE")}
-              className="flex h-12 min-w-[82px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold transition-transform active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              className="flex h-12 min-w-[72px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 transition-transform active:scale-95 md:h-14 md:min-w-[88px]"
               style={{ color: resolvedTextColor }}
             >
               <Delete className="h-5 w-5" />
@@ -827,7 +853,7 @@ export default function FeedbackKiosk() {
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("DONE")}
-              className="flex h-12 min-w-[82px] items-center justify-center rounded-2xl px-4 text-sm font-semibold transition-transform active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              className="flex h-12 min-w-[72px] items-center justify-center rounded-2xl px-4 transition-transform active:scale-95 md:h-14 md:min-w-[88px]"
               style={{
                 backgroundColor: resolvedPrimaryColor,
                 color: resolvedButtonTextColor,
@@ -837,14 +863,14 @@ export default function FeedbackKiosk() {
             </button>
           </div>
 
-          <div className="flex justify-center gap-2 md:gap-3">
-            {["?", "!", ";", ":"].map((key) => (
+          <div className="flex justify-center gap-2">
+            {EXTRA_PUNCTUATION_KEYS.map((key) => (
               <button
                 key={key}
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleKeyboardKey(key)}
-                className="flex h-11 min-w-[60px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-3 text-sm font-semibold transition-transform active:scale-95 md:h-12 md:min-w-[72px] md:text-base"
+                className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[68px]"
                 style={{ color: resolvedTextColor }}
               >
                 {key}
@@ -855,7 +881,7 @@ export default function FeedbackKiosk() {
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("CLEAR")}
-              className="flex h-11 min-w-[90px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold transition-transform active:scale-95 md:h-12 md:min-w-[110px] md:text-base"
+              className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
               style={{ color: resolvedTextColor }}
             >
               Limpar
@@ -881,7 +907,7 @@ export default function FeedbackKiosk() {
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleKeyboardKey(key)}
-                  className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-xl font-semibold transition-transform active:scale-95 md:h-16"
+                  className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 text-xl font-medium transition-transform active:scale-95 md:h-16"
                   style={{ color: resolvedTextColor }}
                 >
                   {key}
@@ -895,7 +921,7 @@ export default function FeedbackKiosk() {
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("CLEAR")}
-              className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold transition-transform active:scale-95 md:h-16 md:text-base"
+              className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 text-sm font-medium transition-transform active:scale-95 md:h-16"
               style={{ color: resolvedTextColor }}
             >
               Limpar
@@ -905,7 +931,7 @@ export default function FeedbackKiosk() {
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("BACKSPACE")}
-              className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold transition-transform active:scale-95 md:h-16 md:text-base"
+              className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 transition-transform active:scale-95 md:h-16"
               style={{ color: resolvedTextColor }}
             >
               <Delete className="h-5 w-5" />
@@ -915,7 +941,7 @@ export default function FeedbackKiosk() {
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("DONE")}
-              className="flex h-14 items-center justify-center rounded-2xl text-sm font-semibold transition-transform active:scale-95 md:h-16 md:text-base"
+              className="flex h-14 items-center justify-center rounded-2xl transition-transform active:scale-95 md:h-16"
               style={{
                 backgroundColor: resolvedPrimaryColor,
                 color: resolvedButtonTextColor,
@@ -955,11 +981,10 @@ export default function FeedbackKiosk() {
 
       <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-center overflow-hidden">
         <div
-          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${
-            keyboardOpen || keyboardClosing
+          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${keyboardOpen || keyboardClosing
               ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
               : "max-h-full"
-          }`}
+            }`}
           style={{ backgroundColor: cardBackgroundColor }}
         >
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
@@ -1048,18 +1073,17 @@ export default function FeedbackKiosk() {
                           key={tag.id}
                           type="button"
                           onClick={() => handleToggleTag(tag.id)}
-                          className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
-                            active
-                              ? ""
-                              : "border-white/10 bg-black/10 hover:bg-black/20"
-                          }`}
+                          className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${active
+                            ? ""
+                            : "border-white/10 bg-black/10 hover:bg-black/20"
+                            }`}
                           style={
                             active
                               ? {
-                                  borderColor: resolvedPrimaryColor,
-                                  backgroundColor: resolvedPrimaryColor,
-                                  color: resolvedButtonTextColor,
-                                }
+                                borderColor: resolvedPrimaryColor,
+                                backgroundColor: resolvedPrimaryColor,
+                                color: resolvedButtonTextColor,
+                              }
                               : { color: resolvedTextColor }
                           }
                         >
@@ -1130,11 +1154,10 @@ export default function FeedbackKiosk() {
                         openKeyboard("comment");
                       }
                     }}
-                    className={`min-h-[180px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${
-                      activeField === "comment"
-                        ? "border-white/30"
-                        : "border-white/10"
-                    }`}
+                    className={`min-h-[180px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${activeField === "comment"
+                      ? "border-white/30"
+                      : "border-white/10"
+                      }`}
                     style={{ color: resolvedTextColor }}
                   >
                     {comment ? (
@@ -1178,8 +1201,8 @@ export default function FeedbackKiosk() {
                     {isNegativeRating
                       ? "Continuar"
                       : submittingAction === "send"
-                      ? "Enviando..."
-                      : "Enviar"}
+                        ? "Enviando..."
+                        : "Enviar"}
                   </button>
                 </div>
               </section>
@@ -1211,11 +1234,10 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactName")}
-                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
-                        activeField === "contactName"
-                          ? "border-white/30"
-                          : "border-white/10"
-                      }`}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactName"
+                        ? "border-white/30"
+                        : "border-white/10"
+                        }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactName || (
@@ -1236,11 +1258,10 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactPhone")}
-                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
-                        activeField === "contactPhone"
-                          ? "border-white/30"
-                          : "border-white/10"
-                      }`}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactPhone"
+                        ? "border-white/30"
+                        : "border-white/10"
+                        }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactPhone || (
@@ -1258,18 +1279,24 @@ export default function FeedbackKiosk() {
                     <label className="mb-2 block text-left text-sm font-medium opacity-80">
                       Mensagem adicional
                     </label>
-                    <textarea
-                      value={contactMessage}
-                      onChange={(e) => setContactMessage(e.target.value)}
-                      placeholder="Mensagem adicional (opcional)"
-                      className="min-h-[120px] w-full resize-none rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
-                      style={{
-                        color: resolvedTextColor,
-                        userSelect: "none",
-                        WebkitUserSelect: "none",
-                        WebkitTouchCallout: "none",
-                      }}
-                    />
+
+                    <button
+                      type="button"
+                      onClick={() => openKeyboard("contactMessage")}
+                      className={`min-h-[120px] w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactMessage"
+                        ? "border-white/30"
+                        : "border-white/10"
+                        }`}
+                      style={{ color: resolvedTextColor }}
+                    >
+                      {contactMessage ? (
+                        <span className="whitespace-pre-wrap break-words">
+                          {contactMessage}
+                        </span>
+                      ) : (
+                        <span className="opacity-45">Toque para digitar</span>
+                      )}
+                    </button>
                   </div>
 
                   <label className="mt-1 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-4 text-left">
@@ -1392,23 +1419,22 @@ export default function FeedbackKiosk() {
       </div>
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${
-          keyboardOpen && !keyboardClosing
-            ? "translate-y-0 opacity-100 pointer-events-auto"
-            : "translate-y-full opacity-0 pointer-events-none"
-        }`}
+        className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${keyboardOpen && !keyboardClosing
+          ? "translate-y-0 opacity-100 pointer-events-auto"
+          : "translate-y-full opacity-0 pointer-events-none"
+          }`}
       >
         <div className="mx-auto w-full max-w-6xl px-3 pb-3 md:px-6 md:pb-6">
           <div
             className="rounded-t-[28px] border border-white/10 border-b-0 p-4 shadow-2xl backdrop-blur-xl md:p-5"
-            style={{ backgroundColor: "rgba(2, 6, 23, 0.96)" }}
+            style={{ backgroundColor: "rgba(2, 6, 23, 0.97)" }}
           >
             <div className="mb-3 flex items-center justify-end">
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => closeKeyboard(true)}
-                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold transition-transform active:scale-95"
+                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium transition-transform active:scale-95"
                 style={{ color: resolvedTextColor }}
               >
                 Fechar
@@ -1416,7 +1442,9 @@ export default function FeedbackKiosk() {
             </div>
 
             {activeField === "contactPhone" ? renderPhoneKeyboard() : null}
-            {activeField === "comment" || activeField === "contactName"
+            {activeField === "comment" ||
+              activeField === "contactName" ||
+              activeField === "contactMessage"
               ? renderTextKeyboard()
               : null}
           </div>
