@@ -32,11 +32,7 @@ export function AppRoutes() {
               }
             >
               <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="branches" element={<BranchesPage />} />
-              <Route path="kiosks" element={<KiosksPage />} />
-              <Route path="tags" element={<TagsPage />} />
               <Route path="feedbacks" element={<FeedbacksPage />} />
-              <Route path="settings" element={<SettingsPage />} />
             </Route>
 
             <Route
@@ -46,14 +42,19 @@ export function AppRoutes() {
                 />
               }
             >
-              <Route path="users" element={<UsersPage />} />
+              <Route path="tags" element={<TagsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
             </Route>
 
             <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
               <Route path="companies" element={<CompaniesPage />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="branches" element={<BranchesPage />} />
+              <Route path="kiosks" element={<KiosksPage />} />
             </Route>
           </Route>
         </Route>
+
         <Route path="feedback" element={<FeedbackKiosk />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

@@ -1,9 +1,14 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { getStoredUser, logout } from "../../services/auth";
 import {
+  canAccessBranches,
   canAccessCompanies,
+  canAccessDashboard,
+  canAccessFeedbacks,
+  canAccessKiosks,
+  canAccessSettings,
+  canAccessTags,
   canAccessUsers,
-  canViewOperationalModules,
 } from "../../utils/permissions";
 
 type MenuItem = {
@@ -17,14 +22,14 @@ export function Sidebar() {
   const user = getStoredUser();
 
   const menuItems: MenuItem[] = [
-    { label: "Dashboard", to: "/admin/dashboard", visible: !!user },
+    { label: "Dashboard", to: "/admin/dashboard", visible: canAccessDashboard(user) },
     { label: "Empresas", to: "/admin/companies", visible: canAccessCompanies(user) },
     { label: "Usuários", to: "/admin/users", visible: canAccessUsers(user) },
-    { label: "Filiais", to: "/admin/branches", visible: canViewOperationalModules(user) },
-    { label: "Kiosks", to: "/admin/kiosks", visible: canViewOperationalModules(user) },
-    { label: "Tags", to: "/admin/tags", visible: canViewOperationalModules(user) },
-    { label: "Feedbacks", to: "/admin/feedbacks", visible: canViewOperationalModules(user) },
-    { label: "Configurações", to: "/admin/settings", visible: canViewOperationalModules(user) },
+    { label: "Filiais", to: "/admin/branches", visible: canAccessBranches(user) },
+    { label: "Kiosks", to: "/admin/kiosks", visible: canAccessKiosks(user) },
+    { label: "Tags", to: "/admin/tags", visible: canAccessTags(user) },
+    { label: "Feedbacks", to: "/admin/feedbacks", visible: canAccessFeedbacks(user) },
+    { label: "Configurações", to: "/admin/settings", visible: canAccessSettings(user) },
   ];
 
   function handleLogout() {

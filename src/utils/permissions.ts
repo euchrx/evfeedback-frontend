@@ -26,11 +26,35 @@ export function canAccessCompanies(user: AuthUser | null | undefined) {
 }
 
 export function canAccessUsers(user: AuthUser | null | undefined) {
+  return isSuperAdmin(user);
+}
+
+export function canAccessBranches(user: AuthUser | null | undefined) {
+  return isSuperAdmin(user);
+}
+
+export function canAccessKiosks(user: AuthUser | null | undefined) {
+  return isSuperAdmin(user);
+}
+
+export function canAccessTags(user: AuthUser | null | undefined) {
   return isSuperAdmin(user) || isCompanyAdmin(user);
 }
 
-export function canViewOperationalModules(user: AuthUser | null | undefined) {
+export function canAccessFeedbacks(user: AuthUser | null | undefined) {
   return isSuperAdmin(user) || isCompanyAdmin(user) || isManager(user);
+}
+
+export function canAccessSettings(user: AuthUser | null | undefined) {
+  return isSuperAdmin(user) || isCompanyAdmin(user);
+}
+
+export function canAccessDashboard(user: AuthUser | null | undefined) {
+  return isSuperAdmin(user) || isCompanyAdmin(user) || isManager(user);
+}
+
+export function canViewOperationalModules(user: AuthUser | null | undefined) {
+  return canAccessDashboard(user);
 }
 
 export function canManageOperationalModules(user: AuthUser | null | undefined) {
