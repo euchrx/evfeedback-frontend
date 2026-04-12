@@ -530,7 +530,7 @@ export default function FeedbackKiosk() {
           className="w-full rounded-[32px] border border-white/10 p-6 shadow-2xl backdrop-blur md:p-10"
           style={{ backgroundColor: cardBackgroundColor }}
         >
-          {step !== "error" ? (
+          {step !== "error" && step !== "done" ? (
             <header className="mb-8 text-center">
               {logoUrl ? (
                 <img
@@ -835,7 +835,13 @@ export default function FeedbackKiosk() {
 
           {step === "done" && (
             <section className="text-center">
-              {logoUrl}
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={companyName}
+                  className="mx-auto mb-5 h-16 w-auto object-contain md:h-20"
+                />
+              ) : null}
 
               <h2 className="mt-6 text-3xl font-bold md:text-5xl">
                 Obrigado pela sua avaliação
