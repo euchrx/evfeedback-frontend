@@ -248,7 +248,7 @@ export default function FeedbackKiosk() {
       return;
     }
 
-    void handleSubmit(false);
+    void handleSubmit(false, "send");
   }
 
   async function syncKioskData(options?: { initial?: boolean }) {
@@ -322,7 +322,7 @@ export default function FeedbackKiosk() {
     if (!rating || !kioskToken || submittingAction) return;
 
     try {
-      setSubmittingAction(null);
+      setSubmittingAction(action);
       clearInactivityTimer();
 
       await api.post("/kiosk/feedback", {
@@ -633,17 +633,18 @@ export default function FeedbackKiosk() {
                         key={tag.id}
                         type="button"
                         onClick={() => handleToggleTag(tag.id)}
-                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${active
-                          ? ""
-                          : "border-white/10 bg-black/10 hover:bg-black/20"
-                          }`}
+                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
+                          active
+                            ? ""
+                            : "border-white/10 bg-black/10 hover:bg-black/20"
+                        }`}
                         style={
                           active
                             ? {
-                              borderColor: resolvedPrimaryColor,
-                              backgroundColor: resolvedPrimaryColor,
-                              color: resolvedButtonTextColor,
-                            }
+                                borderColor: resolvedPrimaryColor,
+                                backgroundColor: resolvedPrimaryColor,
+                                color: resolvedButtonTextColor,
+                              }
                             : { color: resolvedTextColor }
                         }
                       >
@@ -735,7 +736,7 @@ export default function FeedbackKiosk() {
                 <button
                   type="button"
                   onClick={handleSubmitCommentStep}
-                  disabled={isSubmitting}
+                  disabled={submittingAction !== null}
                   className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
                   style={{
                     backgroundColor: resolvedPrimaryColor,
@@ -744,9 +745,9 @@ export default function FeedbackKiosk() {
                 >
                   {isNegativeRating
                     ? "Continuar"
-                    : isSubmitting
-                      ? "Enviando..."
-                      : "Enviar"}
+                    : submittingAction === "send"
+                    ? "Enviando..."
+                    : "Enviar"}
                 </button>
               </div>
             </section>
@@ -810,6 +811,7 @@ export default function FeedbackKiosk() {
                 <textarea
                   value={contactMessage}
                   onChange={(e) => setContactMessage(e.target.value)}
+                  onKeyDown={handleTextareaEnterBlur}
                   placeholder="Mensagem adicional (opcional)"
                   className="min-h-[120px] w-full resize-none rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
                   style={{
@@ -857,8 +859,8 @@ export default function FeedbackKiosk() {
                   disabled={submittingAction !== null}
                   className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
                   style={{
-                    backgroundColor: primaryColor,
-                    color: buttonTextColor,
+                    backgroundColor: resolvedPrimaryColor,
+                    color: resolvedButtonTextColor,
                   }}
                 >
                   {submittingAction === "send" ? "Enviando..." : "Enviar"}
