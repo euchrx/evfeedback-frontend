@@ -57,6 +57,16 @@ const PHONE_KEYS = [
   ["+", "0", "-"],
 ];
 
+const ACCENTED_VARIANTS: Record<string, string[]> = {
+  a: ["á", "à", "â", "ã"],
+  e: ["é", "ê"],
+  i: ["í"],
+  o: ["ó", "ô", "õ"],
+  u: ["ú"],
+};
+
+const LONG_PRESS_MS = 350;
+
 function getConfigSnapshot(data: PublicKioskConfig) {
   return JSON.stringify({
     kiosk: data.kiosk,
@@ -115,7 +125,13 @@ export default function FeedbackKiosk() {
   const [activeField, setActiveField] = useState<ActiveField>(null);
   const [keyboardUppercase, setKeyboardUppercase] = useState(false);
   const [keyboardClosing, setKeyboardClosing] = useState(false);
+  const [accentMenu, setAccentMenu] = useState<{
+    key: string;
+    options: string[];
+  } | null>(null);
 
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
   const inactivityTimerRef = useRef<number | null>(null);
   const delayedResetTimerRef = useRef<number | null>(null);
   const keyboardCloseTimerRef = useRef<number | null>(null);
@@ -154,6 +170,7 @@ export default function FeedbackKiosk() {
   const canApplyLiveRefresh = step === "rating" || step === "done";
   const keyboardOpen = activeField !== null;
 
+
   function clearInactivityTimer() {
     if (inactivityTimerRef.current) {
       window.clearTimeout(inactivityTimerRef.current);
@@ -175,6 +192,13 @@ export default function FeedbackKiosk() {
     }
   }
 
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
   function blurNativeActiveElement() {
     const activeEl = document.activeElement;
     if (activeEl instanceof HTMLElement) {
@@ -185,6 +209,10 @@ export default function FeedbackKiosk() {
   function hardResetFlow() {
     clearInactivityTimer();
     clearDelayedResetTimer();
+    clearKeyboardCloseTimer();
+    clearLongPressTimer();
+    longPressTriggeredRef.current = false;
+    setAccentMenu(null);
     setActiveField(null);
     setKeyboardUppercase(false);
     setKeyboardClosing(false);
@@ -223,6 +251,9 @@ export default function FeedbackKiosk() {
 
   function closeKeyboard(animated = true) {
     clearKeyboardCloseTimer();
+    setAccentMenu(null);
+    clearLongPressTimer();
+    longPressTriggeredRef.current = false;
 
     if (!keyboardOpen) {
       setActiveField(null);
@@ -281,6 +312,9 @@ export default function FeedbackKiosk() {
   }
 
   function openKeyboard(field: ActiveField) {
+    setAccentMenu(null);
+    clearLongPressTimer();
+    longPressTriggeredRef.current = false;
     clearDelayedResetTimer();
     blurNativeActiveElement();
     setKeyboardClosing(false);
@@ -336,6 +370,9 @@ export default function FeedbackKiosk() {
   }
 
   function handleKeyboardKey(key: string) {
+    setAccentMenu(null);
+    clearLongPressTimer();
+    longPressTriggeredRef.current = false;
     if (!activeField || keyboardClosing) return;
 
     switch (key) {
@@ -367,18 +404,8 @@ export default function FeedbackKiosk() {
         }
         return;
       default: {
-        const nextValue =
-          activeField === "contactPhone"
-            ? key
-            : keyboardUppercase
-              ? key.toUpperCase()
-              : key.toLowerCase();
-
-        updateActiveFieldValue((current) => `${current}${nextValue}`);
-
-        if (activeField !== "contactPhone") {
-          setKeyboardUppercase(false);
-        }
+        insertCharacter(key);
+        return;
       }
     }
   }
@@ -388,6 +415,84 @@ export default function FeedbackKiosk() {
       event.preventDefault();
       handleKeyboardKey(key);
     };
+  }
+
+  function insertCharacter(rawKey: string) {
+    if (!activeField || keyboardClosing) return;
+
+    const key =
+      activeField === "contactPhone"
+        ? rawKey
+        : keyboardUppercase
+          ? rawKey.toUpperCase()
+          : rawKey.toLowerCase();
+
+    updateActiveFieldValue((current) => `${current}${key}`);
+
+    if (activeField !== "contactPhone") {
+      setKeyboardUppercase(false);
+    }
+  }
+
+  function getAccentOptions(key: string) {
+    const lower = key.toLowerCase();
+    return ACCENTED_VARIANTS[lower] ?? [];
+  }
+
+  function handleLetterPointerDown(key: string) {
+    return (event: React.PointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+
+      if (!activeField || keyboardClosing) return;
+
+      const options = getAccentOptions(key);
+      longPressTriggeredRef.current = false;
+
+      if (options.length === 0) {
+        insertCharacter(key);
+        return;
+      }
+
+      clearLongPressTimer();
+
+      longPressTimerRef.current = window.setTimeout(() => {
+        longPressTriggeredRef.current = true;
+        setAccentMenu({
+          key,
+          options: keyboardUppercase
+            ? options.map((item) => item.toUpperCase())
+            : options,
+        });
+      }, LONG_PRESS_MS);
+    };
+  }
+
+  function handleLetterPointerUp(key: string) {
+    return (event: React.PointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+
+      const options = getAccentOptions(key);
+
+      if (options.length === 0) return;
+
+      const triggered = longPressTriggeredRef.current;
+      clearLongPressTimer();
+
+      if (!triggered) {
+        insertCharacter(key);
+      }
+    };
+  }
+
+  function handleLetterPointerLeave() {
+    clearLongPressTimer();
+  }
+
+  function handleAccentSelect(accentedChar: string) {
+    insertCharacter(accentedChar);
+    setAccentMenu(null);
+    clearLongPressTimer();
+    longPressTriggeredRef.current = false;
   }
 
   function handleSelectRating(value: number) {
@@ -673,6 +778,7 @@ export default function FeedbackKiosk() {
       clearInactivityTimer();
       clearDelayedResetTimer();
       clearKeyboardCloseTimer();
+      clearLongPressTimer();
     };
   }, []);
 
@@ -822,10 +928,34 @@ export default function FeedbackKiosk() {
                   <button
                     key={key}
                     type="button"
-                    onPointerDown={handleKeyPress(key)}
-                    className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-transform active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
+                    onPointerDown={handleLetterPointerDown(key)}
+                    onPointerUp={handleLetterPointerUp(key)}
+                    onPointerLeave={handleLetterPointerLeave}
+                    className="relative flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-transform active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
                     style={{ color: resolvedTextColor }}
                   >
+                    {accentMenu?.key === key ? (
+                      <div
+                        className="absolute -top-14 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-2xl border border-white/10 bg-slate-900/95 px-2 py-2 shadow-2xl"
+                        onPointerDown={(e) => e.preventDefault()}
+                      >
+                        {accentMenu.options.map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              handleAccentSelect(option);
+                            }}
+                            className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-xl border border-white/8 bg-white/10 px-2 text-base font-medium transition-transform active:scale-95"
+                            style={{ color: resolvedTextColor }}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
                     {label}
                   </button>
                 );
