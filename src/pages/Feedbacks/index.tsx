@@ -446,6 +446,50 @@ export default function FeedbackKiosk() {
   }, []);
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+
+    html.classList.add("overflow-hidden", "overscroll-none");
+    body.classList.add("overflow-hidden", "overscroll-none");
+
+    const previousHtmlStyle = {
+      height: html.style.height,
+      overflow: html.style.overflow,
+      overscrollBehavior: html.style.overscrollBehavior,
+    };
+
+    const previousBodyStyle = {
+      height: body.style.height,
+      overflow: body.style.overflow,
+      overscrollBehavior: body.style.overscrollBehavior,
+      touchAction: body.style.touchAction,
+    };
+
+    html.style.height = "100%";
+    html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+
+    body.style.height = "100%";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    body.style.touchAction = "manipulation";
+
+    return () => {
+      html.classList.remove("overflow-hidden", "overscroll-none");
+      body.classList.remove("overflow-hidden", "overscroll-none");
+
+      html.style.height = previousHtmlStyle.height;
+      html.style.overflow = previousHtmlStyle.overflow;
+      html.style.overscrollBehavior = previousHtmlStyle.overscrollBehavior;
+
+      body.style.height = previousBodyStyle.height;
+      body.style.overflow = previousBodyStyle.overflow;
+      body.style.overscrollBehavior = previousBodyStyle.overscrollBehavior;
+      body.style.touchAction = previousBodyStyle.touchAction;
+    };
+  }, []);
+
+  useEffect(() => {
     const preventGesture = (event: Event) => {
       event.preventDefault();
     };
@@ -521,7 +565,7 @@ export default function FeedbackKiosk() {
 
   return (
     <main
-      className="relative min-h-screen select-none overflow-hidden px-4 py-6 md:px-8 md:py-10"
+      className="relative h-screen overflow-hidden select-none px-4 py-6 md:px-8 md:py-10"
       style={{
         backgroundColor,
         color: textColor,
@@ -543,9 +587,9 @@ export default function FeedbackKiosk() {
         </div>
       ) : null}
 
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-5xl items-center justify-center">
+      <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center overflow-hidden">
         <div
-          className="w-full rounded-[32px] border border-white/10 p-6 shadow-2xl backdrop-blur md:p-10"
+          className="max-h-full w-full overflow-hidden rounded-[32px] border border-white/10 p-6 shadow-2xl backdrop-blur md:p-10"
           style={{ backgroundColor: cardBackgroundColor }}
         >
           {step !== "error" && step !== "done" ? (
