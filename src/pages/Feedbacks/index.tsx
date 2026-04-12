@@ -105,6 +105,10 @@ export default function FeedbackKiosk() {
   const textColor = settings?.textColor?.trim() || "#ffffff";
   const buttonTextColor = settings?.buttonTextColor?.trim() || "#0f172a";
 
+  const resolvedPrimaryColor = primaryColor || "#0ea5e9";
+  const resolvedTextColor = textColor || "#ffffff";
+  const resolvedButtonTextColor = buttonTextColor || "#0f172a";
+
   const isNegativeRating = rating === 1 || rating === 2;
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
   const canApplyLiveRefresh = step === "rating" || step === "done";
@@ -540,7 +544,10 @@ export default function FeedbackKiosk() {
                 />
               ) : null}
 
-              <p className="text-sm uppercase tracking-[0.28em] opacity-70">
+              <p
+                className="text-sm uppercase tracking-[0.28em] opacity-90"
+                style={{ color: resolvedPrimaryColor }}
+              >
                 {companyName}
               </p>
             </header>
@@ -554,16 +561,29 @@ export default function FeedbackKiosk() {
                 {heroSubtitle}
               </p>
 
+              <div
+                className="mx-auto mt-6 h-1.5 w-28 rounded-full"
+                style={{ backgroundColor: resolvedPrimaryColor }}
+              />
+
               <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
                 {RATING_OPTIONS.map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => handleSelectRating(option.value)}
-                    className="flex min-h-[150px] flex-col items-center justify-center rounded-3xl border border-white/10 bg-black/10 p-6 transition hover:bg-black/20 active:scale-95 md:min-h-[190px] md:p-8"
+                    className="flex min-h-[150px] flex-col items-center justify-center rounded-3xl p-6 transition active:scale-95 md:min-h-[190px] md:p-8"
+                    style={{
+                      border: `1px solid ${resolvedPrimaryColor}55`,
+                      backgroundColor: `${resolvedPrimaryColor}14`,
+                      boxShadow: `inset 0 0 0 1px ${resolvedPrimaryColor}10`,
+                    }}
                   >
                     <span className="text-5xl md:text-6xl">{option.emoji}</span>
-                    <span className="mt-4 text-base font-semibold md:text-lg">
+                    <span
+                      className="mt-4 text-base font-semibold md:text-lg"
+                      style={{ color: resolvedButtonTextColor }}
+                    >
                       {option.label}
                     </span>
                   </button>
@@ -599,18 +619,19 @@ export default function FeedbackKiosk() {
                         key={tag.id}
                         type="button"
                         onClick={() => handleToggleTag(tag.id)}
-                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${active
+                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
+                          active
                             ? ""
                             : "border-white/10 bg-black/10 hover:bg-black/20"
-                          }`}
+                        }`}
                         style={
                           active
                             ? {
-                              borderColor: primaryColor,
-                              backgroundColor: primaryColor,
-                              color: buttonTextColor,
-                            }
-                            : { color: textColor }
+                                borderColor: resolvedPrimaryColor,
+                                backgroundColor: resolvedPrimaryColor,
+                                color: resolvedButtonTextColor,
+                              }
+                            : { color: resolvedTextColor }
                         }
                       >
                         {tag.name}
@@ -641,8 +662,8 @@ export default function FeedbackKiosk() {
                   onClick={() => setStep("comment")}
                   className="rounded-2xl px-8 py-4 text-lg font-semibold transition"
                   style={{
-                    backgroundColor: primaryColor,
-                    color: buttonTextColor,
+                    backgroundColor: resolvedPrimaryColor,
+                    color: resolvedButtonTextColor,
                   }}
                 >
                   Continuar
@@ -676,7 +697,7 @@ export default function FeedbackKiosk() {
                   placeholder="Escreva aqui sua experiência..."
                   className="min-h-[180px] w-full resize-none rounded-3xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
                   style={{
-                    color: textColor,
+                    color: resolvedTextColor,
                     userSelect: "none",
                     WebkitUserSelect: "none",
                     WebkitTouchCallout: "none",
@@ -703,8 +724,8 @@ export default function FeedbackKiosk() {
                   disabled={isSubmitting}
                   className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
                   style={{
-                    backgroundColor: primaryColor,
-                    color: buttonTextColor,
+                    backgroundColor: resolvedPrimaryColor,
+                    color: resolvedButtonTextColor,
                   }}
                 >
                   {isNegativeRating
@@ -745,7 +766,7 @@ export default function FeedbackKiosk() {
                     }}
                     placeholder="Seu nome"
                     className="w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
-                    style={{ color: textColor }}
+                    style={{ color: resolvedTextColor }}
                   />
                   {contactNameError ? (
                     <p className="mt-2 text-left text-sm text-rose-300">
@@ -763,7 +784,7 @@ export default function FeedbackKiosk() {
                     }}
                     placeholder="Telefone ou WhatsApp"
                     className="w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
-                    style={{ color: textColor }}
+                    style={{ color: resolvedTextColor }}
                   />
                   {contactPhoneError ? (
                     <p className="mt-2 text-left text-sm text-rose-300">
@@ -778,7 +799,7 @@ export default function FeedbackKiosk() {
                   placeholder="Mensagem adicional (opcional)"
                   className="min-h-[120px] w-full resize-none rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
                   style={{
-                    color: textColor,
+                    color: resolvedTextColor,
                     userSelect: "none",
                     WebkitUserSelect: "none",
                     WebkitTouchCallout: "none",
@@ -822,8 +843,8 @@ export default function FeedbackKiosk() {
                   disabled={isSubmitting}
                   className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
                   style={{
-                    backgroundColor: primaryColor,
-                    color: buttonTextColor,
+                    backgroundColor: resolvedPrimaryColor,
+                    color: resolvedButtonTextColor,
                   }}
                 >
                   {isSubmitting ? "Enviando..." : "Enviar"}
@@ -842,13 +863,21 @@ export default function FeedbackKiosk() {
                 />
               ) : null}
 
-              <p className="text-sm uppercase tracking-[0.28em] opacity-70">
+              <p
+                className="text-sm uppercase tracking-[0.28em] opacity-90"
+                style={{ color: resolvedPrimaryColor }}
+              >
                 {companyName}
               </p>
 
               <h2 className="mt-6 text-3xl font-bold md:text-5xl">
                 Obrigado pela sua avaliação
               </h2>
+
+              <div
+                className="mx-auto mt-6 h-1.5 w-28 rounded-full"
+                style={{ backgroundColor: resolvedPrimaryColor }}
+              />
 
               <p className="mx-auto mt-4 max-w-2xl text-lg opacity-90">
                 {thankYouMessage}
@@ -880,8 +909,8 @@ export default function FeedbackKiosk() {
                   onClick={() => resetFlow()}
                   className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold transition"
                   style={{
-                    backgroundColor: primaryColor,
-                    color: buttonTextColor,
+                    backgroundColor: resolvedPrimaryColor,
+                    color: resolvedButtonTextColor,
                   }}
                 >
                   Tentar novamente
@@ -895,7 +924,7 @@ export default function FeedbackKiosk() {
       <div className="pointer-events-none fixed bottom-3 left-1/2 z-10 -translate-x-1/2">
         <span
           className="text-[10px] font-medium uppercase tracking-[0.22em] opacity-40 md:text-xs"
-          style={{ color: textColor }}
+          style={{ color: resolvedTextColor }}
         >
           www.evsystem.com.br
         </span>
