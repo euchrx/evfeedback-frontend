@@ -118,6 +118,7 @@ export default function FeedbackKiosk() {
 
   const inactivityTimerRef = useRef<number | null>(null);
   const delayedResetTimerRef = useRef<number | null>(null);
+  const keyboardCloseTimerRef = useRef<number | null>(null);
   const configSnapshotRef = useRef("");
   const tagsSnapshotRef = useRef("");
   const pendingConfigRef = useRef<PublicKioskConfig | null>(null);
@@ -164,6 +165,13 @@ export default function FeedbackKiosk() {
     if (delayedResetTimerRef.current) {
       window.clearTimeout(delayedResetTimerRef.current);
       delayedResetTimerRef.current = null;
+    }
+  }
+
+  function clearKeyboardCloseTimer() {
+    if (keyboardCloseTimerRef.current) {
+      window.clearTimeout(keyboardCloseTimerRef.current);
+      keyboardCloseTimerRef.current = null;
     }
   }
 
@@ -214,6 +222,8 @@ export default function FeedbackKiosk() {
   }
 
   function closeKeyboard(animated = true) {
+    clearKeyboardCloseTimer();
+
     if (!keyboardOpen) {
       setActiveField(null);
       setKeyboardUppercase(false);
@@ -232,10 +242,11 @@ export default function FeedbackKiosk() {
     setKeyboardClosing(true);
     blurNativeActiveElement();
 
-    window.setTimeout(() => {
+    keyboardCloseTimerRef.current = window.setTimeout(() => {
       setActiveField(null);
       setKeyboardUppercase(false);
       setKeyboardClosing(false);
+      keyboardCloseTimerRef.current = null;
     }, KEYBOARD_CLOSE_ANIMATION_MS);
   }
 
@@ -579,19 +590,6 @@ export default function FeedbackKiosk() {
   }, [step, kioskErrorType]);
 
   useEffect(() => {
-    return () => {
-      clearInactivityTimer();
-      clearDelayedResetTimer();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (step !== "comment" && step !== "contact") {
-      closeKeyboard(false);
-    }
-  }, [step]);
-
-  useEffect(() => {
     if (kioskToken) return;
 
     setKioskErrorType("missing_token");
@@ -647,6 +645,7 @@ export default function FeedbackKiosk() {
     return () => {
       clearInactivityTimer();
       clearDelayedResetTimer();
+      clearKeyboardCloseTimer();
     };
   }, []);
 
@@ -982,8 +981,8 @@ export default function FeedbackKiosk() {
       <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-center overflow-hidden">
         <div
           className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${keyboardOpen || keyboardClosing
-              ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
-              : "max-h-full"
+            ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
+            : "max-h-full"
             }`}
           style={{ backgroundColor: cardBackgroundColor }}
         >
