@@ -126,10 +126,37 @@ export default function SettingsPage() {
       return;
     }
 
+    if (superAdmin && !selectedCompanyId) {
+      setLoading(false);
+      setError("");
+      setSuccess("");
+      return;
+    }
+
     void load();
-  }, [canView, selectedCompanyId]);
+  }, [canView, superAdmin, selectedCompanyId]);
 
   async function load() {
+    if (superAdmin && !selectedCompanyId) {
+      setCompanyName("");
+      setLogoUrl("");
+      setThankYouMessage("");
+      setPrimaryColor("#0ea5e9");
+      setKioskResetSeconds(5);
+      setHeroTitle("");
+      setHeroSubtitle("");
+      setBackgroundColor("#020617");
+      setBackgroundImageUrl("");
+      setCardBackgroundColor("rgba(15,23,42,0.72)");
+      setTextColor("#ffffff");
+      setButtonTextColor("#0f172a");
+      setNotificationEmails("");
+      setDailyNotificationEnabled(true);
+      setMonthlyNotificationEnabled(true);
+      setAppApkInfo(null);
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
