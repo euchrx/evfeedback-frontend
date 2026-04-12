@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import { Delete, CornerDownLeft, ChevronUp } from "lucide-react";
 import { api } from "../../services/api";
 import {
   getPublicKioskConfig,
@@ -9,6 +10,7 @@ import {
 
 type Step = "rating" | "tags" | "comment" | "contact" | "done" | "error";
 type KioskErrorType = "missing_token" | "invalid_token" | "request_error" | null;
+type ActiveField = "comment" | "contactName" | "contactPhone" | null;
 
 type RatingOption = {
   value: number;
@@ -21,8 +23,6 @@ type TagOption = {
   name: string;
 };
 
-type ActiveField = "comment" | "contactName" | "contactPhone" | null;
-
 const RATING_OPTIONS: RatingOption[] = [
   { value: 1, emoji: "😠", label: "Péssimo" },
   { value: 2, emoji: "🙁", label: "Ruim" },
@@ -34,11 +34,12 @@ const RATING_OPTIONS: RatingOption[] = [
 const RESET_DELAY_MS = 5000;
 const INACTIVITY_TIMEOUT_MS = 30000;
 const CONFIG_REFRESH_MS = 90000;
+const KEYBOARD_CLOSE_ANIMATION_MS = 260;
 
 const KEYBOARD_ROWS = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
   ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
-  ["z", "x", "c", "v", "b", "n", "m"],
+  [".", ",", "z", "x", "c", "v", "b", "n", "m"],
 ];
 
 const PHONE_KEYS = [
@@ -92,9 +93,9 @@ export default function FeedbackKiosk() {
   const [contactMessage, setContactMessage] = useState("");
   const [contactConsent, setContactConsent] = useState(false);
 
-  const [submittingAction, setSubmittingAction] = useState<
-    "skip" | "send" | null
-  >(null);
+  const [submittingAction, setSubmittingAction] = useState<"skip" | "send" | null>(
+    null,
+  );
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
   const [apiWarning, setApiWarning] = useState("");
@@ -105,8 +106,10 @@ export default function FeedbackKiosk() {
 
   const [activeField, setActiveField] = useState<ActiveField>(null);
   const [keyboardUppercase, setKeyboardUppercase] = useState(false);
+  const [keyboardClosing, setKeyboardClosing] = useState(false);
 
   const inactivityTimerRef = useRef<number | null>(null);
+  const delayedResetTimerRef = useRef<number | null>(null);
   const configSnapshotRef = useRef("");
   const tagsSnapshotRef = useRef("");
   const pendingConfigRef = useRef<PublicKioskConfig | null>(null);
@@ -119,8 +122,7 @@ export default function FeedbackKiosk() {
     settings?.companyName?.trim() || config?.company?.name || "EvFeedback";
   const logoUrl = settings?.logoUrl?.trim() || "";
   const thankYouMessage =
-    settings?.thankYouMessage?.trim() ||
-    "Sua opinião é muito importante para nós.";
+    settings?.thankYouMessage?.trim() || "Sua opinião é muito importante para nós.";
   const primaryColor = settings?.primaryColor?.trim() || "#0ea5e9";
   const heroTitle =
     settings?.heroTitle?.trim() || "Como foi sua experiência hoje?";
@@ -141,11 +143,19 @@ export default function FeedbackKiosk() {
   const isNegativeRating = rating === 1 || rating === 2;
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
   const canApplyLiveRefresh = step === "rating" || step === "done";
+  const keyboardOpen = activeField !== null;
 
   function clearInactivityTimer() {
     if (inactivityTimerRef.current) {
       window.clearTimeout(inactivityTimerRef.current);
       inactivityTimerRef.current = null;
+    }
+  }
+
+  function clearDelayedResetTimer() {
+    if (delayedResetTimerRef.current) {
+      window.clearTimeout(delayedResetTimerRef.current);
+      delayedResetTimerRef.current = null;
     }
   }
 
@@ -156,10 +166,12 @@ export default function FeedbackKiosk() {
     }
   }
 
-  function resetFlow() {
+  function hardResetFlow() {
     clearInactivityTimer();
+    clearDelayedResetTimer();
     setActiveField(null);
     setKeyboardUppercase(false);
+    setKeyboardClosing(false);
 
     if (!kioskToken) {
       setStep("error");
@@ -193,6 +205,49 @@ export default function FeedbackKiosk() {
     setSubmittingAction(null);
   }
 
+  function closeKeyboard(animated = true) {
+    if (!keyboardOpen) {
+      setActiveField(null);
+      setKeyboardUppercase(false);
+      setKeyboardClosing(false);
+      return;
+    }
+
+    if (!animated) {
+      setActiveField(null);
+      setKeyboardUppercase(false);
+      setKeyboardClosing(false);
+      blurNativeActiveElement();
+      return;
+    }
+
+    setKeyboardClosing(true);
+    blurNativeActiveElement();
+
+    window.setTimeout(() => {
+      setActiveField(null);
+      setKeyboardUppercase(false);
+      setKeyboardClosing(false);
+    }, KEYBOARD_CLOSE_ANIMATION_MS);
+  }
+
+  function resetFlow(animatedKeyboard = false) {
+    if (animatedKeyboard && keyboardOpen) {
+      clearInactivityTimer();
+      clearDelayedResetTimer();
+      setKeyboardClosing(true);
+      blurNativeActiveElement();
+
+      delayedResetTimerRef.current = window.setTimeout(() => {
+        hardResetFlow();
+      }, KEYBOARD_CLOSE_ANIMATION_MS);
+
+      return;
+    }
+
+    hardResetFlow();
+  }
+
   function restartInactivityTimer() {
     if (!rating || step === "rating" || step === "done" || step === "error") {
       clearInactivityTimer();
@@ -202,22 +257,19 @@ export default function FeedbackKiosk() {
     clearInactivityTimer();
 
     inactivityTimerRef.current = window.setTimeout(() => {
-      resetFlow();
+      resetFlow(true);
     }, INACTIVITY_TIMEOUT_MS);
   }
 
   function openKeyboard(field: ActiveField) {
+    clearDelayedResetTimer();
     blurNativeActiveElement();
+    setKeyboardClosing(false);
     setActiveField(field);
+
     if (field === "contactPhone") {
       setKeyboardUppercase(false);
     }
-  }
-
-  function closeKeyboard() {
-    setActiveField(null);
-    setKeyboardUppercase(false);
-    blurNativeActiveElement();
   }
 
   function updateActiveFieldValue(
@@ -248,46 +300,42 @@ export default function FeedbackKiosk() {
   }
 
   function handleKeyboardKey(key: string) {
-    if (!activeField) return;
+    if (!activeField || keyboardClosing) return;
 
-    if (key === "BACKSPACE") {
-      updateActiveFieldValue((current) => current.slice(0, -1));
-      return;
-    }
+    switch (key) {
+      case "BACKSPACE":
+        updateActiveFieldValue((current) => current.slice(0, -1));
+        return;
+      case "CLEAR":
+        updateActiveFieldValue(() => "");
+        return;
+      case "SPACE":
+        if (activeField !== "contactPhone") {
+          updateActiveFieldValue((current) => `${current} `);
+        }
+        return;
+      case "DONE":
+        closeKeyboard(true);
+        return;
+      case "SHIFT":
+        if (activeField !== "contactPhone") {
+          setKeyboardUppercase((current) => !current);
+        }
+        return;
+      default: {
+        const nextValue =
+          activeField === "contactPhone"
+            ? key
+            : keyboardUppercase
+            ? key.toUpperCase()
+            : key.toLowerCase();
 
-    if (key === "CLEAR") {
-      updateActiveFieldValue(() => "");
-      return;
-    }
+        updateActiveFieldValue((current) => `${current}${nextValue}`);
 
-    if (key === "SPACE") {
-      if (activeField === "contactPhone") return;
-      updateActiveFieldValue((current) => `${current} `);
-      return;
-    }
-
-    if (key === "DONE") {
-      closeKeyboard();
-      return;
-    }
-
-    if (key === "SHIFT") {
-      if (activeField === "contactPhone") return;
-      setKeyboardUppercase((current) => !current);
-      return;
-    }
-
-    const nextValue =
-      activeField === "contactPhone"
-        ? key
-        : keyboardUppercase
-        ? key.toUpperCase()
-        : key.toLowerCase();
-
-    updateActiveFieldValue((current) => `${current}${nextValue}`);
-
-    if (keyboardUppercase && activeField !== "contactPhone") {
-      setKeyboardUppercase(false);
+        if (keyboardUppercase && activeField !== "contactPhone") {
+          setKeyboardUppercase(false);
+        }
+      }
     }
   }
 
@@ -304,6 +352,7 @@ export default function FeedbackKiosk() {
     setContactConsent(false);
     setActiveField(null);
     setKeyboardUppercase(false);
+    setKeyboardClosing(false);
     setStep("tags");
   }
 
@@ -325,7 +374,7 @@ export default function FeedbackKiosk() {
     }
 
     setCommentError("");
-    closeKeyboard();
+    closeKeyboard(true);
 
     if (isNegativeRating) {
       setStep("contact");
@@ -369,7 +418,7 @@ export default function FeedbackKiosk() {
       return;
     }
 
-    closeKeyboard();
+    closeKeyboard(true);
     void handleSubmit(false, "send");
   }
 
@@ -446,7 +495,8 @@ export default function FeedbackKiosk() {
     try {
       setSubmittingAction(action);
       clearInactivityTimer();
-      closeKeyboard();
+      clearDelayedResetTimer();
+      closeKeyboard(false);
 
       await api.post("/kiosk/feedback", {
         token: kioskToken,
@@ -485,13 +535,14 @@ export default function FeedbackKiosk() {
     contactMessage,
     contactConsent,
     activeField,
+    keyboardClosing,
   ]);
 
   useEffect(() => {
     if (step !== "done") return;
 
     const timer = window.setTimeout(() => {
-      resetFlow();
+      hardResetFlow();
     }, RESET_DELAY_MS);
 
     return () => window.clearTimeout(timer);
@@ -508,7 +559,7 @@ export default function FeedbackKiosk() {
     }
 
     const timer = window.setTimeout(() => {
-      resetFlow();
+      hardResetFlow();
     }, 5000);
 
     return () => window.clearTimeout(timer);
@@ -569,6 +620,7 @@ export default function FeedbackKiosk() {
   useEffect(() => {
     return () => {
       clearInactivityTimer();
+      clearDelayedResetTimer();
     };
   }, []);
 
@@ -666,7 +718,7 @@ export default function FeedbackKiosk() {
 
   useEffect(() => {
     if (step !== "comment" && step !== "contact") {
-      closeKeyboard();
+      closeKeyboard(false);
     }
   }, [step]);
 
@@ -713,12 +765,14 @@ export default function FeedbackKiosk() {
             >
               {row.map((key) => {
                 const label = keyboardUppercase ? key.toUpperCase() : key;
+
                 return (
                   <button
                     key={key}
                     type="button"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleKeyboardKey(key)}
-                    className="flex h-12 min-w-[2.4rem] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-3 text-base font-semibold transition active:scale-95 md:h-14 md:min-w-[3.1rem] md:text-lg"
+                    className="flex h-12 min-w-[2.35rem] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-3 text-base font-semibold transition-transform active:scale-95 md:h-14 md:min-w-[3rem] md:text-lg"
                     style={{ color: resolvedTextColor }}
                   >
                     {label}
@@ -728,11 +782,12 @@ export default function FeedbackKiosk() {
             </div>
           ))}
 
-          <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+          <div className="grid grid-cols-[auto_1fr_auto_auto] items-stretch gap-2 md:gap-3">
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("SHIFT")}
-              className="flex h-12 min-w-[84px] items-center justify-center rounded-2xl border px-4 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              className="flex h-12 min-w-[82px] items-center justify-center rounded-2xl border px-4 text-sm font-semibold transition-transform active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
               style={{
                 borderColor: keyboardUppercase
                   ? resolvedPrimaryColor
@@ -745,13 +800,14 @@ export default function FeedbackKiosk() {
                   : resolvedTextColor,
               }}
             >
-              Shift
+              <ChevronUp className="h-5 w-5" />
             </button>
 
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("SPACE")}
-              className="flex h-12 min-w-[160px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-5 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[240px] md:text-base"
+              className="flex h-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-5 text-sm font-semibold transition-transform active:scale-95 md:h-14 md:text-base"
               style={{ color: resolvedTextColor }}
             >
               Espaço
@@ -759,32 +815,50 @@ export default function FeedbackKiosk() {
 
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("BACKSPACE")}
-              className="flex h-12 min-w-[84px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              className="flex h-12 min-w-[82px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold transition-transform active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
               style={{ color: resolvedTextColor }}
             >
-              Apagar
+              <Delete className="h-5 w-5" />
             </button>
 
             <button
               type="button"
-              onClick={() => handleKeyboardKey("CLEAR")}
-              className="flex h-12 min-w-[84px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
-              style={{ color: resolvedTextColor }}
-            >
-              Limpar
-            </button>
-
-            <button
-              type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("DONE")}
-              className="flex h-12 min-w-[84px] items-center justify-center rounded-2xl px-4 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              className="flex h-12 min-w-[82px] items-center justify-center rounded-2xl px-4 text-sm font-semibold transition-transform active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
               style={{
                 backgroundColor: resolvedPrimaryColor,
                 color: resolvedButtonTextColor,
               }}
             >
-              Ok
+              <CornerDownLeft className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="flex justify-center gap-2 md:gap-3">
+            {["?", "!", ";", ":"].map((key) => (
+              <button
+                key={key}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleKeyboardKey(key)}
+                className="flex h-11 min-w-[60px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-3 text-sm font-semibold transition-transform active:scale-95 md:h-12 md:min-w-[72px] md:text-base"
+                style={{ color: resolvedTextColor }}
+              >
+                {key}
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handleKeyboardKey("CLEAR")}
+              className="flex h-11 min-w-[90px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold transition-transform active:scale-95 md:h-12 md:min-w-[110px] md:text-base"
+              style={{ color: resolvedTextColor }}
+            >
+              Limpar
             </button>
           </div>
         </div>
@@ -794,7 +868,7 @@ export default function FeedbackKiosk() {
 
   function renderPhoneKeyboard() {
     return (
-      <div className="w-full max-w-md mx-auto">
+      <div className="mx-auto w-full max-w-md">
         <div className="space-y-3">
           {PHONE_KEYS.map((row, rowIndex) => (
             <div
@@ -805,8 +879,9 @@ export default function FeedbackKiosk() {
                 <button
                   key={key}
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleKeyboardKey(key)}
-                  className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-xl font-semibold transition active:scale-95 md:h-16"
+                  className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-xl font-semibold transition-transform active:scale-95 md:h-16"
                   style={{ color: resolvedTextColor }}
                 >
                   {key}
@@ -818,8 +893,9 @@ export default function FeedbackKiosk() {
           <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("CLEAR")}
-              className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold transition active:scale-95 md:h-16 md:text-base"
+              className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold transition-transform active:scale-95 md:h-16 md:text-base"
               style={{ color: resolvedTextColor }}
             >
               Limpar
@@ -827,23 +903,25 @@ export default function FeedbackKiosk() {
 
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("BACKSPACE")}
-              className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold transition active:scale-95 md:h-16 md:text-base"
+              className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold transition-transform active:scale-95 md:h-16 md:text-base"
               style={{ color: resolvedTextColor }}
             >
-              Apagar
+              <Delete className="h-5 w-5" />
             </button>
 
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleKeyboardKey("DONE")}
-              className="flex h-14 items-center justify-center rounded-2xl text-sm font-semibold transition active:scale-95 md:h-16 md:text-base"
+              className="flex h-14 items-center justify-center rounded-2xl text-sm font-semibold transition-transform active:scale-95 md:h-16 md:text-base"
               style={{
                 backgroundColor: resolvedPrimaryColor,
                 color: resolvedButtonTextColor,
               }}
             >
-              Ok
+              <CornerDownLeft className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -877,8 +955,10 @@ export default function FeedbackKiosk() {
 
       <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-center overflow-hidden">
         <div
-          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height,padding-bottom] duration-300 ${
-            activeField ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]" : "max-h-full"
+          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${
+            keyboardOpen || keyboardClosing
+              ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
+              : "max-h-full"
           }`}
           style={{ backgroundColor: cardBackgroundColor }}
         >
@@ -1077,7 +1157,7 @@ export default function FeedbackKiosk() {
                   <button
                     type="button"
                     onClick={() => {
-                      closeKeyboard();
+                      closeKeyboard(false);
                       setStep("tags");
                     }}
                     className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
@@ -1209,7 +1289,7 @@ export default function FeedbackKiosk() {
                   <button
                     type="button"
                     onClick={() => {
-                      closeKeyboard();
+                      closeKeyboard(false);
                       setStep("comment");
                     }}
                     className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
@@ -1295,7 +1375,7 @@ export default function FeedbackKiosk() {
                 {kioskErrorType === "request_error" ? (
                   <button
                     type="button"
-                    onClick={() => resetFlow()}
+                    onClick={() => hardResetFlow()}
                     className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold transition"
                     style={{
                       backgroundColor: resolvedPrimaryColor,
@@ -1313,7 +1393,7 @@ export default function FeedbackKiosk() {
 
       <div
         className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${
-          activeField
+          keyboardOpen && !keyboardClosing
             ? "translate-y-0 opacity-100 pointer-events-auto"
             : "translate-y-full opacity-0 pointer-events-none"
         }`}
@@ -1323,20 +1403,12 @@ export default function FeedbackKiosk() {
             className="rounded-t-[28px] border border-white/10 border-b-0 p-4 shadow-2xl backdrop-blur-xl md:p-5"
             style={{ backgroundColor: "rgba(2, 6, 23, 0.96)" }}
           >
-            <div className="mb-3 flex items-center justify-between">
-              <p
-                className="text-sm font-medium opacity-75"
-                style={{ color: resolvedTextColor }}
-              >
-                {activeField === "comment" && "Teclado do comentário"}
-                {activeField === "contactName" && "Teclado do nome"}
-                {activeField === "contactPhone" && "Teclado do telefone"}
-              </p>
-
+            <div className="mb-3 flex items-center justify-end">
               <button
                 type="button"
-                onClick={closeKeyboard}
-                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold transition active:scale-95"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => closeKeyboard(true)}
+                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold transition-transform active:scale-95"
                 style={{ color: resolvedTextColor }}
               >
                 Fechar
