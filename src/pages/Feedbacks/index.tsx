@@ -835,13 +835,7 @@ export default function FeedbackKiosk() {
 
           {step === "done" && (
             <section className="text-center">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={companyName}
-                  className="mx-auto mb-5 h-16 w-auto object-contain md:h-20"
-                />
-              ) : null}
+              {logoUrl}
 
               <h2 className="mt-6 text-3xl font-bold md:text-5xl">
                 Obrigado pela sua avaliação

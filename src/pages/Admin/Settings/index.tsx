@@ -100,20 +100,29 @@ export default function SettingsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const resolvedPrimaryColor = primaryColor.trim() || "#0ea5e9";
+  const resolvedBackgroundColor = backgroundColor.trim() || "#020617";
+  const resolvedTextColor = textColor.trim() || "#ffffff";
+  const resolvedCardBackgroundColor =
+    cardBackgroundColor.trim() || "rgba(15,23,42,0.72)";
+  const resolvedButtonTextColor = buttonTextColor.trim() || "#0f172a";
+
   const previewCompanyName = companyName.trim() || "EvFeedback";
   const previewHeroTitle = heroTitle.trim() || "Como foi sua experiência hoje?";
   const previewHeroSubtitle =
     heroSubtitle.trim() || "Toque em uma opção para avaliar rapidamente.";
+
   const previewBackgroundStyle = backgroundImageUrl.trim()
     ? {
-        backgroundColor: backgroundColor.trim() || "#020617",
+        backgroundColor: resolvedBackgroundColor,
         backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.78)), url(${backgroundImageUrl.trim()})`,
         backgroundPosition: "center",
         backgroundSize: "cover",
       }
     : {
-        backgroundColor: backgroundColor.trim() || "#020617",
+        backgroundColor: resolvedBackgroundColor,
       };
+
   const appApkQrCodeUrl = appApkInfo?.downloadUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
         appApkInfo.downloadUrl,
@@ -334,111 +343,178 @@ export default function SettingsPage() {
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {superAdmin ? (
-                <select
-                  value={companyId}
-                  onChange={(e) => setCompanyId(e.target.value)}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-                >
-                  <option value="">Selecione a empresa</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">
+                    Empresa
+                  </label>
+                  <select
+                    value={companyId}
+                    onChange={(e) => setCompanyId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+                  >
+                    <option value="">Selecione a empresa</option>
+                    {companies.map((company) => (
+                      <option key={company.id} value={company.id}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ) : null}
 
-              <input
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Nome exibido da empresa"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
-
-              <input
-                value={logoUrl}
-                onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="URL da logo"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
-
-              <input
-                value={heroTitle}
-                onChange={(e) => setHeroTitle(e.target.value)}
-                placeholder="Título principal"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
-
-              <input
-                value={heroSubtitle}
-                onChange={(e) => setHeroSubtitle(e.target.value)}
-                placeholder="Subtítulo"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
-
-              <input
-                value={thankYouMessage}
-                onChange={(e) => setThankYouMessage(e.target.value)}
-                placeholder="Mensagem de agradecimento"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
-
-              <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Nome exibido da empresa
+                </label>
                 <input
-                  type="color"
-                  value={primaryColor}
-                  onChange={(e) => setPrimaryColor(e.target.value)}
-                  className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Ex.: Pedro Pelanda"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
                 />
-                <span className="text-sm text-slate-600">Cor principal</span>
               </div>
 
-              <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  URL da logo
+                </label>
                 <input
-                  type="color"
-                  value={backgroundColor}
-                  onChange={(e) => setBackgroundColor(e.target.value)}
-                  className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
                 />
-                <span className="text-sm text-slate-600">Cor de fundo</span>
               </div>
 
-              <input
-                value={backgroundImageUrl}
-                onChange={(e) => setBackgroundImageUrl(e.target.value)}
-                placeholder="URL da imagem de fundo"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Título principal
+                </label>
+                <input
+                  value={heroTitle}
+                  onChange={(e) => setHeroTitle(e.target.value)}
+                  placeholder="Ex.: Como foi sua experiência hoje?"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                />
+              </div>
 
-              <input
-                value={cardBackgroundColor}
-                onChange={(e) => setCardBackgroundColor(e.target.value)}
-                placeholder="Cor do card"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Subtítulo
+                </label>
+                <input
+                  value={heroSubtitle}
+                  onChange={(e) => setHeroSubtitle(e.target.value)}
+                  placeholder="Ex.: Toque em uma opção para avaliar rapidamente."
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                />
+              </div>
 
-              <input
-                value={textColor}
-                onChange={(e) => setTextColor(e.target.value)}
-                placeholder="Cor do texto"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Mensagem de agradecimento
+                </label>
+                <input
+                  value={thankYouMessage}
+                  onChange={(e) => setThankYouMessage(e.target.value)}
+                  placeholder="Ex.: Obrigado pela sua avaliação!"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                />
+              </div>
 
-              <input
-                value={buttonTextColor}
-                onChange={(e) => setButtonTextColor(e.target.value)}
-                placeholder="Cor do texto do botão"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Cor principal
+                </label>
+                <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+                  <input
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
+                  />
+                  <span className="text-sm text-slate-700">{primaryColor}</span>
+                </div>
+              </div>
 
-              <input
-                type="number"
-                min={1}
-                value={kioskResetSeconds}
-                onChange={(e) => setKioskResetSeconds(Number(e.target.value) || 5)}
-                placeholder="Tempo de reset"
-                className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Cor de fundo
+                </label>
+                <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(e) => setBackgroundColor(e.target.value)}
+                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
+                  />
+                  <span className="text-sm text-slate-700">{backgroundColor}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  URL da imagem de fundo
+                </label>
+                <input
+                  value={backgroundImageUrl}
+                  onChange={(e) => setBackgroundImageUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Cor do card
+                </label>
+                <input
+                  value={cardBackgroundColor}
+                  onChange={(e) => setCardBackgroundColor(e.target.value)}
+                  placeholder="rgba(15,23,42,0.72)"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Cor do texto
+                </label>
+                <input
+                  value={textColor}
+                  onChange={(e) => setTextColor(e.target.value)}
+                  placeholder="#ffffff"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Cor do texto do botão
+                </label>
+                <input
+                  value={buttonTextColor}
+                  onChange={(e) => setButtonTextColor(e.target.value)}
+                  placeholder="#0f172a"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Tempo para reset do kiosk (segundos)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={kioskResetSeconds}
+                  onChange={(e) =>
+                    setKioskResetSeconds(Number(e.target.value) || 5)
+                  }
+                  placeholder="5"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                />
+              </div>
             </div>
           </div>
 
@@ -455,15 +531,14 @@ export default function SettingsPage() {
                 className="relative min-h-[720px] overflow-hidden px-4 py-6 md:px-8 md:py-10"
                 style={{
                   ...previewBackgroundStyle,
-                  color: textColor.trim() || "#ffffff",
+                  color: resolvedTextColor,
                 }}
               >
                 <div className="mx-auto flex min-h-[calc(720px-3rem)] w-full max-w-5xl items-center justify-center">
                   <div
                     className="w-full rounded-[32px] border border-white/10 p-6 shadow-2xl backdrop-blur md:p-10"
                     style={{
-                      backgroundColor:
-                        cardBackgroundColor.trim() || "rgba(15,23,42,0.72)",
+                      backgroundColor: resolvedCardBackgroundColor,
                     }}
                   >
                     <header className="mb-8 text-center">
@@ -478,26 +553,38 @@ export default function SettingsPage() {
                           className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full text-2xl font-bold md:h-20 md:w-20"
                           style={{
                             backgroundColor: "#ffffff",
-                            color: primaryColor.trim() || "#0ea5e9",
+                            color: resolvedPrimaryColor,
+                            boxShadow: `0 0 0 6px ${resolvedPrimaryColor}22`,
                           }}
                         >
                           {previewCompanyName.slice(0, 1).toUpperCase()}
                         </div>
                       )}
 
-                      <p className="text-sm uppercase tracking-[0.28em] opacity-70">
+                      <p
+                        className="text-sm uppercase tracking-[0.28em] opacity-90"
+                        style={{ color: resolvedPrimaryColor }}
+                      >
                         {previewCompanyName}
                       </p>
                     </header>
 
                     <section className="text-center">
-                      <h1 className="text-3xl font-bold md:text-5xl">
+                      <h1
+                        className="text-3xl font-bold md:text-5xl"
+                        style={{ color: resolvedTextColor }}
+                      >
                         {previewHeroTitle}
                       </h1>
 
                       <p className="mx-auto mt-4 max-w-2xl text-base opacity-90 md:text-xl">
                         {previewHeroSubtitle}
                       </p>
+
+                      <div
+                        className="mx-auto mt-6 h-1.5 w-28 rounded-full"
+                        style={{ backgroundColor: resolvedPrimaryColor }}
+                      />
 
                       <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
                         {[
@@ -510,10 +597,18 @@ export default function SettingsPage() {
                           <button
                             key={option.label}
                             type="button"
-                            className="flex min-h-[150px] flex-col items-center justify-center rounded-3xl border border-white/10 bg-black/10 p-6 transition hover:bg-black/20 md:min-h-[190px] md:p-8"
+                            className="flex min-h-[150px] flex-col items-center justify-center rounded-3xl p-6 transition md:min-h-[190px] md:p-8"
+                            style={{
+                              border: `1px solid ${resolvedPrimaryColor}55`,
+                              backgroundColor: `${resolvedPrimaryColor}18`,
+                              boxShadow: `inset 0 0 0 1px ${resolvedPrimaryColor}18`,
+                            }}
                           >
                             <span className="text-5xl md:text-6xl">{option.emoji}</span>
-                            <span className="mt-4 text-base font-semibold md:text-lg">
+                            <span
+                              className="mt-4 text-base font-semibold md:text-lg"
+                              style={{ color: resolvedButtonTextColor }}
+                            >
                               {option.label}
                             </span>
                           </button>
@@ -526,7 +621,7 @@ export default function SettingsPage() {
                 <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2">
                   <span
                     className="text-[10px] font-medium uppercase tracking-[0.22em] opacity-40 md:text-xs"
-                    style={{ color: textColor.trim() || "#ffffff" }}
+                    style={{ color: resolvedTextColor }}
                   >
                     Powered by EvFeedback
                   </span>
