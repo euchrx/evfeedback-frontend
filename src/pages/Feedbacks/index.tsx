@@ -599,18 +599,17 @@ export default function FeedbackKiosk() {
                         key={tag.id}
                         type="button"
                         onClick={() => handleToggleTag(tag.id)}
-                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
-                          active
+                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${active
                             ? ""
                             : "border-white/10 bg-black/10 hover:bg-black/20"
-                        }`}
+                          }`}
                         style={
                           active
                             ? {
-                                borderColor: primaryColor,
-                                backgroundColor: primaryColor,
-                                color: buttonTextColor,
-                              }
+                              borderColor: primaryColor,
+                              backgroundColor: primaryColor,
+                              color: buttonTextColor,
+                            }
                             : { color: textColor }
                         }
                       >
@@ -842,6 +841,10 @@ export default function FeedbackKiosk() {
                   className="mx-auto mb-5 h-16 w-auto object-contain md:h-20"
                 />
               ) : null}
+
+              <p className="text-sm uppercase tracking-[0.28em] opacity-70">
+                {companyName}
+              </p>
 
               <h2 className="mt-6 text-3xl font-bold md:text-5xl">
                 Obrigado pela sua avaliação
