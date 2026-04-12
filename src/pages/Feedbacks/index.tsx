@@ -21,6 +21,8 @@ type TagOption = {
   name: string;
 };
 
+type ActiveField = "comment" | "contactName" | "contactPhone" | null;
+
 const RATING_OPTIONS: RatingOption[] = [
   { value: 1, emoji: "😠", label: "Péssimo" },
   { value: 2, emoji: "🙁", label: "Ruim" },
@@ -32,6 +34,19 @@ const RATING_OPTIONS: RatingOption[] = [
 const RESET_DELAY_MS = 5000;
 const INACTIVITY_TIMEOUT_MS = 30000;
 const CONFIG_REFRESH_MS = 90000;
+
+const KEYBOARD_ROWS = [
+  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+  ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+  ["z", "x", "c", "v", "b", "n", "m"],
+];
+
+const PHONE_KEYS = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+  ["+", "0", "-"],
+];
 
 function getConfigSnapshot(data: PublicKioskConfig) {
   return JSON.stringify({
@@ -54,6 +69,14 @@ function getTagsSnapshot(tags: TagOption[]) {
 function getKioskTokenFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get("token")?.trim() || "";
+}
+
+function sanitizePhoneValue(value: string) {
+  return value.replace(/[^\d+\-()\s]/g, "");
+}
+
+function clampText(value: string, maxLength: number) {
+  return value.slice(0, maxLength);
 }
 
 export default function FeedbackKiosk() {
@@ -79,6 +102,9 @@ export default function FeedbackKiosk() {
   const [contactNameError, setContactNameError] = useState("");
   const [contactPhoneError, setContactPhoneError] = useState("");
   const [commentError, setCommentError] = useState("");
+
+  const [activeField, setActiveField] = useState<ActiveField>(null);
+  const [keyboardUppercase, setKeyboardUppercase] = useState(false);
 
   const inactivityTimerRef = useRef<number | null>(null);
   const configSnapshotRef = useRef("");
@@ -114,6 +140,9 @@ export default function FeedbackKiosk() {
   const isNegativeRating = rating === 1 || rating === 2;
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
   const canApplyLiveRefresh = step === "rating" || step === "done";
+  const isKeyboardVisible =
+    (step === "comment" || step === "contact") && activeField !== null;
+  const isPhoneKeyboard = activeField === "contactPhone";
 
   function clearInactivityTimer() {
     if (inactivityTimerRef.current) {
@@ -122,8 +151,17 @@ export default function FeedbackKiosk() {
     }
   }
 
+  function blurNativeActiveElement() {
+    const activeEl = document.activeElement;
+    if (activeEl instanceof HTMLElement) {
+      activeEl.blur();
+    }
+  }
+
   function resetFlow() {
     clearInactivityTimer();
+    setActiveField(null);
+    setKeyboardUppercase(false);
 
     if (!kioskToken) {
       setStep("error");
@@ -157,15 +195,6 @@ export default function FeedbackKiosk() {
     setSubmittingAction(null);
   }
 
-  function handleTextareaEnterBlur(
-    event: React.KeyboardEvent<HTMLTextAreaElement>,
-  ) {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      event.currentTarget.blur();
-    }
-  }
-
   function restartInactivityTimer() {
     if (!rating || step === "rating" || step === "done" || step === "error") {
       clearInactivityTimer();
@@ -179,6 +208,91 @@ export default function FeedbackKiosk() {
     }, INACTIVITY_TIMEOUT_MS);
   }
 
+  function openKeyboard(field: ActiveField) {
+    blurNativeActiveElement();
+    setActiveField(field);
+    if (field === "contactPhone") {
+      setKeyboardUppercase(false);
+    }
+  }
+
+  function closeKeyboard() {
+    setActiveField(null);
+    setKeyboardUppercase(false);
+    blurNativeActiveElement();
+  }
+
+  function updateActiveFieldValue(
+    updater: (current: string) => string,
+    fieldOverride?: ActiveField,
+  ) {
+    const field = fieldOverride ?? activeField;
+    if (!field) return;
+
+    if (field === "comment") {
+      setComment((current) => clampText(updater(current), 300));
+      if (commentError) setCommentError("");
+      return;
+    }
+
+    if (field === "contactName") {
+      setContactName((current) => clampText(updater(current), 80));
+      if (contactNameError) setContactNameError("");
+      return;
+    }
+
+    if (field === "contactPhone") {
+      setContactPhone((current) =>
+        clampText(sanitizePhoneValue(updater(current)), 25),
+      );
+      if (contactPhoneError) setContactPhoneError("");
+    }
+  }
+
+  function handleKeyboardKey(key: string) {
+    if (!activeField) return;
+
+    if (key === "BACKSPACE") {
+      updateActiveFieldValue((current) => current.slice(0, -1));
+      return;
+    }
+
+    if (key === "CLEAR") {
+      updateActiveFieldValue(() => "");
+      return;
+    }
+
+    if (key === "SPACE") {
+      if (activeField === "contactPhone") return;
+      updateActiveFieldValue((current) => `${current} `);
+      return;
+    }
+
+    if (key === "DONE") {
+      closeKeyboard();
+      return;
+    }
+
+    if (key === "SHIFT") {
+      if (activeField === "contactPhone") return;
+      setKeyboardUppercase((current) => !current);
+      return;
+    }
+
+    const nextValue =
+      activeField === "contactPhone"
+        ? key
+        : keyboardUppercase
+        ? key.toUpperCase()
+        : key.toLowerCase();
+
+    updateActiveFieldValue((current) => `${current}${nextValue}`);
+
+    if (keyboardUppercase && activeField !== "contactPhone") {
+      setKeyboardUppercase(false);
+    }
+  }
+
   function handleSelectRating(value: number) {
     setRating(value);
     setTagIds([]);
@@ -190,6 +304,8 @@ export default function FeedbackKiosk() {
     setContactPhoneError("");
     setContactMessage("");
     setContactConsent(false);
+    setActiveField(null);
+    setKeyboardUppercase(false);
     setStep("tags");
   }
 
@@ -206,10 +322,12 @@ export default function FeedbackKiosk() {
 
     if (!trimmedComment) {
       setCommentError("Informe seu comentário para continuar.");
+      openKeyboard("comment");
       return;
     }
 
     setCommentError("");
+    closeKeyboard();
 
     if (isNegativeRating) {
       setStep("contact");
@@ -245,9 +363,15 @@ export default function FeedbackKiosk() {
     }
 
     if (hasError) {
+      if (!trimmedName) {
+        openKeyboard("contactName");
+      } else if (!trimmedPhone) {
+        openKeyboard("contactPhone");
+      }
       return;
     }
 
+    closeKeyboard();
     void handleSubmit(false, "send");
   }
 
@@ -324,6 +448,7 @@ export default function FeedbackKiosk() {
     try {
       setSubmittingAction(action);
       clearInactivityTimer();
+      closeKeyboard();
 
       await api.post("/kiosk/feedback", {
         token: kioskToken,
@@ -361,6 +486,7 @@ export default function FeedbackKiosk() {
     contactPhone,
     contactMessage,
     contactConsent,
+    activeField,
   ]);
 
   useEffect(() => {
@@ -531,6 +657,12 @@ export default function FeedbackKiosk() {
     };
   }, []);
 
+  useEffect(() => {
+    if (step !== "comment" && step !== "contact") {
+      closeKeyboard();
+    }
+  }, [step]);
+
   function getErrorTitle() {
     switch (kioskErrorType) {
       case "missing_token":
@@ -563,9 +695,158 @@ export default function FeedbackKiosk() {
     }
   }
 
+  function renderTextKeyboard() {
+    return (
+      <div className="mt-6 w-full max-w-4xl rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur md:p-5">
+        <div className="space-y-3">
+          {KEYBOARD_ROWS.map((row, rowIndex) => (
+            <div
+              key={`row-${rowIndex}`}
+              className="flex justify-center gap-2 md:gap-3"
+            >
+              {row.map((key) => {
+                const label = keyboardUppercase ? key.toUpperCase() : key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleKeyboardKey(key)}
+                    className="flex h-12 min-w-[2.4rem] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-3 text-base font-semibold transition active:scale-95 md:h-14 md:min-w-[3.1rem] md:text-lg"
+                    style={{ color: resolvedTextColor }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+
+          <div className="flex flex-wrap justify-center gap-2 md:gap-3">
+            <button
+              type="button"
+              onClick={() => handleKeyboardKey("SHIFT")}
+              className="flex h-12 min-w-[84px] items-center justify-center rounded-2xl border px-4 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              style={{
+                borderColor: keyboardUppercase
+                  ? resolvedPrimaryColor
+                  : "rgba(255,255,255,0.1)",
+                backgroundColor: keyboardUppercase
+                  ? resolvedPrimaryColor
+                  : "rgba(255,255,255,0.08)",
+                color: keyboardUppercase
+                  ? resolvedButtonTextColor
+                  : resolvedTextColor,
+              }}
+            >
+              Shift
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleKeyboardKey("SPACE")}
+              className="flex h-12 min-w-[160px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-5 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[240px] md:text-base"
+              style={{ color: resolvedTextColor }}
+            >
+              Espaço
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleKeyboardKey("BACKSPACE")}
+              className="flex h-12 min-w-[84px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              style={{ color: resolvedTextColor }}
+            >
+              Apagar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleKeyboardKey("CLEAR")}
+              className="flex h-12 min-w-[84px] items-center justify-center rounded-2xl border border-white/10 bg-white/10 px-4 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              style={{ color: resolvedTextColor }}
+            >
+              Limpar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleKeyboardKey("DONE")}
+              className="flex h-12 min-w-[84px] items-center justify-center rounded-2xl px-4 text-sm font-semibold transition active:scale-95 md:h-14 md:min-w-[100px] md:text-base"
+              style={{
+                backgroundColor: resolvedPrimaryColor,
+                color: resolvedButtonTextColor,
+              }}
+            >
+              Ok
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPhoneKeyboard() {
+    return (
+      <div className="mt-6 w-full max-w-md rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur md:p-5">
+        <div className="space-y-3">
+          {PHONE_KEYS.map((row, rowIndex) => (
+            <div
+              key={`phone-row-${rowIndex}`}
+              className="grid grid-cols-3 gap-3"
+            >
+              {row.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleKeyboardKey(key)}
+                  className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-xl font-semibold transition active:scale-95 md:h-16"
+                  style={{ color: resolvedTextColor }}
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
+          ))}
+
+          <div className="grid grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => handleKeyboardKey("CLEAR")}
+              className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold transition active:scale-95 md:h-16 md:text-base"
+              style={{ color: resolvedTextColor }}
+            >
+              Limpar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleKeyboardKey("BACKSPACE")}
+              className="flex h-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-sm font-semibold transition active:scale-95 md:h-16 md:text-base"
+              style={{ color: resolvedTextColor }}
+            >
+              Apagar
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleKeyboardKey("DONE")}
+              className="flex h-14 items-center justify-center rounded-2xl text-sm font-semibold transition active:scale-95 md:h-16 md:text-base"
+              style={{
+                backgroundColor: resolvedPrimaryColor,
+                color: resolvedButtonTextColor,
+              }}
+            >
+              Ok
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <main
-      className="relative h-screen overflow-hidden select-none px-4 py-6 md:px-8 md:py-10"
+      className="relative h-screen overflow-hidden select-none px-4 py-4 md:px-8 md:py-6"
       style={{
         backgroundColor,
         color: textColor,
@@ -587,397 +868,442 @@ export default function FeedbackKiosk() {
         </div>
       ) : null}
 
-      <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center overflow-hidden">
+      <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-center overflow-hidden">
         <div
-          className="max-h-full w-full overflow-hidden rounded-[32px] border border-white/10 p-6 shadow-2xl backdrop-blur md:p-10"
+          className="flex max-h-full w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8"
           style={{ backgroundColor: cardBackgroundColor }}
         >
-          {step !== "error" && step !== "done" ? (
-            <header className="mb-8 text-center">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={companyName}
-                  className="mx-auto mb-5 h-16 w-auto object-contain md:h-20"
+          <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
+            {step !== "error" && step !== "done" ? (
+              <header className="mb-6 text-center">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={companyName}
+                    className="mx-auto mb-4 h-14 w-auto object-contain md:h-18"
+                  />
+                ) : null}
+
+                <p
+                  className="text-sm uppercase tracking-[0.28em] opacity-90"
+                  style={{ color: resolvedPrimaryColor }}
+                >
+                  {companyName}
+                </p>
+              </header>
+            ) : null}
+
+            {step === "rating" && (
+              <section className="text-center">
+                <h1 className="text-3xl font-bold md:text-5xl">{heroTitle}</h1>
+
+                <p className="mx-auto mt-4 max-w-2xl text-base opacity-90 md:text-xl">
+                  {heroSubtitle}
+                </p>
+
+                <div
+                  className="mx-auto mt-6 h-1.5 w-28 rounded-full"
+                  style={{ backgroundColor: resolvedPrimaryColor }}
                 />
-              ) : null}
 
-              <p
-                className="text-sm uppercase tracking-[0.28em] opacity-90"
-                style={{ color: resolvedPrimaryColor }}
-              >
-                {companyName}
-              </p>
-            </header>
-          ) : null}
+                <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
+                  {RATING_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleSelectRating(option.value)}
+                      className="flex min-h-[150px] flex-col items-center justify-center rounded-3xl p-6 transition active:scale-95 md:min-h-[190px] md:p-8"
+                      style={{
+                        border: `1px solid ${resolvedPrimaryColor}55`,
+                        backgroundColor: `${resolvedPrimaryColor}14`,
+                        boxShadow: `inset 0 0 0 1px ${resolvedPrimaryColor}10`,
+                      }}
+                    >
+                      <span className="text-5xl md:text-6xl">{option.emoji}</span>
+                      <span
+                        className="mt-4 text-base font-semibold md:text-lg"
+                        style={{ color: resolvedButtonTextColor }}
+                      >
+                        {option.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
-          {step === "rating" && (
-            <section className="text-center">
-              <h1 className="text-3xl font-bold md:text-5xl">{heroTitle}</h1>
+            {step === "tags" && (
+              <section className="text-center">
+                <p className="text-sm md:text-base opacity-80">
+                  Avaliação selecionada:
+                  <span className="ml-2 font-semibold">
+                    {selectedRating?.emoji} {selectedRating?.label}
+                  </span>
+                </p>
 
-              <p className="mx-auto mt-4 max-w-2xl text-base opacity-90 md:text-xl">
-                {heroSubtitle}
-              </p>
+                <h2 className="mt-4 text-3xl font-bold md:text-5xl">
+                  O que mais influenciou sua experiência?
+                </h2>
 
-              <div
-                className="mx-auto mt-6 h-1.5 w-28 rounded-full"
-                style={{ backgroundColor: resolvedPrimaryColor }}
-              />
+                <p className="mt-4 text-lg opacity-90">
+                  Você pode marcar uma ou mais opções.
+                </p>
 
-              <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-5 md:gap-5">
-                {RATING_OPTIONS.map((option) => (
+                {tagOptions.length > 0 ? (
+                  <div className="mt-8 grid gap-4 md:grid-cols-2">
+                    {tagOptions.map((tag) => {
+                      const active = tagIds.includes(tag.id);
+
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => handleToggleTag(tag.id)}
+                          className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
+                            active
+                              ? ""
+                              : "border-white/10 bg-black/10 hover:bg-black/20"
+                          }`}
+                          style={
+                            active
+                              ? {
+                                  borderColor: resolvedPrimaryColor,
+                                  backgroundColor: resolvedPrimaryColor,
+                                  color: resolvedButtonTextColor,
+                                }
+                              : { color: resolvedTextColor }
+                          }
+                        >
+                          {tag.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-8 text-base opacity-75">
+                    Nenhuma opção cadastrada no momento.
+                  </p>
+                )}
+
+                <div className="mt-10 flex flex-col gap-3 md:flex-row md:justify-center">
                   <button
-                    key={option.value}
                     type="button"
-                    onClick={() => handleSelectRating(option.value)}
-                    className="flex min-h-[150px] flex-col items-center justify-center rounded-3xl p-6 transition active:scale-95 md:min-h-[190px] md:p-8"
+                    onClick={() => {
+                      setStep("rating");
+                      clearInactivityTimer();
+                    }}
+                    className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
+                  >
+                    Voltar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("comment");
+                      openKeyboard("comment");
+                    }}
+                    className="rounded-2xl px-8 py-4 text-lg font-semibold transition"
                     style={{
-                      border: `1px solid ${resolvedPrimaryColor}55`,
-                      backgroundColor: `${resolvedPrimaryColor}14`,
-                      boxShadow: `inset 0 0 0 1px ${resolvedPrimaryColor}10`,
+                      backgroundColor: resolvedPrimaryColor,
+                      color: resolvedButtonTextColor,
                     }}
                   >
-                    <span className="text-5xl md:text-6xl">{option.emoji}</span>
-                    <span
-                      className="mt-4 text-base font-semibold md:text-lg"
-                      style={{ color: resolvedButtonTextColor }}
-                    >
-                      {option.label}
-                    </span>
+                    Continuar
                   </button>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {step === "tags" && (
-            <section className="text-center">
-              <p className="text-sm md:text-base opacity-80">
-                Avaliação selecionada:
-                <span className="ml-2 font-semibold">
-                  {selectedRating?.emoji} {selectedRating?.label}
-                </span>
-              </p>
-
-              <h2 className="mt-4 text-3xl font-bold md:text-5xl">
-                O que mais influenciou sua experiência?
-              </h2>
-
-              <p className="mt-4 text-lg opacity-90">
-                Você pode marcar uma ou mais opções.
-              </p>
-
-              {tagOptions.length > 0 ? (
-                <div className="mt-8 grid gap-4 md:grid-cols-2">
-                  {tagOptions.map((tag) => {
-                    const active = tagIds.includes(tag.id);
-
-                    return (
-                      <button
-                        key={tag.id}
-                        type="button"
-                        onClick={() => handleToggleTag(tag.id)}
-                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
-                          active
-                            ? ""
-                            : "border-white/10 bg-black/10 hover:bg-black/20"
-                        }`}
-                        style={
-                          active
-                            ? {
-                                borderColor: resolvedPrimaryColor,
-                                backgroundColor: resolvedPrimaryColor,
-                                color: resolvedButtonTextColor,
-                              }
-                            : { color: resolvedTextColor }
-                        }
-                      >
-                        {tag.name}
-                      </button>
-                    );
-                  })}
                 </div>
-              ) : (
-                <p className="mt-8 text-base opacity-75">
-                  Nenhuma opção cadastrada no momento.
-                </p>
-              )}
+              </section>
+            )}
 
-              <div className="mt-10 flex flex-col gap-3 md:flex-row md:justify-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep("rating");
-                    clearInactivityTimer();
-                  }}
-                  className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
-                >
-                  Voltar
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStep("comment")}
-                  className="rounded-2xl px-8 py-4 text-lg font-semibold transition"
-                  style={{
-                    backgroundColor: resolvedPrimaryColor,
-                    color: resolvedButtonTextColor,
-                  }}
-                >
-                  Continuar
-                </button>
-              </div>
-            </section>
-          )}
-
-          {step === "comment" && (
-            <section className="text-center">
-              <p className="text-sm md:text-base opacity-80">
-                Avaliação:
-                <span className="ml-2 font-semibold">
-                  {selectedRating?.emoji} {selectedRating?.label}
-                </span>
-              </p>
-
-              <h2 className="mt-4 text-3xl font-bold md:text-5xl">
-                Deseja deixar um comentário?
-              </h2>
-
-              <p className="mt-4 text-lg opacity-90">Essa etapa é obrigatória.</p>
-
-              <div className="mx-auto mt-8 max-w-3xl">
-                <textarea
-                  value={comment}
-                  onChange={(e) => {
-                    setComment(e.target.value);
-                    if (commentError) setCommentError("");
-                  }}
-                  onKeyDown={handleTextareaEnterBlur}
-                  placeholder="Escreva aqui sua experiência..."
-                  className="min-h-[180px] w-full resize-none rounded-3xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
-                  style={{
-                    color: resolvedTextColor,
-                    userSelect: "none",
-                    WebkitUserSelect: "none",
-                    WebkitTouchCallout: "none",
-                  }}
-                />
-
-                {commentError ? (
-                  <p className="mt-3 text-sm text-rose-300">{commentError}</p>
-                ) : null}
-              </div>
-
-              <div className="mt-10 flex flex-col gap-3 md:flex-row md:justify-center">
-                <button
-                  type="button"
-                  onClick={() => setStep("tags")}
-                  className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
-                >
-                  Voltar
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSubmitCommentStep}
-                  disabled={submittingAction !== null}
-                  className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
-                  style={{
-                    backgroundColor: resolvedPrimaryColor,
-                    color: resolvedButtonTextColor,
-                  }}
-                >
-                  {isNegativeRating
-                    ? "Continuar"
-                    : submittingAction === "send"
-                    ? "Enviando..."
-                    : "Enviar"}
-                </button>
-              </div>
-            </section>
-          )}
-
-          {step === "contact" && (
-            <section className="text-center">
-              <p className="text-sm md:text-base opacity-80">
-                Avaliação:
-                <span className="ml-2 font-semibold">
-                  {selectedRating?.emoji} {selectedRating?.label}
-                </span>
-              </p>
-
-              <h2 className="mt-4 text-3xl font-bold md:text-5xl">
-                Deseja se identificar?
-              </h2>
-
-              <p className="mt-4 text-lg opacity-90">
-                Se quiser, deixe seus dados para que a equipe possa entrar em
-                contato sobre sua experiência.
-              </p>
-
-              <div className="mx-auto mt-8 grid max-w-3xl gap-4">
-                <div>
-                  <input
-                    value={contactName}
-                    onChange={(e) => {
-                      setContactName(e.target.value);
-                      if (contactNameError) setContactNameError("");
-                    }}
-                    placeholder="Seu nome"
-                    className="w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
-                    style={{ color: resolvedTextColor }}
-                  />
-                  {contactNameError ? (
-                    <p className="mt-2 text-left text-sm text-rose-300">
-                      {contactNameError}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div>
-                  <input
-                    value={contactPhone}
-                    onChange={(e) => {
-                      setContactPhone(e.target.value);
-                      if (contactPhoneError) setContactPhoneError("");
-                    }}
-                    placeholder="Telefone ou WhatsApp"
-                    className="w-full rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
-                    style={{ color: resolvedTextColor }}
-                  />
-                  {contactPhoneError ? (
-                    <p className="mt-2 text-left text-sm text-rose-300">
-                      {contactPhoneError}
-                    </p>
-                  ) : null}
-                </div>
-
-                <textarea
-                  value={contactMessage}
-                  onChange={(e) => setContactMessage(e.target.value)}
-                  onKeyDown={handleTextareaEnterBlur}
-                  placeholder="Mensagem adicional (opcional)"
-                  className="min-h-[120px] w-full resize-none rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
-                  style={{
-                    color: resolvedTextColor,
-                    userSelect: "none",
-                    WebkitUserSelect: "none",
-                    WebkitTouchCallout: "none",
-                  }}
-                />
-
-                <label className="mt-1 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-4 text-left">
-                  <input
-                    type="checkbox"
-                    checked={contactConsent}
-                    onChange={(e) => setContactConsent(e.target.checked)}
-                    className="mt-1 h-5 w-5 rounded border-white/20"
-                  />
-                  <span className="text-sm opacity-90 md:text-base">
-                    Autorizo o contato da equipe sobre este atendimento.
+            {step === "comment" && (
+              <section className="text-center">
+                <p className="text-sm md:text-base opacity-80">
+                  Avaliação:
+                  <span className="ml-2 font-semibold">
+                    {selectedRating?.emoji} {selectedRating?.label}
                   </span>
-                </label>
-              </div>
+                </p>
 
-              <div className="mt-10 flex flex-col gap-3 md:flex-row md:justify-center">
-                <button
-                  type="button"
-                  onClick={() => setStep("comment")}
-                  className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
+                <h2 className="mt-4 text-3xl font-bold md:text-5xl">
+                  Deseja deixar um comentário?
+                </h2>
+
+                <p className="mt-4 text-lg opacity-90">Essa etapa é obrigatória.</p>
+
+                <div className="mx-auto mt-8 max-w-3xl">
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openKeyboard("comment")}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        openKeyboard("comment");
+                      }
+                    }}
+                    className={`min-h-[180px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${
+                      activeField === "comment"
+                        ? "border-white/30"
+                        : "border-white/10"
+                    }`}
+                    style={{ color: resolvedTextColor }}
+                  >
+                    {comment ? (
+                      <span className="whitespace-pre-wrap break-words">
+                        {comment}
+                      </span>
+                    ) : (
+                      <span className="opacity-45">
+                        Escreva aqui sua experiência...
+                      </span>
+                    )}
+                  </div>
+
+                  {commentError ? (
+                    <p className="mt-3 text-sm text-rose-300">{commentError}</p>
+                  ) : null}
+                </div>
+
+                {activeField === "comment" ? renderTextKeyboard() : null}
+
+                <div className="mt-8 flex flex-col gap-3 md:flex-row md:justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeKeyboard();
+                      setStep("tags");
+                    }}
+                    className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
+                  >
+                    Voltar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSubmitCommentStep}
+                    disabled={submittingAction !== null}
+                    className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
+                    style={{
+                      backgroundColor: resolvedPrimaryColor,
+                      color: resolvedButtonTextColor,
+                    }}
+                  >
+                    {isNegativeRating
+                      ? "Continuar"
+                      : submittingAction === "send"
+                      ? "Enviando..."
+                      : "Enviar"}
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {step === "contact" && (
+              <section className="text-center">
+                <p className="text-sm md:text-base opacity-80">
+                  Avaliação:
+                  <span className="ml-2 font-semibold">
+                    {selectedRating?.emoji} {selectedRating?.label}
+                  </span>
+                </p>
+
+                <h2 className="mt-4 text-3xl font-bold md:text-5xl">
+                  Deseja se identificar?
+                </h2>
+
+                <p className="mt-4 text-lg opacity-90">
+                  Se quiser, deixe seus dados para que a equipe possa entrar em
+                  contato sobre sua experiência.
+                </p>
+
+                <div className="mx-auto mt-8 grid max-w-3xl gap-4">
+                  <div>
+                    <label className="mb-2 block text-left text-sm font-medium opacity-80">
+                      Seu nome
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => openKeyboard("contactName")}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactName"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
+                      style={{ color: resolvedTextColor }}
+                    >
+                      {contactName || (
+                        <span className="opacity-45">Toque para digitar</span>
+                      )}
+                    </button>
+                    {contactNameError ? (
+                      <p className="mt-2 text-left text-sm text-rose-300">
+                        {contactNameError}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-left text-sm font-medium opacity-80">
+                      Telefone ou WhatsApp
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => openKeyboard("contactPhone")}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactPhone"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
+                      style={{ color: resolvedTextColor }}
+                    >
+                      {contactPhone || (
+                        <span className="opacity-45">Toque para digitar</span>
+                      )}
+                    </button>
+                    {contactPhoneError ? (
+                      <p className="mt-2 text-left text-sm text-rose-300">
+                        {contactPhoneError}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-left text-sm font-medium opacity-80">
+                      Mensagem adicional
+                    </label>
+                    <textarea
+                      value={contactMessage}
+                      onChange={(e) => setContactMessage(e.target.value)}
+                      placeholder="Mensagem adicional (opcional)"
+                      className="min-h-[120px] w-full resize-none rounded-2xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
+                      style={{
+                        color: resolvedTextColor,
+                        userSelect: "none",
+                        WebkitUserSelect: "none",
+                        WebkitTouchCallout: "none",
+                      }}
+                    />
+                  </div>
+
+                  <label className="mt-1 flex items-start gap-3 rounded-2xl border border-white/10 bg-black/10 px-4 py-4 text-left">
+                    <input
+                      type="checkbox"
+                      checked={contactConsent}
+                      onChange={(e) => setContactConsent(e.target.checked)}
+                      className="mt-1 h-5 w-5 rounded border-white/20"
+                    />
+                    <span className="text-sm opacity-90 md:text-base">
+                      Autorizo o contato da equipe sobre este atendimento.
+                    </span>
+                  </label>
+                </div>
+
+                {activeField === "contactName" ? renderTextKeyboard() : null}
+                {activeField === "contactPhone" ? renderPhoneKeyboard() : null}
+
+                <div className="mt-8 flex flex-col gap-3 md:flex-row md:justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeKeyboard();
+                      setStep("comment");
+                    }}
+                    className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25"
+                  >
+                    Voltar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmit(false, "skip")}
+                    disabled={submittingAction !== null}
+                    className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25 disabled:opacity-60"
+                  >
+                    {submittingAction === "skip" ? "Enviando..." : "Pular e enviar"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSubmitWithContact}
+                    disabled={submittingAction !== null}
+                    className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
+                    style={{
+                      backgroundColor: resolvedPrimaryColor,
+                      color: resolvedButtonTextColor,
+                    }}
+                  >
+                    {submittingAction === "send" ? "Enviando..." : "Enviar"}
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {step === "done" && (
+              <section className="text-center">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={companyName}
+                    className="mx-auto mb-5 h-16 w-auto object-contain md:h-20"
+                  />
+                ) : null}
+
+                <p
+                  className="text-sm uppercase tracking-[0.28em] opacity-90"
+                  style={{ color: resolvedPrimaryColor }}
                 >
-                  Voltar
-                </button>
+                  {companyName}
+                </p>
 
-                <button
-                  type="button"
-                  onClick={() => void handleSubmit(false, "skip")}
-                  disabled={submittingAction !== null}
-                  className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25 disabled:opacity-60"
-                >
-                  {submittingAction === "skip" ? "Enviando..." : "Pular e enviar"}
-                </button>
+                <h2 className="mt-6 text-3xl font-bold md:text-5xl">
+                  Obrigado pela sua avaliação
+                </h2>
 
-                <button
-                  type="button"
-                  onClick={handleSubmitWithContact}
-                  disabled={submittingAction !== null}
-                  className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
-                  style={{
-                    backgroundColor: resolvedPrimaryColor,
-                    color: resolvedButtonTextColor,
-                  }}
-                >
-                  {submittingAction === "send" ? "Enviando..." : "Enviar"}
-                </button>
-              </div>
-            </section>
-          )}
-
-          {step === "done" && (
-            <section className="text-center">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={companyName}
-                  className="mx-auto mb-5 h-16 w-auto object-contain md:h-20"
+                <div
+                  className="mx-auto mt-6 h-1.5 w-28 rounded-full"
+                  style={{ backgroundColor: resolvedPrimaryColor }}
                 />
-              ) : null}
 
-              <p
-                className="text-sm uppercase tracking-[0.28em] opacity-90"
-                style={{ color: resolvedPrimaryColor }}
-              >
-                {companyName}
-              </p>
+                <p className="mx-auto mt-4 max-w-2xl text-lg opacity-90">
+                  {thankYouMessage}
+                </p>
 
-              <h2 className="mt-6 text-3xl font-bold md:text-5xl">
-                Obrigado pela sua avaliação
-              </h2>
+                <p className="mt-6 text-sm opacity-70 md:text-base">
+                  Esta tela será reiniciada automaticamente.
+                </p>
+              </section>
+            )}
 
-              <div
-                className="mx-auto mt-6 h-1.5 w-28 rounded-full"
-                style={{ backgroundColor: resolvedPrimaryColor }}
-              />
+            {step === "error" && (
+              <section className="text-center">
+                <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-rose-500/15 text-5xl">
+                  {getErrorEmoji()}
+                </div>
 
-              <p className="mx-auto mt-4 max-w-2xl text-lg opacity-90">
-                {thankYouMessage}
-              </p>
+                <h2 className="mt-6 text-3xl font-bold md:text-5xl">
+                  {getErrorTitle()}
+                </h2>
 
-              <p className="mt-6 text-sm opacity-70 md:text-base">
-                Esta tela será reiniciada automaticamente.
-              </p>
-            </section>
-          )}
+                <p className="mx-auto mt-4 max-w-2xl text-lg opacity-90">
+                  {getErrorDescription()}
+                </p>
 
-          {step === "error" && (
-            <section className="text-center">
-              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-rose-500/15 text-5xl">
-                {getErrorEmoji()}
-              </div>
-
-              <h2 className="mt-6 text-3xl font-bold md:text-5xl">
-                {getErrorTitle()}
-              </h2>
-
-              <p className="mx-auto mt-4 max-w-2xl text-lg opacity-90">
-                {getErrorDescription()}
-              </p>
-
-              {kioskErrorType === "request_error" ? (
-                <button
-                  type="button"
-                  onClick={() => resetFlow()}
-                  className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold transition"
-                  style={{
-                    backgroundColor: resolvedPrimaryColor,
-                    color: resolvedButtonTextColor,
-                  }}
-                >
-                  Tentar novamente
-                </button>
-              ) : null}
-            </section>
-          )}
+                {kioskErrorType === "request_error" ? (
+                  <button
+                    type="button"
+                    onClick={() => resetFlow()}
+                    className="mt-8 rounded-2xl px-8 py-4 text-lg font-semibold transition"
+                    style={{
+                      backgroundColor: resolvedPrimaryColor,
+                      color: resolvedButtonTextColor,
+                    }}
+                  >
+                    Tentar novamente
+                  </button>
+                ) : null}
+              </section>
+            )}
+          </div>
         </div>
       </div>
 
