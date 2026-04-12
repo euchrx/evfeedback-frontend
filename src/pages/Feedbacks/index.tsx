@@ -587,7 +587,6 @@ export default function FeedbackKiosk() {
 
     if (!trimmedComment) {
       setCommentError("Informe seu comentário para continuar.");
-      openKeyboard("comment");
       return;
     }
 
@@ -1028,7 +1027,7 @@ export default function FeedbackKiosk() {
             </div>
           ))}
 
-          <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2">
+          <div className="grid grid-cols-[auto_1fr_auto_auto] gap-2">
             <button
               type="button"
               onPointerDown={handleKeyPress("SHIFT")}
@@ -1060,7 +1059,7 @@ export default function FeedbackKiosk() {
             <button
               type="button"
               onPointerDown={handleKeyPress("LEFT")}
-              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+              className="hidden h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
               style={{ color: resolvedTextColor }}
             >
               ←
@@ -1069,7 +1068,7 @@ export default function FeedbackKiosk() {
             <button
               type="button"
               onPointerDown={handleKeyPress("RIGHT")}
-              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+              className="hidden h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
               style={{ color: resolvedTextColor }}
             >
               →
@@ -1109,6 +1108,24 @@ export default function FeedbackKiosk() {
                 {key}
               </button>
             ))}
+
+            <button
+              type="button"
+              onPointerDown={handleKeyPress("LEFT")}
+              className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[68px]"
+              style={{ color: resolvedTextColor }}
+            >
+              ←
+            </button>
+
+            <button
+              type="button"
+              onPointerDown={handleKeyPress("RIGHT")}
+              className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[68px]"
+              style={{ color: resolvedTextColor }}
+            >
+              →
+            </button>
 
             <button
               type="button"
@@ -1364,7 +1381,6 @@ export default function FeedbackKiosk() {
                     type="button"
                     onClick={() => {
                       setStep("comment");
-                      openKeyboard("comment");
                     }}
                     className="rounded-2xl px-8 py-4 text-lg font-semibold transition"
                     style={{
@@ -1388,7 +1404,7 @@ export default function FeedbackKiosk() {
                 </p>
 
                 <h2 className="mt-4 text-3xl font-bold md:text-5xl">
-                  Deixe sua opinião no campo abaixo:
+                 Por favor, deixe sua opinião abaixo.
                 </h2>
 
                 <p className="mt-4 text-lg opacity-90">Essa etapa é obrigatória.</p>
@@ -1682,7 +1698,7 @@ export default function FeedbackKiosk() {
           : "translate-y-full opacity-0 pointer-events-none"
           }`}
       >
-        <div className="mx-auto w-full max-w-6xl px-3 pb-3 md:px-6 md:pb-6">
+        <div className="mx-auto w-full max-w-6xl px-3 md:px-6">
           <div
             className="rounded-t-[28px] border border-white/10 border-b-0 p-4 shadow-2xl backdrop-blur-xl md:p-5"
             style={{ backgroundColor: "rgba(2, 6, 23, 0.97)" }}
