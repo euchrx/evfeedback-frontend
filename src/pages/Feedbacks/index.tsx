@@ -155,6 +155,15 @@ export default function FeedbackKiosk() {
     setIsSubmitting(false);
   }
 
+  function handleTextareaEnterBlur(
+    event: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.blur();
+    }
+  }
+
   function restartInactivityTimer() {
     if (!rating || step === "rating" || step === "done" || step === "error") {
       clearInactivityTimer();
@@ -619,18 +628,17 @@ export default function FeedbackKiosk() {
                         key={tag.id}
                         type="button"
                         onClick={() => handleToggleTag(tag.id)}
-                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
-                          active
-                            ? ""
-                            : "border-white/10 bg-black/10 hover:bg-black/20"
-                        }`}
+                        className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${active
+                          ? ""
+                          : "border-white/10 bg-black/10 hover:bg-black/20"
+                          }`}
                         style={
                           active
                             ? {
-                                borderColor: resolvedPrimaryColor,
-                                backgroundColor: resolvedPrimaryColor,
-                                color: resolvedButtonTextColor,
-                              }
+                              borderColor: resolvedPrimaryColor,
+                              backgroundColor: resolvedPrimaryColor,
+                              color: resolvedButtonTextColor,
+                            }
                             : { color: resolvedTextColor }
                         }
                       >
@@ -694,6 +702,7 @@ export default function FeedbackKiosk() {
                     setComment(e.target.value);
                     if (commentError) setCommentError("");
                   }}
+                  onKeyDown={handleTextareaEnterBlur}
                   placeholder="Escreva aqui sua experiência..."
                   className="min-h-[180px] w-full resize-none rounded-3xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none placeholder:text-white/45 focus:border-white/30 md:text-lg"
                   style={{
