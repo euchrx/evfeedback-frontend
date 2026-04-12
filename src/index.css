@@ -11,3 +11,24 @@ body,
 body {
   touch-action: manipulation;
 }
+
+@keyframes kiosk-caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.kiosk-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.15em;
+  margin-left: 1px;
+  vertical-align: -0.12em;
+  background: currentColor;
+  animation: kiosk-caret-blink 1s steps(1, end) infinite;
+}

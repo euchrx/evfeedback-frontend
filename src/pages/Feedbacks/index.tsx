@@ -1198,7 +1198,7 @@ export default function FeedbackKiosk() {
       <span className="whitespace-pre-wrap break-words leading-relaxed">
         {before}
         {isActive ? (
-          <span className="ml-[1px] inline-block h-5 w-[2px] animate-pulse bg-white align-middle" />
+          <span className="kiosk-caret" />
         ) : null}
         {after}
       </span>
@@ -1414,7 +1414,7 @@ export default function FeedbackKiosk() {
                       renderTextWithCursor(comment, "comment")
                     ) : activeField === "comment" ? (
                       <span className="opacity-45">
-                        <span className="ml-[1px] inline-block h-5 w-[2px] animate-pulse bg-white align-middle" />
+                        <span className="kiosk-caret" />
                       </span>
                     ) : (
                       <span className="opacity-45">Escreva aqui sua experiência...</span>
@@ -1494,7 +1494,7 @@ export default function FeedbackKiosk() {
                         renderTextWithCursor(contactName, "contactName")
                       ) : activeField === "contactName" ? (
                         <span className="opacity-45">
-                          <span className="ml-[1px] inline-block h-5 w-[2px] animate-pulse bg-white align-middle" />
+                          <span className="kiosk-caret" />
                         </span>
                       ) : (
                         <span className="opacity-45">Toque para digitar</span>
@@ -1549,7 +1549,7 @@ export default function FeedbackKiosk() {
                         renderTextWithCursor(contactMessage, "contactMessage")
                       ) : activeField === "contactMessage" ? (
                         <span className="opacity-45">
-                          <span className="ml-[1px] inline-block h-5 w-[2px] animate-pulse bg-white align-middle" />
+                          <span className="kiosk-caret" />
                         </span>
                       ) : (
                         <span className="opacity-45">Toque para digitar</span>
