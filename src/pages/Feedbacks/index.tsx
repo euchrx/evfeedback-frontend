@@ -288,7 +288,19 @@ export default function FeedbackKiosk() {
 
     if (field === "contactPhone") {
       setKeyboardUppercase(false);
+      return;
     }
+
+    const currentValue =
+      field === "comment"
+        ? comment
+        : field === "contactName"
+          ? contactName
+          : field === "contactMessage"
+            ? contactMessage
+            : "";
+
+    setKeyboardUppercase(currentValue.trim().length === 0);
   }
 
   function updateActiveFieldValue(
