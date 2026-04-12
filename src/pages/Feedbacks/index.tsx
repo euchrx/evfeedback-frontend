@@ -489,10 +489,14 @@ export default function FeedbackKiosk() {
   }
 
   function handleAccentSelect(accentedChar: string) {
-    insertCharacter(accentedChar);
+    updateActiveFieldValue((current) => `${current}${accentedChar}`);
     setAccentMenu(null);
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
+
+    if (activeField !== "contactPhone") {
+      setKeyboardUppercase(false);
+    }
   }
 
   function handleSelectRating(value: number) {
@@ -927,19 +931,11 @@ export default function FeedbackKiosk() {
                 const label = keyboardUppercase ? key.toUpperCase() : key;
 
                 return (
-                  <button
-                    key={key}
-                    type="button"
-                    onPointerDown={handleLetterPointerDown(key)}
-                    onPointerUp={handleLetterPointerUp(key)}
-                    onPointerLeave={handleLetterPointerLeave}
-                    className="relative flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-transform active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
-                    style={{ color: resolvedTextColor }}
-                  >
+                  <div key={key} className="relative">
                     {accentMenu?.key === key ? (
                       <div
                         className="absolute -top-14 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-2xl border border-white/10 bg-slate-900/95 px-2 py-2 shadow-2xl"
-                        onPointerDown={(e) => e.preventDefault()}
+                        onPointerDown={(e) => e.stopPropagation()}
                       >
                         {accentMenu.options.map((option) => (
                           <button
@@ -947,6 +943,7 @@ export default function FeedbackKiosk() {
                             type="button"
                             onPointerDown={(e) => {
                               e.preventDefault();
+                              e.stopPropagation();
                               handleAccentSelect(option);
                             }}
                             className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-xl border border-white/8 bg-white/10 px-2 text-base font-medium transition-transform active:scale-95"
@@ -958,8 +955,17 @@ export default function FeedbackKiosk() {
                       </div>
                     ) : null}
 
-                    {label}
-                  </button>
+                    <button
+                      type="button"
+                      onPointerDown={handleLetterPointerDown(key)}
+                      onPointerUp={handleLetterPointerUp(key)}
+                      onPointerLeave={handleLetterPointerLeave}
+                      className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-transform active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
+                      style={{ color: resolvedTextColor }}
+                    >
+                      {label}
+                    </button>
+                  </div>
                 );
               })}
             </div>
