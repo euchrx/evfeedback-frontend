@@ -343,38 +343,6 @@ export default function FeedbackKiosk() {
     setKeyboardUppercase(currentValue.trim().length === 0);
   }
 
-  function updateActiveFieldValue(
-    updater: (current: string) => string,
-    fieldOverride?: ActiveField,
-  ) {
-    const field = fieldOverride ?? activeField;
-    if (!field) return;
-
-    if (field === "comment") {
-      setComment((current) => clampText(updater(current), 300));
-      if (commentError) setCommentError("");
-      return;
-    }
-
-    if (field === "contactName") {
-      setContactName((current) => clampText(updater(current), 80));
-      if (contactNameError) setContactNameError("");
-      return;
-    }
-
-    if (field === "contactPhone") {
-      setContactPhone((current) =>
-        clampText(sanitizePhoneValue(updater(current)), 25),
-      );
-      if (contactPhoneError) setContactPhoneError("");
-      return;
-    }
-
-    if (field === "contactMessage") {
-      setContactMessage((current) => clampText(updater(current), 300));
-    }
-  }
-
   function handleKeyboardKey(key: string) {
     setAccentMenu(null);
     clearLongPressTimer();
