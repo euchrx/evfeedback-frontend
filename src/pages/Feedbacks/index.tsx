@@ -119,7 +119,8 @@ export default function FeedbackKiosk() {
     settings?.companyName?.trim() || config?.company?.name || "EvFeedback";
   const logoUrl = settings?.logoUrl?.trim() || "";
   const thankYouMessage =
-    settings?.thankYouMessage?.trim() || "Sua opinião é muito importante para nós.";
+    settings?.thankYouMessage?.trim() ||
+    "Sua opinião é muito importante para nós.";
   const primaryColor = settings?.primaryColor?.trim() || "#0ea5e9";
   const heroTitle =
     settings?.heroTitle?.trim() || "Como foi sua experiência hoje?";
@@ -499,7 +500,10 @@ export default function FeedbackKiosk() {
   useEffect(() => {
     if (step !== "error") return;
 
-    if (kioskErrorType === "missing_token" || kioskErrorType === "invalid_token") {
+    if (
+      kioskErrorType === "missing_token" ||
+      kioskErrorType === "invalid_token"
+    ) {
       return;
     }
 
@@ -635,9 +639,15 @@ export default function FeedbackKiosk() {
       };
     })();
 
-    document.addEventListener("gesturestart", preventGesture, { passive: false });
-    document.addEventListener("gesturechange", preventGesture, { passive: false });
-    document.addEventListener("gestureend", preventGesture, { passive: false });
+    document.addEventListener("gesturestart", preventGesture, {
+      passive: false,
+    });
+    document.addEventListener("gesturechange", preventGesture, {
+      passive: false,
+    });
+    document.addEventListener("gestureend", preventGesture, {
+      passive: false,
+    });
     document.addEventListener("touchstart", preventMultiTouchZoom, {
       passive: false,
     });
@@ -694,7 +704,7 @@ export default function FeedbackKiosk() {
 
   function renderTextKeyboard() {
     return (
-      <div className="mt-6 w-full max-w-4xl rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur md:p-5">
+      <div className="w-full">
         <div className="space-y-3">
           {KEYBOARD_ROWS.map((row, rowIndex) => (
             <div
@@ -784,7 +794,7 @@ export default function FeedbackKiosk() {
 
   function renderPhoneKeyboard() {
     return (
-      <div className="mt-6 w-full max-w-md rounded-[28px] border border-white/10 bg-black/20 p-4 backdrop-blur md:p-5">
+      <div className="w-full max-w-md mx-auto">
         <div className="space-y-3">
           {PHONE_KEYS.map((row, rowIndex) => (
             <div
@@ -867,7 +877,9 @@ export default function FeedbackKiosk() {
 
       <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-center overflow-hidden">
         <div
-          className="flex max-h-full w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8"
+          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height,padding-bottom] duration-300 ${
+            activeField ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]" : "max-h-full"
+          }`}
           style={{ backgroundColor: cardBackgroundColor }}
         >
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
@@ -1061,8 +1073,6 @@ export default function FeedbackKiosk() {
                   ) : null}
                 </div>
 
-                {activeField === "comment" ? renderTextKeyboard() : null}
-
                 <div className="mt-8 flex flex-col gap-3 md:flex-row md:justify-center">
                   <button
                     type="button"
@@ -1195,9 +1205,6 @@ export default function FeedbackKiosk() {
                   </label>
                 </div>
 
-                {activeField === "contactName" ? renderTextKeyboard() : null}
-                {activeField === "contactPhone" ? renderPhoneKeyboard() : null}
-
                 <div className="mt-8 flex flex-col gap-3 md:flex-row md:justify-center">
                   <button
                     type="button"
@@ -1300,6 +1307,46 @@ export default function FeedbackKiosk() {
                 ) : null}
               </section>
             )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${
+          activeField
+            ? "translate-y-0 opacity-100 pointer-events-auto"
+            : "translate-y-full opacity-0 pointer-events-none"
+        }`}
+      >
+        <div className="mx-auto w-full max-w-6xl px-3 pb-3 md:px-6 md:pb-6">
+          <div
+            className="rounded-t-[28px] border border-white/10 border-b-0 p-4 shadow-2xl backdrop-blur-xl md:p-5"
+            style={{ backgroundColor: "rgba(2, 6, 23, 0.96)" }}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <p
+                className="text-sm font-medium opacity-75"
+                style={{ color: resolvedTextColor }}
+              >
+                {activeField === "comment" && "Teclado do comentário"}
+                {activeField === "contactName" && "Teclado do nome"}
+                {activeField === "contactPhone" && "Teclado do telefone"}
+              </p>
+
+              <button
+                type="button"
+                onClick={closeKeyboard}
+                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold transition active:scale-95"
+                style={{ color: resolvedTextColor }}
+              >
+                Fechar
+              </button>
+            </div>
+
+            {activeField === "contactPhone" ? renderPhoneKeyboard() : null}
+            {activeField === "comment" || activeField === "contactName"
+              ? renderTextKeyboard()
+              : null}
           </div>
         </div>
       </div>
