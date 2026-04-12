@@ -140,9 +140,6 @@ export default function FeedbackKiosk() {
   const isNegativeRating = rating === 1 || rating === 2;
   const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
   const canApplyLiveRefresh = step === "rating" || step === "done";
-  const isKeyboardVisible =
-    (step === "comment" || step === "contact") && activeField !== null;
-  const isPhoneKeyboard = activeField === "contactPhone";
 
   function clearInactivityTimer() {
     if (inactivityTimerRef.current) {
