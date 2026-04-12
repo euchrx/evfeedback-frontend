@@ -1282,14 +1282,14 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactMessage")}
-                      className={`min-h-[120px] w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactMessage"
-                        ? "border-white/30"
-                        : "border-white/10"
+                      className={`flex min-h-[120px] w-full items-start rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactMessage"
+                          ? "border-white/30"
+                          : "border-white/10"
                         }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactMessage ? (
-                        <span className="whitespace-pre-wrap break-words">
+                        <span className="whitespace-pre-wrap break-words leading-relaxed">
                           {contactMessage}
                         </span>
                       ) : (
