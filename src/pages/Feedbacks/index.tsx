@@ -69,7 +69,9 @@ export default function FeedbackKiosk() {
   const [contactMessage, setContactMessage] = useState("");
   const [contactConsent, setContactConsent] = useState(false);
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingAction, setSubmittingAction] = useState<
+    "skip" | "send" | null
+  >(null);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
   const [apiWarning, setApiWarning] = useState("");
@@ -136,7 +138,7 @@ export default function FeedbackKiosk() {
       setContactPhoneError("");
       setContactMessage("");
       setContactConsent(false);
-      setIsSubmitting(false);
+      setSubmittingAction(null);
       return;
     }
 
@@ -152,7 +154,7 @@ export default function FeedbackKiosk() {
     setContactPhoneError("");
     setContactMessage("");
     setContactConsent(false);
-    setIsSubmitting(false);
+    setSubmittingAction(null);
   }
 
   function handleTextareaEnterBlur(
@@ -214,12 +216,12 @@ export default function FeedbackKiosk() {
       return;
     }
 
-    void handleSubmit(false);
+    void handleSubmit(false, "send");
   }
 
   function handleSubmitWithContact() {
     if (!isNegativeRating) {
-      void handleSubmit(false);
+      void handleSubmit(false, "send");
       return;
     }
 
@@ -313,11 +315,14 @@ export default function FeedbackKiosk() {
     }
   }
 
-  async function handleSubmit(skipComment = false) {
-    if (!rating || !kioskToken || isSubmitting) return;
+  async function handleSubmit(
+    skipComment = false,
+    action: "skip" | "send" = "send",
+  ) {
+    if (!rating || !kioskToken || submittingAction) return;
 
     try {
-      setIsSubmitting(true);
+      setSubmittingAction(null);
       clearInactivityTimer();
 
       await api.post("/kiosk/feedback", {
@@ -337,7 +342,7 @@ export default function FeedbackKiosk() {
       setKioskErrorType("request_error");
       setStep("error");
     } finally {
-      setIsSubmitting(false);
+      setSubmittingAction(null);
     }
   }
 
@@ -839,24 +844,24 @@ export default function FeedbackKiosk() {
 
                 <button
                   type="button"
-                  onClick={() => void handleSubmit(false)}
-                  disabled={isSubmitting}
+                  onClick={() => void handleSubmit(false, "skip")}
+                  disabled={submittingAction !== null}
                   className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25 disabled:opacity-60"
                 >
-                  {isSubmitting ? "Enviando..." : "Pular e enviar"}
+                  {submittingAction === "skip" ? "Enviando..." : "Pular e enviar"}
                 </button>
 
                 <button
                   type="button"
                   onClick={handleSubmitWithContact}
-                  disabled={isSubmitting}
+                  disabled={submittingAction !== null}
                   className="rounded-2xl px-8 py-4 text-lg font-semibold transition disabled:opacity-60"
                   style={{
-                    backgroundColor: resolvedPrimaryColor,
-                    color: resolvedButtonTextColor,
+                    backgroundColor: primaryColor,
+                    color: buttonTextColor,
                   }}
                 >
-                  {isSubmitting ? "Enviando..." : "Enviar"}
+                  {submittingAction === "send" ? "Enviando..." : "Enviar"}
                 </button>
               </div>
             </section>
