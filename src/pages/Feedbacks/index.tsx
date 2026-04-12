@@ -779,6 +779,8 @@ export default function FeedbackKiosk() {
       clearDelayedResetTimer();
       clearKeyboardCloseTimer();
       clearLongPressTimer();
+      longPressTriggeredRef.current = false;
+      setAccentMenu(null);
     };
   }, []);
 
