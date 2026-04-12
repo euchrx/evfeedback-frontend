@@ -363,6 +363,13 @@ export default function FeedbackKiosk() {
     }
   }
 
+  function handleKeyPress(key: string) {
+    return (event: React.PointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      handleKeyboardKey(key);
+    };
+  }
+
   function handleSelectRating(value: number) {
     setRating(value);
     setTagIds([]);
@@ -795,8 +802,7 @@ export default function FeedbackKiosk() {
                   <button
                     key={key}
                     type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleKeyboardKey(key)}
+                    onPointerDown={handleKeyPress(key)}
                     className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-transform active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
                     style={{ color: resolvedTextColor }}
                   >
@@ -810,8 +816,7 @@ export default function FeedbackKiosk() {
           <div className="grid grid-cols-[auto_1fr_auto_auto] gap-2">
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleKeyboardKey("SHIFT")}
+              onPointerDown={handleKeyPress("SHIFT")}
               className="flex h-12 min-w-[72px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[88px]"
               style={{
                 borderColor: keyboardUppercase
@@ -830,8 +835,7 @@ export default function FeedbackKiosk() {
 
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleKeyboardKey("SPACE")}
+              onPointerDown={handleKeyPress("SPACE")}
               className="flex h-12 items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-5 text-sm font-medium transition-transform active:scale-95 md:h-14"
               style={{ color: resolvedTextColor }}
             >
@@ -840,8 +844,7 @@ export default function FeedbackKiosk() {
 
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleKeyboardKey("BACKSPACE")}
+              onPointerDown={handleKeyPress("BACKSPACE")}
               className="flex h-12 min-w-[72px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 transition-transform active:scale-95 md:h-14 md:min-w-[88px]"
               style={{ color: resolvedTextColor }}
             >
@@ -850,8 +853,7 @@ export default function FeedbackKiosk() {
 
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleKeyboardKey("DONE")}
+              onPointerDown={handleKeyPress("DONE")}
               className="flex h-12 min-w-[72px] items-center justify-center rounded-2xl px-4 transition-transform active:scale-95 md:h-14 md:min-w-[88px]"
               style={{
                 backgroundColor: resolvedPrimaryColor,
@@ -867,8 +869,7 @@ export default function FeedbackKiosk() {
               <button
                 key={key}
                 type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => handleKeyboardKey(key)}
+                onPointerDown={handleKeyPress(key)}
                 className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[68px]"
                 style={{ color: resolvedTextColor }}
               >
@@ -878,8 +879,7 @@ export default function FeedbackKiosk() {
 
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleKeyboardKey("CLEAR")}
+              onPointerDown={handleKeyPress("CLEAR")}
               className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
               style={{ color: resolvedTextColor }}
             >
@@ -904,8 +904,7 @@ export default function FeedbackKiosk() {
                 <button
                   key={key}
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleKeyboardKey(key)}
+                  onPointerDown={handleKeyPress(key)}
                   className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 text-xl font-medium transition-transform active:scale-95 md:h-16"
                   style={{ color: resolvedTextColor }}
                 >
@@ -918,8 +917,7 @@ export default function FeedbackKiosk() {
           <div className="grid grid-cols-3 gap-3">
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleKeyboardKey("CLEAR")}
+              onPointerDown={handleKeyPress("CLEAR")}
               className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 text-sm font-medium transition-transform active:scale-95 md:h-16"
               style={{ color: resolvedTextColor }}
             >
@@ -928,8 +926,7 @@ export default function FeedbackKiosk() {
 
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleKeyboardKey("BACKSPACE")}
+              onPointerDown={handleKeyPress("BACKSPACE")}
               className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 transition-transform active:scale-95 md:h-16"
               style={{ color: resolvedTextColor }}
             >
@@ -938,8 +935,7 @@ export default function FeedbackKiosk() {
 
             <button
               type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => handleKeyboardKey("DONE")}
+              onPointerDown={handleKeyPress("DONE")}
               className="flex h-14 items-center justify-center rounded-2xl transition-transform active:scale-95 md:h-16"
               style={{
                 backgroundColor: resolvedPrimaryColor,
@@ -1283,8 +1279,8 @@ export default function FeedbackKiosk() {
                       type="button"
                       onClick={() => openKeyboard("contactMessage")}
                       className={`flex min-h-[120px] w-full items-start rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactMessage"
-                          ? "border-white/30"
-                          : "border-white/10"
+                        ? "border-white/30"
+                        : "border-white/10"
                         }`}
                       style={{ color: resolvedTextColor }}
                     >
@@ -1431,8 +1427,10 @@ export default function FeedbackKiosk() {
             <div className="mb-3 flex items-center justify-end">
               <button
                 type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => closeKeyboard(true)}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  closeKeyboard(true);
+                }}
                 className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium transition-transform active:scale-95"
                 style={{ color: resolvedTextColor }}
               >
