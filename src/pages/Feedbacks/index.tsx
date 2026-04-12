@@ -1420,7 +1420,7 @@ export default function FeedbackKiosk() {
                 </p>
 
                 <h2 className="mt-4 text-3xl font-bold md:text-5xl">
-                  Deseja deixar um comentário?
+                  Deixe sua opinião no campo abaixo:
                 </h2>
 
                 <p className="mt-4 text-lg opacity-90">Essa etapa é obrigatória.</p>
