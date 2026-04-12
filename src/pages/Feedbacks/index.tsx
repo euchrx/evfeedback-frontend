@@ -129,6 +129,7 @@ export default function FeedbackKiosk() {
     key: string;
     options: string[];
   } | null>(null);
+  const [cursorPosition, setCursorPosition] = useState(0);
 
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -216,6 +217,7 @@ export default function FeedbackKiosk() {
     setActiveField(null);
     setKeyboardUppercase(false);
     setKeyboardClosing(false);
+    setCursorPosition(0);
 
     if (!kioskToken) {
       setStep("error");
@@ -320,19 +322,23 @@ export default function FeedbackKiosk() {
     setKeyboardClosing(false);
     setActiveField(field);
 
-    if (field === "contactPhone") {
-      setKeyboardUppercase(false);
-      return;
-    }
-
     const currentValue =
       field === "comment"
         ? comment
         : field === "contactName"
           ? contactName
-          : field === "contactMessage"
-            ? contactMessage
-            : "";
+          : field === "contactPhone"
+            ? contactPhone
+            : field === "contactMessage"
+              ? contactMessage
+              : "";
+
+    setCursorPosition(currentValue.length);
+
+    if (field === "contactPhone") {
+      setKeyboardUppercase(false);
+      return;
+    }
 
     setKeyboardUppercase(currentValue.trim().length === 0);
   }
@@ -373,40 +379,66 @@ export default function FeedbackKiosk() {
     setAccentMenu(null);
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
+
     if (!activeField || keyboardClosing) return;
 
+    const currentValue = getActiveFieldValue();
+    const safeCursor = Math.max(0, Math.min(cursorPosition, currentValue.length));
+
     switch (key) {
-      case "BACKSPACE":
-        updateActiveFieldValue((current) => {
-          const next = current.slice(0, -1);
+      case "BACKSPACE": {
+        if (safeCursor === 0) return;
 
-          if (activeField !== "contactPhone") {
-            setKeyboardUppercase(next.trim().length === 0);
-          }
+        const next =
+          currentValue.slice(0, safeCursor - 1) +
+          currentValue.slice(safeCursor);
 
-          return next;
-        });
-        return;
-      case "CLEAR":
-        updateActiveFieldValue(() => "");
-        return;
-      case "SPACE":
+        setActiveFieldValue(next);
+        setCursorPosition(safeCursor - 1);
+
         if (activeField !== "contactPhone") {
-          updateActiveFieldValue((current) => `${current} `);
+          setKeyboardUppercase(next.trim().length === 0);
         }
         return;
+      }
+
+      case "CLEAR":
+        setActiveFieldValue("");
+        setCursorPosition(0);
+        if (activeField !== "contactPhone") {
+          setKeyboardUppercase(true);
+        }
+        return;
+
+      case "SPACE":
+        if (activeField !== "contactPhone") {
+          insertCharacter(" ");
+        }
+        return;
+
       case "DONE":
         closeKeyboard(true);
         return;
+
       case "SHIFT":
         if (activeField !== "contactPhone") {
           setKeyboardUppercase((current) => !current);
         }
         return;
-      default: {
+
+      case "LEFT":
+        setCursorPosition((current) => Math.max(0, current - 1));
+        return;
+
+      case "RIGHT":
+        setCursorPosition((current) =>
+          Math.min(getActiveFieldValue().length, current + 1),
+        );
+        return;
+
+      default:
         insertCharacter(key);
         return;
-      }
     }
   }
 
@@ -420,6 +452,9 @@ export default function FeedbackKiosk() {
   function insertCharacter(rawKey: string) {
     if (!activeField || keyboardClosing) return;
 
+    const currentValue = getActiveFieldValue();
+    const safeCursor = Math.max(0, Math.min(cursorPosition, currentValue.length));
+
     const key =
       activeField === "contactPhone"
         ? rawKey
@@ -427,7 +462,13 @@ export default function FeedbackKiosk() {
           ? rawKey.toUpperCase()
           : rawKey.toLowerCase();
 
-    updateActiveFieldValue((current) => `${current}${key}`);
+    const nextValue =
+      currentValue.slice(0, safeCursor) +
+      key +
+      currentValue.slice(safeCursor);
+
+    setActiveFieldValue(nextValue);
+    setCursorPosition(safeCursor + key.length);
 
     if (activeField !== "contactPhone") {
       setKeyboardUppercase(false);
@@ -437,6 +478,46 @@ export default function FeedbackKiosk() {
   function getAccentOptions(key: string) {
     const lower = key.toLowerCase();
     return ACCENTED_VARIANTS[lower] ?? [];
+  }
+
+  function getActiveFieldValue(fieldOverride?: ActiveField) {
+    const field = fieldOverride ?? activeField;
+
+    if (!field) return "";
+
+    if (field === "comment") return comment;
+    if (field === "contactName") return contactName;
+    if (field === "contactPhone") return contactPhone;
+    if (field === "contactMessage") return contactMessage;
+
+    return "";
+  }
+
+  function setActiveFieldValue(value: string, fieldOverride?: ActiveField) {
+    const field = fieldOverride ?? activeField;
+    if (!field) return;
+
+    if (field === "comment") {
+      setComment(clampText(value, 300));
+      if (commentError) setCommentError("");
+      return;
+    }
+
+    if (field === "contactName") {
+      setContactName(clampText(value, 80));
+      if (contactNameError) setContactNameError("");
+      return;
+    }
+
+    if (field === "contactPhone") {
+      setContactPhone(clampText(sanitizePhoneValue(value), 25));
+      if (contactPhoneError) setContactPhoneError("");
+      return;
+    }
+
+    if (field === "contactMessage") {
+      setContactMessage(clampText(value, 300));
+    }
   }
 
   function handleLetterPointerDown(key: string) {
@@ -489,7 +570,16 @@ export default function FeedbackKiosk() {
   }
 
   function handleAccentSelect(accentedChar: string) {
-    updateActiveFieldValue((current) => `${current}${accentedChar}`);
+    const currentValue = getActiveFieldValue();
+    const safeCursor = Math.max(0, Math.min(cursorPosition, currentValue.length));
+
+    const nextValue =
+      currentValue.slice(0, safeCursor) +
+      accentedChar +
+      currentValue.slice(safeCursor);
+
+    setActiveFieldValue(nextValue);
+    setCursorPosition(safeCursor + accentedChar.length);
     setAccentMenu(null);
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
@@ -784,7 +874,6 @@ export default function FeedbackKiosk() {
       clearKeyboardCloseTimer();
       clearLongPressTimer();
       longPressTriggeredRef.current = false;
-      setAccentMenu(null);
     };
   }, []);
 
@@ -971,11 +1060,11 @@ export default function FeedbackKiosk() {
             </div>
           ))}
 
-          <div className="grid grid-cols-[auto_1fr_auto_auto] gap-2">
+          <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-2">
             <button
               type="button"
               onPointerDown={handleKeyPress("SHIFT")}
-              className="flex h-12 min-w-[72px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[88px]"
+              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
               style={{
                 borderColor: keyboardUppercase
                   ? resolvedPrimaryColor
@@ -1002,8 +1091,26 @@ export default function FeedbackKiosk() {
 
             <button
               type="button"
+              onPointerDown={handleKeyPress("LEFT")}
+              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+              style={{ color: resolvedTextColor }}
+            >
+              ←
+            </button>
+
+            <button
+              type="button"
+              onPointerDown={handleKeyPress("RIGHT")}
+              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+              style={{ color: resolvedTextColor }}
+            >
+              →
+            </button>
+
+            <button
+              type="button"
               onPointerDown={handleKeyPress("BACKSPACE")}
-              className="flex h-12 min-w-[72px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 transition-transform active:scale-95 md:h-14 md:min-w-[88px]"
+              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
               style={{ color: resolvedTextColor }}
             >
               <Delete className="h-5 w-5" />
@@ -1012,7 +1119,7 @@ export default function FeedbackKiosk() {
             <button
               type="button"
               onPointerDown={handleKeyPress("DONE")}
-              className="flex h-12 min-w-[72px] items-center justify-center rounded-2xl px-4 transition-transform active:scale-95 md:h-14 md:min-w-[88px]"
+              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
               style={{
                 backgroundColor: resolvedPrimaryColor,
                 color: resolvedButtonTextColor,
@@ -1105,6 +1212,28 @@ export default function FeedbackKiosk() {
           </div>
         </div>
       </div>
+    );
+  }
+
+  function renderTextWithCursor(value: string, field: Exclude<ActiveField, "contactPhone" | null>) {
+    const isActive = activeField === field;
+    const safeCursor = Math.max(0, Math.min(cursorPosition, value.length));
+
+    const before = value.slice(0, safeCursor);
+    const after = value.slice(safeCursor);
+
+    if (!value && !isActive) {
+      return null;
+    }
+
+    return (
+      <span className="whitespace-pre-wrap break-words leading-relaxed">
+        {before}
+        {isActive ? (
+          <span className="ml-[1px] inline-block h-5 w-[2px] animate-pulse bg-white align-middle" />
+        ) : null}
+        {after}
+      </span>
     );
   }
 
@@ -1314,13 +1443,13 @@ export default function FeedbackKiosk() {
                     style={{ color: resolvedTextColor }}
                   >
                     {comment ? (
-                      <span className="whitespace-pre-wrap break-words">
-                        {comment}
+                      renderTextWithCursor(comment, "comment")
+                    ) : activeField === "comment" ? (
+                      <span className="opacity-45">
+                        <span className="ml-[1px] inline-block h-5 w-[2px] animate-pulse bg-white align-middle" />
                       </span>
                     ) : (
-                      <span className="opacity-45">
-                        Escreva aqui sua experiência...
-                      </span>
+                      <span className="opacity-45">Escreva aqui sua experiência...</span>
                     )}
                   </div>
 
@@ -1393,7 +1522,13 @@ export default function FeedbackKiosk() {
                         }`}
                       style={{ color: resolvedTextColor }}
                     >
-                      {contactName || (
+                      {contactName ? (
+                        renderTextWithCursor(contactName, "contactName")
+                      ) : activeField === "contactName" ? (
+                        <span className="opacity-45">
+                          <span className="ml-[1px] inline-block h-5 w-[2px] animate-pulse bg-white align-middle" />
+                        </span>
+                      ) : (
                         <span className="opacity-45">Toque para digitar</span>
                       )}
                     </button>
@@ -1443,8 +1578,10 @@ export default function FeedbackKiosk() {
                       style={{ color: resolvedTextColor }}
                     >
                       {contactMessage ? (
-                        <span className="whitespace-pre-wrap break-words leading-relaxed">
-                          {contactMessage}
+                        renderTextWithCursor(contactMessage, "contactMessage")
+                      ) : activeField === "contactMessage" ? (
+                        <span className="opacity-45">
+                          <span className="ml-[1px] inline-block h-5 w-[2px] animate-pulse bg-white align-middle" />
                         </span>
                       ) : (
                         <span className="opacity-45">Toque para digitar</span>
