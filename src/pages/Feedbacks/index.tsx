@@ -340,7 +340,15 @@ export default function FeedbackKiosk() {
 
     switch (key) {
       case "BACKSPACE":
-        updateActiveFieldValue((current) => current.slice(0, -1));
+        updateActiveFieldValue((current) => {
+          const next = current.slice(0, -1);
+
+          if (activeField !== "contactPhone") {
+            setKeyboardUppercase(next.trim().length === 0);
+          }
+
+          return next;
+        });
         return;
       case "CLEAR":
         updateActiveFieldValue(() => "");
@@ -368,7 +376,7 @@ export default function FeedbackKiosk() {
 
         updateActiveFieldValue((current) => `${current}${nextValue}`);
 
-        if (keyboardUppercase && activeField !== "contactPhone") {
+        if (activeField !== "contactPhone") {
           setKeyboardUppercase(false);
         }
       }
