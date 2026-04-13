@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Eye, ShieldCheck, TriangleAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  Building2,
+  CalendarClock,
+  Eye,
+  MessageSquareText,
+  ShieldCheck,
+  Star,
+  Store,
+  X,
+} from "lucide-react";
 import {
   getSharedFeedbacks,
   type SharedFeedbackFilters,
@@ -15,13 +25,30 @@ function getRatingLabel(rating: number) {
     case 2:
       return "Ruim";
     case 3:
-      return "Ok";
+      return "Regular";
     case 4:
       return "Bom";
     case 5:
       return "Excelente";
     default:
       return `${rating}`;
+  }
+}
+
+function getRatingBadgeClass(rating: number) {
+  switch (rating) {
+    case 1:
+      return "border border-rose-500/30 bg-rose-500/10 text-rose-300";
+    case 2:
+      return "border border-orange-500/30 bg-orange-500/10 text-orange-300";
+    case 3:
+      return "border border-amber-500/30 bg-amber-500/10 text-amber-300";
+    case 4:
+      return "border border-sky-500/30 bg-sky-500/10 text-sky-300";
+    case 5:
+      return "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+    default:
+      return "border border-slate-700 bg-slate-800 text-slate-200";
   }
 }
 
@@ -49,11 +76,75 @@ function hasContactInfo(feedback: FeedbackItem) {
   );
 }
 
+function AccessBlocked({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <main className="min-h-screen bg-slate-950 px-4 py-10 text-white sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-3xl">
+        <div className="rounded-[28px] border border-rose-500/25 bg-slate-900/90 p-8 shadow-2xl">
+          <div className="flex items-start gap-4">
+            <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-3">
+              <AlertTriangle className="h-6 w-6 text-rose-300" />
+            </div>
+
+            <div className="space-y-3">
+              <h1 className="text-3xl font-bold tracking-tight text-white">
+                {title}
+              </h1>
+              <p className="text-base leading-7 text-slate-300">
+                {description}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function SummaryCard({
+  icon,
+  label,
+  value,
+  helper,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  helper: string;
+}) {
+  return (
+    <div className="rounded-3xl border border-slate-800 bg-slate-900/85 p-5 shadow-xl">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+            {label}
+          </p>
+          <p className="mt-3 text-3xl font-bold tracking-tight text-white">
+            {value}
+          </p>
+          <p className="mt-2 text-sm text-slate-400">{helper}</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/80 p-3 text-slate-300">
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PublicFeedbacksPage() {
   const token = useMemo(() => getTokenFromUrl(), []);
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [accessDenied, setAccessDenied] = useState(false);
   const [selectedFeedback, setSelectedFeedback] = useState<FeedbackItem | null>(
     null,
   );
@@ -72,7 +163,8 @@ export default function PublicFeedbacksPage() {
   useEffect(() => {
     if (!token) {
       setLoading(false);
-      setError("Link inválido ou incompleto. O token de acesso não foi informado.");
+      setAccessDenied(true);
+      setLoadError("");
       return;
     }
 
@@ -84,7 +176,8 @@ export default function PublicFeedbacksPage() {
 
     try {
       setLoading(true);
-      setError("");
+      setLoadError("");
+      setAccessDenied(false);
 
       const finalFilters = customFilters ?? filters;
 
@@ -99,7 +192,8 @@ export default function PublicFeedbacksPage() {
       setFeedbacks(Array.isArray(data) ? data : []);
     } catch {
       setFeedbacks([]);
-      setError("Não foi possível validar o link ou carregar os feedbacks.");
+      setAccessDenied(true);
+      setLoadError("Link inválido, expirado ou sem permissão para visualização.");
     } finally {
       setLoading(false);
     }
@@ -208,131 +302,238 @@ export default function PublicFeedbacksPage() {
     }
   }, [page, totalPages]);
 
+  const totalFeedbacks = filteredFeedbacks.length;
+
+  const averageRating = useMemo(() => {
+    if (!filteredFeedbacks.length) return 0;
+
+    const total = filteredFeedbacks.reduce((sum, item) => sum + item.rating, 0);
+    return total / filteredFeedbacks.length;
+  }, [filteredFeedbacks]);
+
+  const feedbacksWithComment = useMemo(() => {
+    return filteredFeedbacks.filter((item) => item.comment?.trim()).length;
+  }, [filteredFeedbacks]);
+
+  const uniqueBranches = useMemo(() => {
+    return new Set(
+      filteredFeedbacks
+        .map((item) => item.branch?.name?.trim())
+        .filter(Boolean),
+    ).size;
+  }, [filteredFeedbacks]);
+
+  const uniqueKiosks = useMemo(() => {
+    return new Set(
+      filteredFeedbacks
+        .map((item) => item.kiosk?.name?.trim())
+        .filter(Boolean),
+    ).size;
+  }, [filteredFeedbacks]);
+
   if (!token) {
     return (
-      <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
-        <div className="mx-auto max-w-3xl rounded-3xl border border-rose-500/30 bg-slate-900/80 p-8 shadow-2xl">
-          <div className="flex items-center gap-3">
-            <TriangleAlert className="text-rose-400" />
-            <h1 className="text-2xl font-bold">Acesso indisponível</h1>
-          </div>
-          <p className="mt-4 text-slate-300">
-            Este link não contém um token válido para visualização dos feedbacks.
-          </p>
-        </div>
-      </main>
+      <AccessBlocked
+        title="Acesso indisponível"
+        description="Este link não contém um token válido para visualização dos feedbacks."
+      />
+    );
+  }
+
+  if (!loading && accessDenied) {
+    return (
+      <AccessBlocked
+        title="Link inválido ou expirado"
+        description={loadError || "Não foi possível validar este acesso compartilhado."}
+      />
     );
   }
 
   return (
     <>
       <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl space-y-8">
-          <section className="rounded-3xl border border-slate-800 bg-slate-900/85 p-6 shadow-2xl">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-2">
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
+        <div className="mx-auto max-w-[1600px] space-y-8">
+          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-2xl sm:p-8">
+            <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
                   <ShieldCheck size={14} />
                   Acesso somente leitura
                 </div>
 
-                <h1 className="text-3xl font-bold tracking-tight text-white">
-                  Relatório de feedbacks
-                </h1>
-
-                <p className="max-w-3xl text-sm text-slate-300 sm:text-base">
-                  Visualização compartilhada por link seguro. Esta página não permite
-                  edição, exclusão ou acesso ao painel administrativo.
-                </p>
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                    Relatório de feedbacks
+                  </h1>
+                  <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-300 sm:text-base">
+                    Visualização compartilhada por link seguro para acompanhamento
+                    operacional e gerencial. Esta área permite apenas consulta e foi
+                    preparada para ambientes com múltiplas unidades, alto volume de
+                    atendimento e leitura executiva dos registros.
+                  </p>
+                </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-sm text-slate-300">
-                Token presente: <span className="font-semibold text-emerald-300">sim</span>
+              <div className="grid gap-3 sm:grid-cols-2 xl:w-[360px]">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Token
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-emerald-300">
+                    Presente e validado
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Modo
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-sky-300">
+                    Leitura protegida
+                  </p>
+                </div>
               </div>
             </div>
           </section>
 
-          {error ? (
-            <div className="rounded-2xl border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-              {error}
-            </div>
-          ) : null}
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <SummaryCard
+              icon={<MessageSquareText className="h-5 w-5" />}
+              label="Total de registros"
+              value={loading ? "--" : String(totalFeedbacks)}
+              helper="Quantidade de feedbacks dentro da visualização atual."
+            />
 
-          <section className="rounded-3xl border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold text-white">Filtros</h2>
-              <p className="text-sm text-slate-400">
-                Refine a visualização por nota, filial, kiosk e período.
+            <SummaryCard
+              icon={<Star className="h-5 w-5" />}
+              label="Nota média"
+              value={loading ? "--" : averageRating.toFixed(1)}
+              helper="Média consolidada das avaliações filtradas."
+            />
+
+            <SummaryCard
+              icon={<Building2 className="h-5 w-5" />}
+              label="Filiais presentes"
+              value={loading ? "--" : String(uniqueBranches)}
+              helper="Unidades com registros dentro do recorte atual."
+            />
+
+            <SummaryCard
+              icon={<Store className="h-5 w-5" />}
+              label="Kiosks monitorados"
+              value={loading ? "--" : String(uniqueKiosks)}
+              helper="Pontos de coleta incluídos na listagem filtrada."
+            />
+          </section>
+
+          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-2xl font-semibold tracking-tight text-white">
+                Filtros e recorte operacional
+              </h2>
+              <p className="text-sm leading-6 text-slate-400">
+                Refine a visualização por nota, filial, kiosk, período e texto livre
+                para inspeção mais objetiva dos registros.
               </p>
             </div>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <select
-                value={filters.rating ?? ""}
-                onChange={(e) => handleChangeFilter("rating", e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-sky-500"
-              >
-                <option value="">Todas as notas</option>
-                <option value="1">1 - Péssimo</option>
-                <option value="2">2 - Ruim</option>
-                <option value="3">3 - Ok</option>
-                <option value="4">4 - Bom</option>
-                <option value="5">5 - Excelente</option>
-              </select>
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Nota
+                </label>
+                <select
+                  value={filters.rating ?? ""}
+                  onChange={(e) => handleChangeFilter("rating", e.target.value)}
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                >
+                  <option value="">Todas as notas</option>
+                  <option value="1">1 - Péssimo</option>
+                  <option value="2">2 - Ruim</option>
+                  <option value="3">3 - Regular</option>
+                  <option value="4">4 - Bom</option>
+                  <option value="5">5 - Excelente</option>
+                </select>
+              </div>
 
-              <select
-                value={filters.branchId ?? ""}
-                onChange={(e) => handleChangeFilter("branchId", e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-sky-500"
-              >
-                <option value="">Todas as filiais</option>
-                {branchOptions.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Filial
+                </label>
+                <select
+                  value={filters.branchId ?? ""}
+                  onChange={(e) => handleChangeFilter("branchId", e.target.value)}
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                >
+                  <option value="">Todas as filiais</option>
+                  {branchOptions.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <select
-                value={filters.kioskId ?? ""}
-                onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-sky-500"
-              >
-                <option value="">Todos os kiosks</option>
-                {kioskOptions.map((kiosk) => (
-                  <option key={kiosk.id} value={kiosk.id}>
-                    {kiosk.name}
-                  </option>
-                ))}
-              </select>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Kiosk
+                </label>
+                <select
+                  value={filters.kioskId ?? ""}
+                  onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                >
+                  <option value="">Todos os kiosks</option>
+                  {kioskOptions.map((kiosk) => (
+                    <option key={kiosk.id} value={kiosk.id}>
+                      {kiosk.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <input
-                type="date"
-                value={filters.startDate ?? ""}
-                onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-sky-500"
-              />
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Data inicial
+                </label>
+                <input
+                  type="date"
+                  value={filters.startDate ?? ""}
+                  onChange={(e) => handleChangeFilter("startDate", e.target.value)}
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                />
+              </div>
 
-              <input
-                type="date"
-                value={filters.endDate ?? ""}
-                onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-sky-500"
-              />
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Data final
+                </label>
+                <input
+                  type="date"
+                  value={filters.endDate ?? ""}
+                  onChange={(e) => handleChangeFilter("endDate", e.target.value)}
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                />
+              </div>
             </div>
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-sky-500"
-              />
+            <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_auto_auto]">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Busca textual
+                </label>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
+                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none placeholder:text-slate-500 transition focus:border-sky-500"
+                />
+              </div>
 
               <button
                 type="button"
                 onClick={handleApplyFilters}
-                className="rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+                className="self-end rounded-2xl bg-sky-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-sky-700"
               >
                 Aplicar filtros
               </button>
@@ -340,114 +541,196 @@ export default function PublicFeedbacksPage() {
               <button
                 type="button"
                 onClick={handleClearFilters}
-                className="rounded-xl border border-slate-700 bg-slate-950 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+                className="self-end rounded-2xl border border-slate-700 bg-slate-950 px-6 py-3.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
               >
                 Limpar
               </button>
             </div>
           </section>
 
-          <section className="rounded-3xl border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white">Lista de feedbacks</h2>
-                <p className="mt-1 text-sm text-slate-400">
-                  {loading ? "Carregando..." : `${filteredFeedbacks.length} item(ns)`}
+                <h2 className="text-2xl font-semibold tracking-tight text-white">
+                  Painel detalhado de feedbacks
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Leitura estruturada dos registros com foco em unidade, ponto de
+                  coleta, avaliação, comentário e marcadores operacionais.
                 </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[420px]">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Comentários preenchidos
+                  </p>
+                  <p className="mt-2 text-lg font-bold text-white">
+                    {loading ? "--" : feedbacksWithComment}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Última atualização visual
+                  </p>
+                  <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-slate-300">
+                    <CalendarClock className="h-4 w-4" />
+                    Agora
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-800">
+            <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/55">
               {loading ? (
-                <div className="px-6 py-10 text-center text-slate-400">
+                <div className="px-6 py-14 text-center text-slate-400">
                   Carregando feedbacks...
                 </div>
               ) : filteredFeedbacks.length === 0 ? (
-                <div className="px-6 py-10 text-center text-slate-400">
-                  Nenhum feedback encontrado.
+                <div className="px-6 py-14 text-center">
+                  <p className="text-lg font-semibold text-white">
+                    Nenhum feedback encontrado
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">
+                    Ajuste os filtros para ampliar o recorte ou limpe a pesquisa atual.
+                  </p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-[980px] divide-y divide-slate-800">
-                    <thead className="bg-slate-950/70">
+                  <table className="min-w-[1380px] w-full">
+                    <thead className="border-b border-slate-800 bg-slate-950/90">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Data
+                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Data e hora
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Nota
+                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Avaliação
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Filial
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Kiosk
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Comentário
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Tags
+                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Tags operacionais
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <th className="px-5 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Contato
+                        </th>
+                        <th className="px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Ações
                         </th>
                       </tr>
                     </thead>
 
-                    <tbody className="divide-y divide-slate-800 bg-slate-900">
-                      {paginatedFeedbacks.map((feedback) => (
-                        <tr key={feedback.id} className="hover:bg-slate-800/60">
-                          <td className="px-4 py-4 text-sm text-slate-300">
-                            {formatDate(feedback.createdAt)}
+                    <tbody>
+                      {paginatedFeedbacks.map((feedback, index) => (
+                        <tr
+                          key={feedback.id}
+                          className={[
+                            "border-b border-slate-800/80 transition hover:bg-slate-900/90",
+                            index % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/40",
+                          ].join(" ")}
+                        >
+                          <td className="px-5 py-5 align-top">
+                            <div className="min-w-[150px]">
+                              <p className="text-sm font-medium text-white">
+                                {formatDate(feedback.createdAt)}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Registro cronológico
+                              </p>
+                            </div>
                           </td>
 
-                          <td className="px-4 py-4 text-sm text-slate-300">
-                            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200">
-                              {feedback.rating} - {getRatingLabel(feedback.rating)}
-                            </span>
+                          <td className="px-5 py-5 align-top">
+                            <div className="min-w-[140px]">
+                              <span
+                                className={[
+                                  "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                                  getRatingBadgeClass(feedback.rating),
+                                ].join(" ")}
+                              >
+                                {feedback.rating} · {getRatingLabel(feedback.rating)}
+                              </span>
+                            </div>
                           </td>
 
-                          <td className="px-4 py-4 text-sm text-slate-300">
-                            {feedback.branch?.name ?? "-"}
+                          <td className="px-5 py-5 align-top">
+                            <div className="min-w-[180px]">
+                              <p className="text-sm font-semibold text-white">
+                                {feedback.branch?.name ?? "-"}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Unidade operacional
+                              </p>
+                            </div>
                           </td>
 
-                          <td className="px-4 py-4 text-sm text-slate-300">
-                            {feedback.kiosk?.name ?? "-"}
+                          <td className="px-5 py-5 align-top">
+                            <div className="min-w-[160px]">
+                              <p className="text-sm font-semibold text-white">
+                                {feedback.kiosk?.name ?? "-"}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Ponto de coleta
+                              </p>
+                            </div>
                           </td>
 
-                          <td className="max-w-[260px] px-4 py-4 text-sm text-slate-300">
-                            <span className="line-clamp-2">
-                              {feedback.comment?.trim() || "Sem comentário."}
-                            </span>
+                          <td className="px-5 py-5 align-top">
+                            <div className="max-w-[360px]">
+                              <p className="line-clamp-3 text-sm leading-6 text-slate-200">
+                                {feedback.comment?.trim() || "Sem comentário informado."}
+                              </p>
+                            </div>
                           </td>
 
-                          <td className="px-4 py-4 text-sm text-slate-300">
-                            {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
-                                {feedback.tags!.map((item) => (
+                          <td className="px-5 py-5 align-top">
+                            <div className="flex max-w-[280px] flex-wrap gap-2">
+                              {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
+                                feedback.tags!.map((item) => (
                                   <span
                                     key={item.id}
-                                    className="rounded-full bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-200"
+                                    className="inline-flex rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-medium text-slate-200"
                                   >
                                     {item.tag?.name ?? "Tag"}
                                   </span>
-                                ))}
-                              </div>
-                            ) : (
-                              "-"
-                            )}
+                                ))
+                              ) : (
+                                <span className="text-sm text-slate-500">Sem tags</span>
+                              )}
+                            </div>
                           </td>
 
-                          <td className="px-4 py-4">
+                          <td className="px-5 py-5 align-top text-center">
+                            <span
+                              className={[
+                                "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                                hasContactInfo(feedback)
+                                  ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                  : "border border-slate-700 bg-slate-800 text-slate-400",
+                              ].join(" ")}
+                            >
+                              {hasContactInfo(feedback) ? "Disponível" : "Não informado"}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-5 align-top">
                             <div className="flex justify-end">
                               <button
                                 type="button"
                                 onClick={() => setSelectedFeedback(feedback)}
-                                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-slate-200 transition hover:bg-slate-700"
+                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700"
                                 title="Ver detalhes"
                               >
-                                <Eye size={18} />
+                                <Eye size={16} />
+                                Detalhes
                               </button>
                             </div>
                           </td>
@@ -462,7 +745,8 @@ export default function PublicFeedbacksPage() {
             {!loading && filteredFeedbacks.length > 0 ? (
               <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-slate-400">
-                  Página {page} de {totalPages}
+                  Exibindo página <span className="font-semibold text-white">{page}</span> de{" "}
+                  <span className="font-semibold text-white">{totalPages}</span>
                 </p>
 
                 <div className="flex gap-2">
@@ -470,7 +754,7 @@ export default function PublicFeedbacksPage() {
                     type="button"
                     onClick={() => setPage((current) => Math.max(1, current - 1))}
                     disabled={page === 1}
-                    className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Anterior
                   </button>
@@ -481,7 +765,7 @@ export default function PublicFeedbacksPage() {
                       setPage((current) => Math.min(totalPages, current + 1))
                     }
                     disabled={page === totalPages}
-                    className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-700 disabled:opacity-50"
+                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Próxima
                   </button>
@@ -493,111 +777,165 @@ export default function PublicFeedbacksPage() {
       </main>
 
       {selectedFeedback ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-2xl sm:p-7">
+            <div className="flex flex-col gap-4 border-b border-slate-800 pb-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-white">Detalhes do feedback</h2>
-                <p className="mt-1 text-sm text-slate-400">
-                  Visualização em modo somente leitura.
+                <div className="inline-flex items-center gap-2 rounded-full border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">
+                  <Eye size={14} />
+                  Detalhamento do registro
+                </div>
+
+                <h2 className="mt-4 text-3xl font-bold tracking-tight text-white">
+                  Feedback em modo leitura
+                </h2>
+
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                  Visualização completa do registro para análise gerencial, auditoria
+                  operacional e acompanhamento das ocorrências por unidade.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setSelectedFeedback(null)}
-                className="rounded-xl bg-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-700"
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
               >
-                Fechar
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="mt-6 grid gap-6 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-800 p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            <div className="mt-6 grid gap-5 lg:grid-cols-2">
+              <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                   Dados gerais
                 </h3>
 
-                <div className="mt-4 space-y-3 text-sm text-slate-300">
-                  <p>
-                    <span className="font-semibold text-white">Data:</span>{" "}
-                    {formatDate(selectedFeedback.createdAt)}
-                  </p>
-                  <p>
-                    <span className="font-semibold text-white">Nota:</span>{" "}
-                    {selectedFeedback.rating} -{" "}
-                    {getRatingLabel(selectedFeedback.rating)}
-                  </p>
-                  <p>
-                    <span className="font-semibold text-white">Filial:</span>{" "}
-                    {selectedFeedback.branch?.name ?? "-"}
-                  </p>
-                  <p>
-                    <span className="font-semibold text-white">Kiosk:</span>{" "}
-                    {selectedFeedback.kiosk?.name ?? "-"}
-                  </p>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      Data
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-white">
+                      {formatDate(selectedFeedback.createdAt)}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      Avaliação
+                    </p>
+                    <div className="mt-2">
+                      <span
+                        className={[
+                          "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                          getRatingBadgeClass(selectedFeedback.rating),
+                        ].join(" ")}
+                      >
+                        {selectedFeedback.rating} ·{" "}
+                        {getRatingLabel(selectedFeedback.rating)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      Filial
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-white">
+                      {selectedFeedback.branch?.name ?? "-"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                      Kiosk
+                    </p>
+                    <p className="mt-2 text-sm font-medium text-white">
+                      {selectedFeedback.kiosk?.name ?? "-"}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-800 p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  Contato
+              <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Contato do cliente
                 </h3>
 
                 {hasContactInfo(selectedFeedback) ? (
-                  <div className="mt-4 space-y-3 text-sm text-slate-300">
-                    <p>
-                      <span className="font-semibold text-white">Nome:</span>{" "}
-                      {selectedFeedback.contactName?.trim() || "-"}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-white">Telefone:</span>{" "}
-                      {selectedFeedback.contactPhone?.trim() || "-"}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-white">Mensagem:</span>{" "}
-                      {selectedFeedback.contactMessage?.trim() || "-"}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-white">Consentimento:</span>{" "}
-                      {selectedFeedback.contactConsent ? "Sim" : "Não"}
-                    </p>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        Nome
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-white">
+                        {selectedFeedback.contactName?.trim() || "-"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        Telefone
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-white">
+                        {selectedFeedback.contactPhone?.trim() || "-"}
+                      </p>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        Mensagem de contato
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">
+                        {selectedFeedback.contactMessage?.trim() || "-"}
+                      </p>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                        Consentimento
+                      </p>
+                      <p className="mt-2 text-sm font-medium text-white">
+                        {selectedFeedback.contactConsent ? "Sim" : "Não"}
+                      </p>
+                    </div>
                   </div>
                 ) : (
-                  <p className="mt-4 text-sm text-slate-400">
-                    Nenhuma informação de contato registrada.
+                  <p className="mt-5 text-sm leading-6 text-slate-400">
+                    Nenhuma informação de contato foi registrada neste feedback.
                   </p>
                 )}
               </div>
 
-              <div className="rounded-2xl border border-slate-800 p-4 md:col-span-2">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  Comentário
+              <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5 lg:col-span-2">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Comentário registrado
                 </h3>
-                <p className="mt-4 whitespace-pre-wrap text-sm text-slate-300">
-                  {selectedFeedback.comment?.trim() || "Sem comentário."}
+                <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-200">
+                  {selectedFeedback.comment?.trim() || "Sem comentário informado."}
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-800 p-4 md:col-span-2">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  Tags
+              <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5 lg:col-span-2">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Tags operacionais
                 </h3>
 
                 {(selectedFeedback.tags ?? []).length > 0 ? (
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-5 flex flex-wrap gap-2">
                     {selectedFeedback.tags!.map((item) => (
                       <span
                         key={item.id}
-                        className="rounded-full bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-200"
+                        className="inline-flex rounded-full border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200"
                       >
                         {item.tag?.name ?? "Tag"}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-4 text-sm text-slate-400">
-                    Nenhuma tag marcada.
+                  <p className="mt-5 text-sm text-slate-400">
+                    Nenhuma tag foi vinculada a este registro.
                   </p>
                 )}
               </div>
