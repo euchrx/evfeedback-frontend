@@ -7,7 +7,6 @@ import {
   CalendarClock,
   Eye,
   MessageSquareText,
-  ShieldCheck,
   Star,
   Store,
   X,
@@ -125,7 +124,7 @@ function SummaryCard({
   value,
   helper,
 }: {
-  icon: JSX.Element;
+  icon: React.ReactNode;
   label: string;
   value: string;
   helper: string;
