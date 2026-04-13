@@ -42,10 +42,12 @@ const INACTIVITY_TIMEOUT_MS = 30000;
 const CONFIG_REFRESH_MS = 90000;
 const KEYBOARD_CLOSE_ANIMATION_MS = 260;
 
+const KEYBOARD_NUMBER_ROW = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+
 const KEYBOARD_ROWS = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
   ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
-  [".", ",", "z", "x", "c", "v", "b", "n", "m"],
+  ["z", "x", "c", "v", "b", "n", "m"],
 ];
 
 const EXTRA_PUNCTUATION_KEYS = ["?", "!", ";", ":", "@"];
@@ -54,7 +56,7 @@ const PHONE_KEYS = [
   ["1", "2", "3"],
   ["4", "5", "6"],
   ["7", "8", "9"],
-  ["+", "0", "-"],
+  ["", "0", ""],
 ];
 
 const ACCENTED_VARIANTS: Record<string, string[]> = {
@@ -91,7 +93,19 @@ function getKioskTokenFromUrl() {
 }
 
 function sanitizePhoneValue(value: string) {
-  return value.replace(/[^\d+\-()\s]/g, "");
+  return value.replace(/\D/g, "").slice(0, 11);
+}
+
+function formatPhoneValue(value: string) {
+  const digits = sanitizePhoneValue(value);
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  }
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
 }
 
 function clampText(value: string, maxLength: number) {
@@ -200,6 +214,23 @@ export default function FeedbackKiosk() {
     }
   }
 
+  function clearKeyHighlightTimer() {
+    if (keyHighlightTimerRef.current) {
+      window.clearTimeout(keyHighlightTimerRef.current);
+      keyHighlightTimerRef.current = null;
+    }
+  }
+
+  function flashKey(key: string) {
+    setActiveVisualKey(key);
+    clearKeyHighlightTimer();
+
+    keyHighlightTimerRef.current = window.setTimeout(() => {
+      setActiveVisualKey(null);
+      keyHighlightTimerRef.current = null;
+    }, 140);
+  }
+
   function blurNativeActiveElement() {
     const activeEl = document.activeElement;
     if (activeEl instanceof HTMLElement) {
@@ -212,8 +243,10 @@ export default function FeedbackKiosk() {
     clearDelayedResetTimer();
     clearKeyboardCloseTimer();
     clearLongPressTimer();
+    clearKeyHighlightTimer();
     longPressTriggeredRef.current = false;
     setAccentMenu(null);
+    setActiveVisualKey(null);
     setActiveField(null);
     setKeyboardUppercase(false);
     setKeyboardClosing(false);
@@ -350,6 +383,8 @@ export default function FeedbackKiosk() {
 
     if (!activeField || keyboardClosing) return;
 
+    flashKey(key);
+
     const currentValue = getActiveFieldValue();
     const safeCursor = Math.max(0, Math.min(cursorPosition, currentValue.length));
 
@@ -478,7 +513,7 @@ export default function FeedbackKiosk() {
     }
 
     if (field === "contactPhone") {
-      setContactPhone(clampText(sanitizePhoneValue(value), 25));
+      setContactPhone(formatPhoneValue(value));
       if (contactPhoneError) setContactPhoneError("");
       return;
     }
@@ -721,7 +756,7 @@ export default function FeedbackKiosk() {
         comment: skipComment ? "" : comment.trim(),
         tagIds,
         contactName: isNegativeRating ? contactName.trim() : "",
-        contactPhone: isNegativeRating ? contactPhone.trim() : "",
+        contactPhone: isNegativeRating ? sanitizePhoneValue(contactPhone) : "",
         contactMessage: isNegativeRating ? contactMessage.trim() : "",
         contactConsent: isNegativeRating ? contactConsent : false,
       });
@@ -889,6 +924,31 @@ export default function FeedbackKiosk() {
   }, []);
 
   useEffect(() => {
+    if (!accentMenu) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+
+      if (!target) {
+        setAccentMenu(null);
+        return;
+      }
+
+      if (target.closest("[data-accent-popup='true']")) {
+        return;
+      }
+
+      setAccentMenu(null);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [accentMenu]);
+
+  useEffect(() => {
     const preventGesture = (event: Event) => {
       event.preventDefault();
     };
@@ -978,6 +1038,32 @@ export default function FeedbackKiosk() {
     return (
       <div className="w-full">
         <div className="space-y-2">
+          <div className="flex justify-center gap-2">
+            {KEYBOARD_NUMBER_ROW.map((key) => {
+              const isActive = activeVisualKey === key;
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onPointerDown={handleKeyPress(key)}
+                  className="flex h-11 min-w-[2.4rem] items-center justify-center rounded-2xl border px-3 text-[16px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all active:scale-95 md:h-12 md:min-w-[3rem] md:text-[17px]"
+                  style={{
+                    borderColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.08)",
+                    backgroundColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.12)",
+                    color: isActive ? resolvedButtonTextColor : resolvedTextColor,
+                  }}
+                >
+                  {key}
+                </button>
+              );
+            })}
+          </div>
+
           {KEYBOARD_ROWS.map((row, rowIndex) => (
             <div
               key={`row-${rowIndex}`}
@@ -985,11 +1071,17 @@ export default function FeedbackKiosk() {
             >
               {row.map((key) => {
                 const label = keyboardUppercase ? key.toUpperCase() : key;
+                const isActive = activeVisualKey === key;
 
                 return (
-                  <div key={key} className="relative">
+                  <div
+                    key={key}
+                    className="relative"
+                    data-accent-trigger="true"
+                  >
                     {accentMenu?.key === key ? (
                       <div
+                        data-accent-popup="true"
                         className="absolute -top-14 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-2xl border border-white/10 bg-slate-900/95 px-2 py-2 shadow-2xl"
                         onPointerDown={(e) => e.stopPropagation()}
                       >
@@ -1016,14 +1108,63 @@ export default function FeedbackKiosk() {
                       onPointerDown={handleLetterPointerDown(key)}
                       onPointerUp={handleLetterPointerUp(key)}
                       onPointerLeave={handleLetterPointerLeave}
-                      className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-transform active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
-                      style={{ color: resolvedTextColor }}
+                      className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
+                      style={{
+                        borderColor: isActive
+                          ? resolvedPrimaryColor
+                          : "rgba(255,255,255,0.08)",
+                        backgroundColor: isActive
+                          ? resolvedPrimaryColor
+                          : "rgba(255,255,255,0.12)",
+                        color: isActive
+                          ? resolvedButtonTextColor
+                          : resolvedTextColor,
+                      }}
                     >
                       {label}
                     </button>
                   </div>
                 );
               })}
+
+              {rowIndex === 2 ? (
+                <>
+                  {[".", ","].map((key) => {
+                    const isActive = activeVisualKey === key;
+
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onPointerDown={handleKeyPress(key)}
+                        className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
+                        style={{
+                          borderColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.08)",
+                          backgroundColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.12)",
+                          color: isActive
+                            ? resolvedButtonTextColor
+                            : resolvedTextColor,
+                        }}
+                      >
+                        {key}
+                      </button>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("BACKSPACE")}
+                    className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+                    style={{ color: resolvedTextColor }}
+                  >
+                    <Delete className="h-5 w-5" />
+                  </button>
+                </>
+              ) : null}
             </div>
           ))}
 
@@ -1059,7 +1200,7 @@ export default function FeedbackKiosk() {
             <button
               type="button"
               onPointerDown={handleKeyPress("LEFT")}
-              className="hidden h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
               style={{ color: resolvedTextColor }}
             >
               ←
@@ -1068,64 +1209,37 @@ export default function FeedbackKiosk() {
             <button
               type="button"
               onPointerDown={handleKeyPress("RIGHT")}
-              className="hidden h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
               style={{ color: resolvedTextColor }}
             >
               →
-            </button>
-
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("BACKSPACE")}
-              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
-              style={{ color: resolvedTextColor }}
-            >
-              <Delete className="h-5 w-5" />
-            </button>
-
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("DONE")}
-              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
-              style={{
-                backgroundColor: resolvedPrimaryColor,
-                color: resolvedButtonTextColor,
-              }}
-            >
-              <CornerDownLeft className="h-5 w-5" />
             </button>
           </div>
 
           <div className="flex justify-center gap-2">
-            {EXTRA_PUNCTUATION_KEYS.map((key) => (
-              <button
-                key={key}
-                type="button"
-                onPointerDown={handleKeyPress(key)}
-                className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[68px]"
-                style={{ color: resolvedTextColor }}
-              >
-                {key}
-              </button>
-            ))}
+            {EXTRA_PUNCTUATION_KEYS.map((key) => {
+              const isActive = activeVisualKey === key;
 
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("LEFT")}
-              className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[68px]"
-              style={{ color: resolvedTextColor }}
-            >
-              ←
-            </button>
-
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("RIGHT")}
-              className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-3 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[68px]"
-              style={{ color: resolvedTextColor }}
-            >
-              →
-            </button>
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onPointerDown={handleKeyPress(key)}
+                  className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border px-3 text-sm font-medium transition-all active:scale-95 md:h-11 md:min-w-[68px]"
+                  style={{
+                    borderColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.08)",
+                    backgroundColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.12)",
+                    color: isActive ? resolvedButtonTextColor : resolvedTextColor,
+                  }}
+                >
+                  {key}
+                </button>
+              );
+            })}
 
             <button
               type="button"
@@ -1134,6 +1248,18 @@ export default function FeedbackKiosk() {
               style={{ color: resolvedTextColor }}
             >
               Limpar
+            </button>
+
+            <button
+              type="button"
+              onPointerDown={handleKeyPress("DONE")}
+              className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
+              style={{
+                backgroundColor: resolvedPrimaryColor,
+                color: resolvedButtonTextColor,
+              }}
+            >
+              concluir
             </button>
           </div>
         </div>
@@ -1150,17 +1276,24 @@ export default function FeedbackKiosk() {
               key={`phone-row-${rowIndex}`}
               className="grid grid-cols-3 gap-3"
             >
-              {row.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onPointerDown={handleKeyPress(key)}
-                  className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 text-xl font-medium transition-transform active:scale-95 md:h-16"
-                  style={{ color: resolvedTextColor }}
-                >
-                  {key}
-                </button>
-              ))}
+              {row.map((key, keyIndex) =>
+                key ? (
+                  <button
+                    key={key}
+                    type="button"
+                    onPointerDown={handleKeyPress(key)}
+                    className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 text-xl font-medium transition-transform active:scale-95 md:h-16"
+                    style={{ color: resolvedTextColor }}
+                  >
+                    {key}
+                  </button>
+                ) : (
+                  <div
+                    key={`empty-${rowIndex}-${keyIndex}`}
+                    className="h-14 md:h-16"
+                  />
+                ),
+              )}
             </div>
           ))}
 
@@ -1200,7 +1333,7 @@ export default function FeedbackKiosk() {
     );
   }
 
-  function renderTextWithCursor(value: string, field: Exclude<ActiveField, "contactPhone" | null>) {
+  function renderTextWithCursor(value: string, field: Exclude<ActiveField, null>) {
     const isActive = activeField === field;
     const safeCursor = Math.max(0, Math.min(cursorPosition, value.length));
 
@@ -1214,9 +1347,7 @@ export default function FeedbackKiosk() {
     return (
       <span className="whitespace-pre-wrap break-words leading-relaxed">
         {before}
-        {isActive ? (
-          <span className="kiosk-caret" />
-        ) : null}
+        {isActive ? <span className="kiosk-caret" /> : null}
         {after}
       </span>
     );
@@ -1404,7 +1535,7 @@ export default function FeedbackKiosk() {
                 </p>
 
                 <h2 className="mt-4 text-3xl font-bold md:text-5xl">
-                 Por favor, deixe sua opinião abaixo.
+                  Por favor, deixe sua opinião abaixo.
                 </h2>
 
                 <p className="mt-4 text-lg opacity-90">Essa etapa é obrigatória.</p>
@@ -1536,7 +1667,13 @@ export default function FeedbackKiosk() {
                         }`}
                       style={{ color: resolvedTextColor }}
                     >
-                      {contactPhone || (
+                      {contactPhone ? (
+                        renderTextWithCursor(contactPhone, "contactPhone")
+                      ) : activeField === "contactPhone" ? (
+                        <span className="opacity-45">
+                          <span className="kiosk-caret" />
+                        </span>
+                      ) : (
                         <span className="opacity-45">Toque para digitar</span>
                       )}
                     </button>
