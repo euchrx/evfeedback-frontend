@@ -82,9 +82,9 @@ function getTokenFromUrl() {
 function hasContactInfo(feedback: FeedbackItem) {
   return Boolean(
     feedback.contactName?.trim() ||
-      feedback.contactPhone?.trim() ||
-      feedback.contactMessage?.trim() ||
-      feedback.contactConsent,
+    feedback.contactPhone?.trim() ||
+    feedback.contactMessage?.trim() ||
+    feedback.contactConsent,
   );
 }
 
@@ -506,48 +506,6 @@ export default function PublicFeedbacksPage() {
     <>
       <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[1700px] space-y-8">
-          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-2xl sm:p-8">
-            <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
-                  <ShieldCheck size={14} />
-                  Acesso somente leitura
-                </div>
-
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                    Relatório executivo de feedbacks
-                  </h1>
-                  <p className="mt-3 max-w-5xl text-sm leading-7 text-slate-300 sm:text-base">
-                    Visão estruturada para acompanhamento operacional e gerencial
-                    dos registros de atendimento, percepção do cliente, pontos de
-                    coleta e ocorrências por unidade.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 xl:w-[360px]">
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Token
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-emerald-300">
-                    Presente e validado
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/80 px-4 py-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Modo
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-sky-300">
-                    Leitura protegida
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <SummaryCard
               icon={<MessageSquareText className="h-5 w-5" />}
