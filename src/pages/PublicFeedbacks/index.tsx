@@ -1323,7 +1323,7 @@ export default function PublicFeedbacksPage() {
                       type="date"
                       value={filters.startDate ?? ""}
                       onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:invert"
                     />
                   </div>
 
@@ -1335,7 +1335,7 @@ export default function PublicFeedbacksPage() {
                       type="date"
                       value={filters.endDate ?? ""}
                       onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:invert"
                     />
                   </div>
 
