@@ -6,10 +6,8 @@ import {
   Building2,
   Download,
   Eye,
-  FileSpreadsheet,
   MessageSquareText,
   Printer,
-  ShieldCheck,
   Star,
   Store,
   X,
@@ -84,9 +82,9 @@ function getTokenFromUrl() {
 function hasContactInfo(feedback: FeedbackItem) {
   return Boolean(
     feedback.contactName?.trim() ||
-      feedback.contactPhone?.trim() ||
-      feedback.contactMessage?.trim() ||
-      feedback.contactConsent,
+    feedback.contactPhone?.trim() ||
+    feedback.contactMessage?.trim() ||
+    feedback.contactConsent,
   );
 }
 
@@ -216,18 +214,15 @@ function getTagStyle(color?: string | null) {
   if (!rgb) {
     return {
       borderColor: "rgba(71, 85, 105, 0.9)",
-      backgroundColor: "rgba(30, 41, 59, 0.9)",
-      color: "rgb(226, 232, 240)",
+      backgroundColor: "rgba(30, 41, 59, 0.92)",
+      color: "#e2e8f0",
     };
   }
 
-  const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-  const textColor = brightness > 160 ? "#0f172a" : "#ffffff";
-
   return {
     borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.55)`,
-    backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)`,
-    color: textColor,
+    backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.16)`,
+    color: "#f8fafc",
   };
 }
 
@@ -672,47 +667,6 @@ export default function PublicFeedbacksPage() {
 
       <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8 print:bg-white print:text-slate-900">
         <div className="mx-auto max-w-[1700px] space-y-8">
-          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-2xl print:border-slate-300 print:bg-white print:shadow-none">
-            <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300 print:border-slate-300 print:bg-white print:text-slate-900">
-                  <ShieldCheck size={14} />
-                  Acesso somente leitura
-                </div>
-
-                <div>
-                  <h1 className="text-3xl font-bold tracking-tight text-white print:text-slate-900 sm:text-4xl">
-                    Relatório executivo de feedbacks
-                  </h1>
-                  <p className="mt-3 max-w-5xl text-sm leading-7 text-slate-300 print:text-slate-700 sm:text-base">
-                    Visão estruturada para acompanhamento operacional e gerencial
-                    dos registros de atendimento, percepção do cliente, pontos de
-                    coleta e ocorrências por unidade.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3 print:hidden">
-                <button
-                  type="button"
-                  onClick={handleExportCsv}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
-                >
-                  <FileSpreadsheet className="h-4 w-4" />
-                  Exportar CSV
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handlePrintPdf}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
-                >
-                  <Printer className="h-4 w-4" />
-                  Exportar PDF
-                </button>
-              </div>
-            </div>
-          </section>
 
           <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -747,9 +701,9 @@ export default function PublicFeedbacksPage() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-[28px] border border-slate-800 bg-slate-950/45 p-4 print:hidden">
-              <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
-                <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="mt-6 overflow-hidden rounded-t-[28px] border border-b-0 border-slate-800 bg-slate-950/80 print:hidden">
+              <div className="border-b border-slate-800 px-5 py-4">
+                <div className="grid gap-3 xl:grid-cols-[150px_180px_180px_180px_180px_minmax(260px,1fr)_auto_auto]">
                   <div className="space-y-2">
                     <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                       Nota
@@ -757,7 +711,7 @@ export default function PublicFeedbacksPage() {
                     <select
                       value={filters.rating ?? ""}
                       onChange={(e) => handleChangeFilter("rating", e.target.value)}
-                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
                     >
                       <option value="">Todas</option>
                       <option value="1">1 - Péssimo</option>
@@ -775,7 +729,7 @@ export default function PublicFeedbacksPage() {
                     <select
                       value={filters.branchId ?? ""}
                       onChange={(e) => handleChangeFilter("branchId", e.target.value)}
-                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
                     >
                       <option value="">Todas</option>
                       {branchOptions.map((branch) => (
@@ -793,7 +747,7 @@ export default function PublicFeedbacksPage() {
                     <select
                       value={filters.kioskId ?? ""}
                       onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
-                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
                     >
                       <option value="">Todos</option>
                       {kioskOptions.map((kiosk) => (
@@ -812,7 +766,7 @@ export default function PublicFeedbacksPage() {
                       type="date"
                       value={filters.startDate ?? ""}
                       onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
                     />
                   </div>
 
@@ -824,28 +778,26 @@ export default function PublicFeedbacksPage() {
                       type="date"
                       value={filters.endDate ?? ""}
                       onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
                     />
                   </div>
 
-                  <div className="space-y-2 xl:col-span-1">
+                  <div className="space-y-2">
                     <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                       Busca textual
                     </label>
                     <input
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Buscar..."
-                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 transition focus:border-sky-500"
+                      placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 transition focus:border-sky-500"
                     />
                   </div>
-                </div>
 
-                <div className="flex gap-3 xl:shrink-0">
                   <button
                     type="button"
                     onClick={handleApplyFilters}
-                    className="rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+                    className="self-end rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
                   >
                     Aplicar
                   </button>
@@ -853,7 +805,7 @@ export default function PublicFeedbacksPage() {
                   <button
                     type="button"
                     onClick={handleClearFilters}
-                    className="rounded-2xl border border-slate-700 bg-slate-950 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+                    className="self-end rounded-xl border border-slate-700 bg-slate-950 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
                   >
                     Limpar
                   </button>
@@ -861,7 +813,7 @@ export default function PublicFeedbacksPage() {
               </div>
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/55 print:border-slate-300 print:bg-white">
+            <div className="overflow-hidden rounded-b-[28px] border border-slate-800 bg-slate-950/55 print:border-slate-300 print:bg-white">
               {loading ? (
                 <div className="px-6 py-14 text-center text-slate-400">
                   Carregando feedbacks...
