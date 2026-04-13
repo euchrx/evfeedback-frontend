@@ -108,6 +108,30 @@ function formatPhoneValue(value: string) {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
 }
 
+function getPhoneDigitsBeforeCursor(maskedValue: string, cursor: number) {
+  return maskedValue.slice(0, cursor).replace(/\D/g, "").length;
+}
+
+function getPhoneCursorFromDigits(digitsValue: string, digitsCursor: number) {
+  const masked = formatPhoneValue(digitsValue);
+
+  if (digitsCursor <= 0) return 0;
+
+  let digitCount = 0;
+
+  for (let i = 0; i < masked.length; i++) {
+    if (/\d/.test(masked[i])) {
+      digitCount += 1;
+
+      if (digitCount === digitsCursor) {
+        return i + 1;
+      }
+    }
+  }
+
+  return masked.length;
+}
+
 function clampText(value: string, maxLength: number) {
   return value.slice(0, maxLength);
 }
@@ -145,7 +169,10 @@ export default function FeedbackKiosk() {
   } | null>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [activeVisualKey, setActiveVisualKey] = useState<string | null>(null);
+  const [capsLock, setCapsLock] = useState(false);
 
+  const shiftClickTimerRef = useRef<number | null>(null);
+  const lastShiftPressRef = useRef(0);
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
   const inactivityTimerRef = useRef<number | null>(null);
@@ -187,6 +214,12 @@ export default function FeedbackKiosk() {
   const canApplyLiveRefresh = step === "rating" || step === "done";
   const keyboardOpen = activeField !== null;
 
+  function clearShiftClickTimer() {
+    if (shiftClickTimerRef.current) {
+      window.clearTimeout(shiftClickTimerRef.current);
+      shiftClickTimerRef.current = null;
+    }
+  }
 
   function clearInactivityTimer() {
     if (inactivityTimerRef.current) {
@@ -246,13 +279,16 @@ export default function FeedbackKiosk() {
     clearKeyboardCloseTimer();
     clearLongPressTimer();
     clearKeyHighlightTimer();
+    clearShiftClickTimer();
     longPressTriggeredRef.current = false;
+    lastShiftPressRef.current = 0;
     setAccentMenu(null);
     setActiveVisualKey(null);
     setActiveField(null);
     setKeyboardUppercase(false);
     setKeyboardClosing(false);
     setCursorPosition(0);
+    setCapsLock(false);
 
     if (!kioskToken) {
       setStep("error");
@@ -295,6 +331,9 @@ export default function FeedbackKiosk() {
     if (!keyboardOpen) {
       setActiveField(null);
       setKeyboardUppercase(false);
+      setCapsLock(false);
+      clearShiftClickTimer();
+      lastShiftPressRef.current = 0;
       setKeyboardClosing(false);
       return;
     }
@@ -392,6 +431,26 @@ export default function FeedbackKiosk() {
 
     switch (key) {
       case "BACKSPACE": {
+        if (activeField === "contactPhone") {
+          const currentDigits = sanitizePhoneValue(currentValue);
+          const digitsCursor = getPhoneDigitsBeforeCursor(currentValue, safeCursor);
+
+          if (digitsCursor === 0) return;
+
+          const nextDigits =
+            currentDigits.slice(0, digitsCursor - 1) +
+            currentDigits.slice(digitsCursor);
+
+          const sanitizedNextDigits = sanitizePhoneValue(nextDigits);
+          setContactPhone(formatPhoneValue(sanitizedNextDigits));
+          setCursorPosition(
+            getPhoneCursorFromDigits(sanitizedNextDigits, digitsCursor - 1),
+          );
+
+          if (contactPhoneError) setContactPhoneError("");
+          return;
+        }
+
         if (safeCursor === 0) return;
 
         const next =
@@ -401,8 +460,8 @@ export default function FeedbackKiosk() {
         setActiveFieldValue(next);
         setCursorPosition(safeCursor - 1);
 
-        if (activeField !== "contactPhone") {
-          setKeyboardUppercase(next.trim().length === 0);
+        if (!capsLock) {
+          setKeyboardUppercase(false);
         }
         return;
       }
@@ -425,11 +484,43 @@ export default function FeedbackKiosk() {
         closeKeyboard(true);
         return;
 
-      case "SHIFT":
-        if (activeField !== "contactPhone") {
-          setKeyboardUppercase((current) => !current);
+      case "SHIFT": {
+        if (activeField === "contactPhone") return;
+
+        const now = Date.now();
+        const isDoublePress = now - lastShiftPressRef.current <= 300;
+
+        if (capsLock) {
+          setCapsLock(false);
+          setKeyboardUppercase(false);
+          clearShiftClickTimer();
+          lastShiftPressRef.current = 0;
+          return;
         }
+
+        if (isDoublePress) {
+          setCapsLock(true);
+          setKeyboardUppercase(true);
+          clearShiftClickTimer();
+          lastShiftPressRef.current = 0;
+          return;
+        }
+
+        lastShiftPressRef.current = now;
+        setCapsLock((currentCaps) => {
+          if (currentCaps) return currentCaps;
+          return false;
+        });
+        setKeyboardUppercase((current) => !current);
+
+        clearShiftClickTimer();
+        shiftClickTimerRef.current = window.setTimeout(() => {
+          lastShiftPressRef.current = 0;
+          shiftClickTimerRef.current = null;
+        }, 300);
+
         return;
+      }
 
       case "LEFT":
         setCursorPosition((current) => Math.max(0, current - 1));
@@ -460,12 +551,28 @@ export default function FeedbackKiosk() {
     const currentValue = getActiveFieldValue();
     const safeCursor = Math.max(0, Math.min(cursorPosition, currentValue.length));
 
-    const key =
-      activeField === "contactPhone"
-        ? rawKey
-        : keyboardUppercase
-          ? rawKey.toUpperCase()
-          : rawKey.toLowerCase();
+    if (activeField === "contactPhone") {
+      const currentDigits = sanitizePhoneValue(currentValue);
+      const digitsCursor = getPhoneDigitsBeforeCursor(currentValue, safeCursor);
+      const nextDigits =
+        currentDigits.slice(0, digitsCursor) +
+        rawKey.replace(/\D/g, "") +
+        currentDigits.slice(digitsCursor);
+
+      const sanitizedNextDigits = sanitizePhoneValue(nextDigits);
+      setContactPhone(formatPhoneValue(sanitizedNextDigits));
+      setCursorPosition(
+        getPhoneCursorFromDigits(
+          sanitizedNextDigits,
+          Math.min(digitsCursor + rawKey.replace(/\D/g, "").length, sanitizedNextDigits.length),
+        ),
+      );
+
+      if (contactPhoneError) setContactPhoneError("");
+      return;
+    }
+
+    const key = keyboardUppercase ? rawKey.toUpperCase() : rawKey.toLowerCase();
 
     const nextValue =
       currentValue.slice(0, safeCursor) +
@@ -474,8 +581,7 @@ export default function FeedbackKiosk() {
 
     setActiveFieldValue(nextValue);
     setCursorPosition(safeCursor + key.length);
-
-    if (activeField !== "contactPhone") {
+    if (!capsLock) {
       setKeyboardUppercase(false);
     }
   }
@@ -1176,13 +1282,13 @@ export default function FeedbackKiosk() {
               onPointerDown={handleKeyPress("SHIFT")}
               className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
               style={{
-                borderColor: keyboardUppercase
+                borderColor: keyboardUppercase || capsLock
                   ? resolvedPrimaryColor
                   : "rgba(255,255,255,0.08)",
-                backgroundColor: keyboardUppercase
+                backgroundColor: keyboardUppercase || capsLock
                   ? resolvedPrimaryColor
                   : "rgba(255,255,255,0.12)",
-                color: keyboardUppercase
+                color: keyboardUppercase || capsLock
                   ? resolvedButtonTextColor
                   : resolvedTextColor,
               }}
@@ -1261,7 +1367,7 @@ export default function FeedbackKiosk() {
                 color: resolvedButtonTextColor,
               }}
             >
-              concluir
+              Concluir
             </button>
           </div>
         </div>
