@@ -518,10 +518,6 @@ export default function PublicFeedbacksPage() {
     return total / sortedFeedbacks.length;
   }, [sortedFeedbacks]);
 
-  const feedbacksWithComment = useMemo(() => {
-    return sortedFeedbacks.filter((item) => item.comment?.trim()).length;
-  }, [sortedFeedbacks]);
-
   const feedbacksWithContact = useMemo(() => {
     return sortedFeedbacks.filter((item) => hasContactInfo(item)).length;
   }, [sortedFeedbacks]);
