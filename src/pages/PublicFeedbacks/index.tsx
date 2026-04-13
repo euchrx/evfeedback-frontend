@@ -7,8 +7,8 @@ import {
   Download,
   Eye,
   MessageSquareText,
-  Printer,
   Calendar,
+  Printer,
   Star,
   Store,
   X,
@@ -1316,301 +1316,305 @@ export default function PublicFeedbacksPage() {
                     </select>
                   </div>
 
-                  <div className="relative">
-                    <input
-                      type="date"
-                      value={filters.startDate ?? ""}
-                      onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pr-11 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-11 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-                    />
-                    <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
-                  </div>
-
                   <div className="space-y-2">
                     <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Data final
+                      Data inicial
                     </label>
                     <div className="relative">
                       <input
                         type="date"
-                        value={filters.endDate ?? ""}
-                        onChange={(e) => handleChangeFilter("endDate", e.target.value)}
+                        value={filters.startDate ?? ""}
+                        onChange={(e) => handleChangeFilter("startDate", e.target.value)}
                         className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pr-11 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-11 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                       />
                       <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
                     </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Data final
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={filters.endDate ?? ""}
+                          onChange={(e) => handleChangeFilter("endDate", e.target.value)}
+                          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pr-11 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-11 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        />
+                        <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Busca textual
+                      </label>
+                      <input
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 transition focus:border-sky-500"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleApplyFilters}
+                      className="self-end rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+                    >
+                      Aplicar
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleClearFilters}
+                      className="self-end rounded-xl border border-slate-700 bg-slate-950 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+                    >
+                      Limpar
+                    </button>
                   </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Busca textual
-                    </label>
-                    <input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 transition focus:border-sky-500"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleApplyFilters}
-                    className="self-end rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
-                  >
-                    Aplicar
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleClearFilters}
-                    className="self-end rounded-xl border border-slate-700 bg-slate-950 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
-                  >
-                    Limpar
-                  </button>
                 </div>
               </div>
-            </div>
 
-            <div className="overflow-hidden rounded-b-[28px] border border-slate-800 bg-slate-950/55 print:border-slate-300 print:bg-white">
-              {loading ? (
-                <div className="px-6 py-14 text-center text-slate-400">
-                  Carregando feedbacks...
-                </div>
-              ) : sortedFeedbacks.length === 0 ? (
-                <div className="px-6 py-14 text-center">
-                  <p className="text-lg font-semibold text-white print:text-slate-900">
-                    Nenhum feedback encontrado
-                  </p>
-                  <p className="mt-2 text-sm text-slate-400 print:text-slate-700">
-                    Ajuste os filtros para ampliar o recorte ou limpe a pesquisa atual.
-                  </p>
-                </div>
-              ) : (
-                <div className="max-h-[720px] overflow-auto">
-                  <table className="min-w-[1500px] w-full">
-                    <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur print:border-slate-300 print:bg-white">
-                      <tr>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Data e hora"
-                            active={sortField === "createdAt"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("createdAt")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Avaliação"
-                            active={sortField === "rating"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("rating")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Filial"
-                            active={sortField === "branch"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("branch")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Kiosk"
-                            active={sortField === "kiosk"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("kiosk")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Comentário"
-                            active={sortField === "comment"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("comment")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Tags operacionais"
-                            active={sortField === "tags"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("tags")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-center">
-                          <ColumnSortButton
-                            label="Contato"
-                            active={sortField === "contact"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("contact")}
-                            align="center"
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Ações
-                        </th>
-                      </tr>
-                    </thead>
+              <div className="overflow-hidden rounded-b-[28px] border border-slate-800 bg-slate-950/55 print:border-slate-300 print:bg-white">
+                {loading ? (
+                  <div className="px-6 py-14 text-center text-slate-400">
+                    Carregando feedbacks...
+                  </div>
+                ) : sortedFeedbacks.length === 0 ? (
+                  <div className="px-6 py-14 text-center">
+                    <p className="text-lg font-semibold text-white print:text-slate-900">
+                      Nenhum feedback encontrado
+                    </p>
+                    <p className="mt-2 text-sm text-slate-400 print:text-slate-700">
+                      Ajuste os filtros para ampliar o recorte ou limpe a pesquisa atual.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="max-h-[720px] overflow-auto">
+                    <table className="min-w-[1500px] w-full">
+                      <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur print:border-slate-300 print:bg-white">
+                        <tr>
+                          <th className="px-5 py-4 text-left">
+                            <ColumnSortButton
+                              label="Data e hora"
+                              active={sortField === "createdAt"}
+                              direction={sortDirection}
+                              onClick={() => toggleSort("createdAt")}
+                            />
+                          </th>
+                          <th className="px-5 py-4 text-left">
+                            <ColumnSortButton
+                              label="Avaliação"
+                              active={sortField === "rating"}
+                              direction={sortDirection}
+                              onClick={() => toggleSort("rating")}
+                            />
+                          </th>
+                          <th className="px-5 py-4 text-left">
+                            <ColumnSortButton
+                              label="Filial"
+                              active={sortField === "branch"}
+                              direction={sortDirection}
+                              onClick={() => toggleSort("branch")}
+                            />
+                          </th>
+                          <th className="px-5 py-4 text-left">
+                            <ColumnSortButton
+                              label="Kiosk"
+                              active={sortField === "kiosk"}
+                              direction={sortDirection}
+                              onClick={() => toggleSort("kiosk")}
+                            />
+                          </th>
+                          <th className="px-5 py-4 text-left">
+                            <ColumnSortButton
+                              label="Comentário"
+                              active={sortField === "comment"}
+                              direction={sortDirection}
+                              onClick={() => toggleSort("comment")}
+                            />
+                          </th>
+                          <th className="px-5 py-4 text-left">
+                            <ColumnSortButton
+                              label="Tags operacionais"
+                              active={sortField === "tags"}
+                              direction={sortDirection}
+                              onClick={() => toggleSort("tags")}
+                            />
+                          </th>
+                          <th className="px-5 py-4 text-center">
+                            <ColumnSortButton
+                              label="Contato"
+                              active={sortField === "contact"}
+                              direction={sortDirection}
+                              onClick={() => toggleSort("contact")}
+                              align="center"
+                            />
+                          </th>
+                          <th className="px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            Ações
+                          </th>
+                        </tr>
+                      </thead>
 
-                    <tbody>
-                      {paginatedFeedbacks.map((feedback, index) => (
-                        <tr
-                          key={feedback.id}
-                          className={[
-                            "border-b border-slate-800/80 transition hover:bg-slate-900/90 print:border-slate-300",
-                            index % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/40",
-                          ].join(" ")}
-                        >
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[170px]">
-                              <p className="text-sm font-medium text-white print:text-slate-900">
-                                {formatDate(feedback.createdAt)}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Registro cronológico
-                              </p>
-                            </div>
-                          </td>
+                      <tbody>
+                        {paginatedFeedbacks.map((feedback, index) => (
+                          <tr
+                            key={feedback.id}
+                            className={[
+                              "border-b border-slate-800/80 transition hover:bg-slate-900/90 print:border-slate-300",
+                              index % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/40",
+                            ].join(" ")}
+                          >
+                            <td className="px-5 py-5 align-top">
+                              <div className="min-w-[170px]">
+                                <p className="text-sm font-medium text-white print:text-slate-900">
+                                  {formatDate(feedback.createdAt)}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Registro cronológico
+                                </p>
+                              </div>
+                            </td>
 
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[150px]">
+                            <td className="px-5 py-5 align-top">
+                              <div className="min-w-[150px]">
+                                <span
+                                  className={[
+                                    "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                                    getRatingBadgeClass(feedback.rating),
+                                  ].join(" ")}
+                                >
+                                  {feedback.rating} · {getRatingLabel(feedback.rating)}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top">
+                              <div className="min-w-[190px]">
+                                <p className="text-sm font-semibold text-white print:text-slate-900">
+                                  {feedback.branch?.name ?? "-"}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Unidade operacional
+                                </p>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top">
+                              <div className="min-w-[170px]">
+                                <p className="text-sm font-semibold text-white print:text-slate-900">
+                                  {feedback.kiosk?.name ?? "-"}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Ponto de coleta
+                                </p>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top">
+                              <div className="max-w-[380px]">
+                                <p className="line-clamp-3 text-sm leading-6 text-slate-200 print:text-slate-700">
+                                  {feedback.comment?.trim() || "Sem comentário informado."}
+                                </p>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top">
+                              <div className="flex max-w-[320px] flex-wrap gap-2">
+                                {(feedback.tags ?? []).length > 0 ? (
+                                  feedback.tags!.map((item) => (
+                                    <span
+                                      key={item.id}
+                                      className="inline-flex rounded-full border px-3 py-1 text-xs font-medium"
+                                      style={getTagStyle(item.tag?.color)}
+                                    >
+                                      {item.tag?.name ?? "Tag"}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-sm text-slate-500">Sem tags</span>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top text-center">
                               <span
                                 className={[
                                   "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
-                                  getRatingBadgeClass(feedback.rating),
+                                  hasContactInfo(feedback)
+                                    ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                    : "border border-slate-700 bg-slate-800 text-slate-400",
                                 ].join(" ")}
                               >
-                                {feedback.rating} · {getRatingLabel(feedback.rating)}
+                                {hasContactInfo(feedback) ? "Disponível" : "Não informado"}
                               </span>
-                            </div>
-                          </td>
+                            </td>
 
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[190px]">
-                              <p className="text-sm font-semibold text-white print:text-slate-900">
-                                {feedback.branch?.name ?? "-"}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Unidade operacional
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[170px]">
-                              <p className="text-sm font-semibold text-white print:text-slate-900">
-                                {feedback.kiosk?.name ?? "-"}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Ponto de coleta
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="max-w-[380px]">
-                              <p className="line-clamp-3 text-sm leading-6 text-slate-200 print:text-slate-700">
-                                {feedback.comment?.trim() || "Sem comentário informado."}
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="flex max-w-[320px] flex-wrap gap-2">
-                              {(feedback.tags ?? []).length > 0 ? (
-                                feedback.tags!.map((item) => (
-                                  <span
-                                    key={item.id}
-                                    className="inline-flex rounded-full border px-3 py-1 text-xs font-medium"
-                                    style={getTagStyle(item.tag?.color)}
+                            <td className="px-5 py-5 align-top">
+                              <div className="flex justify-end">
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePrintSingleFeedback(feedback)}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-800 print:hidden"
+                                    title="Exportar feedback"
                                   >
-                                    {item.tag?.name ?? "Tag"}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-sm text-slate-500">Sem tags</span>
-                              )}
-                            </div>
-                          </td>
+                                    <Printer size={16} />
+                                    Exportar
+                                  </button>
 
-                          <td className="px-5 py-5 align-top text-center">
-                            <span
-                              className={[
-                                "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
-                                hasContactInfo(feedback)
-                                  ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                                  : "border border-slate-700 bg-slate-800 text-slate-400",
-                              ].join(" ")}
-                            >
-                              {hasContactInfo(feedback) ? "Disponível" : "Não informado"}
-                            </span>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="flex justify-end">
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handlePrintSingleFeedback(feedback)}
-                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-800 print:hidden"
-                                  title="Exportar feedback"
-                                >
-                                  <Printer size={16} />
-                                  Exportar
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedFeedback(feedback)}
-                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 print:hidden"
-                                  title="Ver detalhes"
-                                >
-                                  <Eye size={16} />
-                                  Detalhes
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedFeedback(feedback)}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 print:hidden"
+                                    title="Ver detalhes"
+                                  >
+                                    <Eye size={16} />
+                                    Detalhes
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {!loading && sortedFeedbacks.length > 0 ? (
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
-                <p className="text-sm text-slate-400">
-                  Exibindo página <span className="font-semibold text-white">{page}</span> de{" "}
-                  <span className="font-semibold text-white">{totalPages}</span>
-                </p>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    disabled={page === 1}
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Anterior
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPage((current) => Math.min(totalPages, current + 1))
-                    }
-                    disabled={page === totalPages}
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Próxima
-                  </button>
-                </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            ) : null}
+
+              {!loading && sortedFeedbacks.length > 0 ? (
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
+                  <p className="text-sm text-slate-400">
+                    Exibindo página <span className="font-semibold text-white">{page}</span> de{" "}
+                    <span className="font-semibold text-white">{totalPages}</span>
+                  </p>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage((current) => Math.max(1, current - 1))}
+                      disabled={page === 1}
+                      className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Anterior
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPage((current) => Math.min(totalPages, current + 1))
+                      }
+                      disabled={page === totalPages}
+                      className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Próxima
+                    </button>
+                  </div>
+                </div>
+              ) : null}
           </section>
 
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
