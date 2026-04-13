@@ -144,6 +144,7 @@ export default function FeedbackKiosk() {
     options: string[];
   } | null>(null);
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [activeVisualKey, setActiveVisualKey] = useState<string | null>(null);
 
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -154,6 +155,7 @@ export default function FeedbackKiosk() {
   const tagsSnapshotRef = useRef("");
   const pendingConfigRef = useRef<PublicKioskConfig | null>(null);
   const pendingTagsRef = useRef<TagOption[] | null>(null);
+  const keyHighlightTimerRef = useRef<number | null>(null);
 
   const kioskToken = useMemo(() => getKioskTokenFromUrl(), []);
 
