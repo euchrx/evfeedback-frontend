@@ -8,6 +8,7 @@ import {
   Eye,
   MessageSquareText,
   Printer,
+  Calendar,
   Star,
   Store,
   X,
@@ -1315,28 +1316,29 @@ export default function PublicFeedbacksPage() {
                     </select>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Data inicial
-                    </label>
+                  <div className="relative">
                     <input
                       type="date"
                       value={filters.startDate ?? ""}
                       onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:invert"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pr-11 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-11 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                     />
+                    <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                       Data final
                     </label>
-                    <input
-                      type="date"
-                      value={filters.endDate ?? ""}
-                      onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:invert"
-                    />
+                    <div className="relative">
+                      <input
+                        type="date"
+                        value={filters.endDate ?? ""}
+                        onChange={(e) => handleChangeFilter("endDate", e.target.value)}
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pr-11 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-11 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                      />
+                      <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
