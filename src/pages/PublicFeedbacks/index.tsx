@@ -21,11 +21,13 @@ import type { FeedbackItem } from "../../services/feedbacks";
 const PAGE_SIZE = 10;
 
 type SortField =
+  | "priority"
   | "createdAt"
   | "rating"
   | "branch"
   | "kiosk"
   | "comment"
+  | "tags"
   | "contact";
 
 type SortDirection = "asc" | "desc";
@@ -231,6 +233,89 @@ function escapeCsvValue(value: unknown) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+function normalizeText(value?: string | null) {
+  return (value ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+function isBadTag(tagName?: string | null) {
+  const text = normalizeText(tagName);
+
+  if (!text) return false;
+
+  const badTerms = [
+    "ruim",
+    "pessimo",
+    "péssimo",
+    "demora",
+    "espera",
+    "tempo de espera",
+    "atraso",
+    "problema",
+    "reclamacao",
+    "reclamação",
+    "insatisfacao",
+    "insatisfação",
+    "atendimento ruim",
+    "fila",
+    "lento",
+    "lentidao",
+    "lentidão",
+    "erro",
+    "falha",
+    "sujeira",
+    "desorganizacao",
+    "desorganização",
+  ];
+
+  return badTerms.some((term) => text.includes(normalizeText(term)));
+}
+
+function getFeedbackPriorityScore(feedback: FeedbackItem) {
+  const hasBadTag = (feedback.tags ?? []).some((item) =>
+    isBadTag(item.tag?.name),
+  );
+
+  const hasContact = hasContactInfo(feedback);
+  const ratingWeight = 6 - feedback.rating;
+  const hasComment = Boolean(feedback.comment?.trim());
+  const createdAtWeight = new Date(feedback.createdAt).getTime();
+
+  return {
+    hasBadTag,
+    hasContact,
+    ratingWeight,
+    hasComment,
+    createdAtWeight,
+  };
+}
+
+function comparePriority(a: FeedbackItem, b: FeedbackItem) {
+  const pa = getFeedbackPriorityScore(a);
+  const pb = getFeedbackPriorityScore(b);
+
+  if (Number(pb.hasBadTag) !== Number(pa.hasBadTag)) {
+    return Number(pb.hasBadTag) - Number(pa.hasBadTag);
+  }
+
+  if (Number(pb.hasContact) !== Number(pa.hasContact)) {
+    return Number(pb.hasContact) - Number(pa.hasContact);
+  }
+
+  if (pb.ratingWeight !== pa.ratingWeight) {
+    return pb.ratingWeight - pa.ratingWeight;
+  }
+
+  if (Number(pb.hasComment) !== Number(pa.hasComment)) {
+    return Number(pb.hasComment) - Number(pa.hasComment);
+  }
+
+  return pb.createdAtWeight - pa.createdAtWeight;
+}
+
 export default function PublicFeedbacksPage() {
   const token = useMemo(() => getTokenFromUrl(), []);
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
@@ -251,7 +336,7 @@ export default function PublicFeedbacksPage() {
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortField, setSortField] = useState<SortField>("priority");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   useEffect(() => {
@@ -331,7 +416,13 @@ export default function PublicFeedbacksPage() {
     }
 
     setSortField(field);
-    setSortDirection(field === "createdAt" ? "desc" : "asc");
+
+    if (field === "createdAt" || field === "priority") {
+      setSortDirection("desc");
+      return;
+    }
+
+    setSortDirection("asc");
   }
 
   function handleExportCsv() {
@@ -466,6 +557,11 @@ export default function PublicFeedbacksPage() {
     items.sort((a, b) => {
       let result = 0;
 
+      if (sortField === "priority") {
+        result = comparePriority(a, b);
+        return sortDirection === "asc" ? -result : result;
+      }
+
       if (sortField === "createdAt") {
         result = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       } else if (sortField === "rating") {
@@ -476,6 +572,22 @@ export default function PublicFeedbacksPage() {
         result = (a.kiosk?.name ?? "").localeCompare(b.kiosk?.name ?? "");
       } else if (sortField === "comment") {
         result = (a.comment ?? "").localeCompare(b.comment ?? "");
+      } else if (sortField === "tags") {
+        const aTags = (a.tags ?? [])
+          .map((item) => item.tag?.name ?? "")
+          .join(", ");
+        const bTags = (b.tags ?? [])
+          .map((item) => item.tag?.name ?? "")
+          .join(", ");
+
+        const aHasBadTag = (a.tags ?? []).some((item) => isBadTag(item.tag?.name));
+        const bHasBadTag = (b.tags ?? []).some((item) => isBadTag(item.tag?.name));
+
+        if (aHasBadTag !== bHasBadTag) {
+          result = Number(aHasBadTag) - Number(bHasBadTag);
+        } else {
+          result = aTags.localeCompare(bTags);
+        }
       } else if (sortField === "contact") {
         result = Number(hasContactInfo(a)) - Number(hasContactInfo(b));
       }
@@ -872,8 +984,13 @@ export default function PublicFeedbacksPage() {
                             onClick={() => toggleSort("comment")}
                           />
                         </th>
-                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Tags operacionais
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Tags operacionais"
+                            active={sortField === "tags"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("tags")}
+                          />
                         </th>
                         <th className="px-5 py-4 text-center">
                           <ColumnSortButton
