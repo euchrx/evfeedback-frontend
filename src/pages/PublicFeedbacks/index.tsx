@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
   Building2,
-  CalendarClock,
+  Download,
   Eye,
+  FileSpreadsheet,
   MessageSquareText,
+  Printer,
+  ShieldCheck,
   Star,
   Store,
   X,
@@ -81,9 +84,9 @@ function getTokenFromUrl() {
 function hasContactInfo(feedback: FeedbackItem) {
   return Boolean(
     feedback.contactName?.trim() ||
-    feedback.contactPhone?.trim() ||
-    feedback.contactMessage?.trim() ||
-    feedback.contactConsent,
+      feedback.contactPhone?.trim() ||
+      feedback.contactMessage?.trim() ||
+      feedback.contactConsent,
   );
 }
 
@@ -124,7 +127,7 @@ function SummaryCard({
   value,
   helper,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   helper: string;
@@ -186,6 +189,51 @@ function ColumnSortButton({
       ) : null}
     </button>
   );
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function hexToRgb(hex?: string | null) {
+  if (!hex) return null;
+
+  const cleaned = hex.replace("#", "").trim();
+
+  if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return null;
+
+  const bigint = Number.parseInt(cleaned, 16);
+  return {
+    r: (bigint >> 16) & 255,
+    g: (bigint >> 8) & 255,
+    b: bigint & 255,
+  };
+}
+
+function getTagStyle(color?: string | null) {
+  const rgb = hexToRgb(color);
+
+  if (!rgb) {
+    return {
+      borderColor: "rgba(71, 85, 105, 0.9)",
+      backgroundColor: "rgba(30, 41, 59, 0.9)",
+      color: "rgb(226, 232, 240)",
+    };
+  }
+
+  const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+  const textColor = brightness > 160 ? "#0f172a" : "#ffffff";
+
+  return {
+    borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.55)`,
+    backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.18)`,
+    color: textColor,
+  };
+}
+
+function escapeCsvValue(value: unknown) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
 }
 
 export default function PublicFeedbacksPage() {
@@ -291,6 +339,77 @@ export default function PublicFeedbacksPage() {
     setSortDirection(field === "createdAt" ? "desc" : "asc");
   }
 
+  function handleExportCsv() {
+    const rows = sortedFeedbacks.map((feedback) => ({
+      dataHora: formatDate(feedback.createdAt),
+      nota: feedback.rating,
+      avaliacao: getRatingLabel(feedback.rating),
+      filial: feedback.branch?.name ?? "",
+      kiosk: feedback.kiosk?.name ?? "",
+      comentario: feedback.comment?.trim() ?? "",
+      tags: (feedback.tags ?? []).map((item) => item.tag?.name ?? "").join(", "),
+      contatoDisponivel: hasContactInfo(feedback) ? "Sim" : "Não",
+      nomeContato: feedback.contactName?.trim() ?? "",
+      telefoneContato: feedback.contactPhone?.trim() ?? "",
+      mensagemContato: feedback.contactMessage?.trim() ?? "",
+      consentimento: feedback.contactConsent ? "Sim" : "Não",
+    }));
+
+    const header = [
+      "Data/Hora",
+      "Nota",
+      "Avaliação",
+      "Filial",
+      "Kiosk",
+      "Comentário",
+      "Tags",
+      "Contato disponível",
+      "Nome contato",
+      "Telefone contato",
+      "Mensagem contato",
+      "Consentimento",
+    ];
+
+    const lines = rows.map((row) =>
+      [
+        row.dataHora,
+        row.nota,
+        row.avaliacao,
+        row.filial,
+        row.kiosk,
+        row.comentario,
+        row.tags,
+        row.contatoDisponivel,
+        row.nomeContato,
+        row.telefoneContato,
+        row.mensagemContato,
+        row.consentimento,
+      ]
+        .map(escapeCsvValue)
+        .join(";"),
+    );
+
+    const csv = [header.map(escapeCsvValue).join(";"), ...lines].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    link.href = url;
+    link.download = `feedbacks-compartilhados-${stamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  function handlePrintPdf() {
+    window.print();
+  }
+
   const branchOptions = useMemo(() => {
     const map = new Map<string, string>();
 
@@ -364,8 +483,7 @@ export default function PublicFeedbacksPage() {
       } else if (sortField === "comment") {
         result = (a.comment ?? "").localeCompare(b.comment ?? "");
       } else if (sortField === "contact") {
-        result =
-          Number(hasContactInfo(a)) - Number(hasContactInfo(b));
+        result = Number(hasContactInfo(a)) - Number(hasContactInfo(b));
       }
 
       return sortDirection === "asc" ? result : -result;
@@ -435,8 +553,7 @@ export default function PublicFeedbacksPage() {
 
     return [5, 4, 3, 2, 1].map((rating) => {
       const count = counts[rating as 1 | 2 | 3 | 4 | 5];
-      const percentage =
-        totalFeedbacks > 0 ? (count / totalFeedbacks) * 100 : 0;
+      const percentage = totalFeedbacks > 0 ? (count / totalFeedbacks) * 100 : 0;
 
       return {
         rating,
@@ -447,40 +564,67 @@ export default function PublicFeedbacksPage() {
     });
   }, [sortedFeedbacks, totalFeedbacks]);
 
-  const branchSummary = useMemo(() => {
+  const branchRanking = useMemo(() => {
     const map = new Map<
       string,
       {
         branchName: string;
         total: number;
-        avg: number;
+        avgAccumulator: number;
         comments: number;
+        contacts: number;
+        promoters: number;
       }
     >();
 
     sortedFeedbacks.forEach((item) => {
       const branchName = item.branch?.name?.trim() || "Sem filial";
+
       const current = map.get(branchName) ?? {
         branchName,
         total: 0,
-        avg: 0,
+        avgAccumulator: 0,
         comments: 0,
+        contacts: 0,
+        promoters: 0,
       };
 
       current.total += 1;
-      current.avg += item.rating;
+      current.avgAccumulator += item.rating;
       if (item.comment?.trim()) current.comments += 1;
+      if (hasContactInfo(item)) current.contacts += 1;
+      if (item.rating >= 4) current.promoters += 1;
 
       map.set(branchName, current);
     });
 
     return Array.from(map.values())
-      .map((item) => ({
+      .map((item) => {
+        const avg = item.total > 0 ? item.avgAccumulator / item.total : 0;
+        const commentRate = item.total > 0 ? item.comments / item.total : 0;
+        const promoterRate = item.total > 0 ? item.promoters / item.total : 0;
+        const score = avg * 100 + promoterRate * 20 + commentRate * 10 + item.total;
+
+        return {
+          branchName: item.branchName,
+          total: item.total,
+          avg,
+          comments: item.comments,
+          contacts: item.contacts,
+          promoterRate,
+          score,
+        };
+      })
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        if (b.avg !== a.avg) return b.avg - a.avg;
+        return b.total - a.total;
+      })
+      .map((item, index) => ({
         ...item,
-        avg: item.total > 0 ? item.avg / item.total : 0,
+        rank: index + 1,
       }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 6);
+      .slice(0, 9);
   }, [sortedFeedbacks]);
 
   if (!token) {
@@ -503,8 +647,78 @@ export default function PublicFeedbacksPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8">
+      <style>{`
+        @media print {
+          body {
+            background: white !important;
+          }
+
+          .print\\:hidden {
+            display: none !important;
+          }
+
+          .print\\:bg-white {
+            background: white !important;
+          }
+
+          .print\\:text-slate-900 {
+            color: #0f172a !important;
+          }
+
+          .print\\:border-slate-300 {
+            border-color: #cbd5e1 !important;
+          }
+
+          .print\\:shadow-none {
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
+
+      <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8 print:bg-white print:text-slate-900">
         <div className="mx-auto max-w-[1700px] space-y-8">
+          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-2xl print:border-slate-300 print:bg-white print:shadow-none">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300 print:border-slate-300 print:bg-white print:text-slate-900">
+                  <ShieldCheck size={14} />
+                  Acesso somente leitura
+                </div>
+
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight text-white print:text-slate-900 sm:text-4xl">
+                    Relatório executivo de feedbacks
+                  </h1>
+                  <p className="mt-3 max-w-5xl text-sm leading-7 text-slate-300 print:text-slate-700 sm:text-base">
+                    Visão estruturada para acompanhamento operacional e gerencial
+                    dos registros de atendimento, percepção do cliente, pontos de
+                    coleta e ocorrências por unidade.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3 print:hidden">
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Exportar CSV
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintPdf}
+                  className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+                >
+                  <Printer className="h-4 w-4" />
+                  Exportar PDF
+                </button>
+              </div>
+            </div>
+          </section>
+
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <SummaryCard
               icon={<MessageSquareText className="h-5 w-5" />}
@@ -542,13 +756,13 @@ export default function PublicFeedbacksPage() {
             />
           </section>
 
-          <section className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-            <div className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
+          <section className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
+            <div className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
               <div className="flex flex-col gap-2">
-                <h2 className="text-2xl font-semibold tracking-tight text-white">
+                <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
                   Filtros e recorte operacional
                 </h2>
-                <p className="text-sm leading-6 text-slate-400">
+                <p className="text-sm leading-6 text-slate-400 print:text-slate-700">
                   Refine a visualização por nota, filial, kiosk, período e texto livre.
                 </p>
               </div>
@@ -664,48 +878,35 @@ export default function PublicFeedbacksPage() {
               </div>
             </div>
 
-            <div className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-white">
-                    Distribuição por nota
-                  </h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">
-                    Visão rápida da concentração das avaliações.
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Comentários
-                  </p>
-                  <p className="mt-2 text-lg font-bold text-white">
-                    {loading ? "--" : feedbacksWithComment}
-                  </p>
-                </div>
+            <div className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
+                  Distribuição por nota
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400 print:text-slate-700">
+                  Visão rápida da concentração das avaliações.
+                </p>
               </div>
 
               <div className="mt-6 space-y-4">
                 {ratingsDistribution.map((item) => (
                   <div key={item.rating} className="space-y-2">
                     <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={[
-                            "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
-                            getRatingBadgeClass(item.rating),
-                          ].join(" ")}
-                        >
-                          {item.rating} · {item.label}
-                        </span>
-                      </div>
+                      <span
+                        className={[
+                          "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                          getRatingBadgeClass(item.rating),
+                        ].join(" ")}
+                      >
+                        {item.rating} · {item.label}
+                      </span>
 
-                      <div className="text-sm text-slate-300">
+                      <div className="text-sm text-slate-300 print:text-slate-700">
                         {item.count} registro(s)
                       </div>
                     </div>
 
-                    <div className="h-2.5 rounded-full bg-slate-800">
+                    <div className="h-2.5 rounded-full bg-slate-800 print:bg-slate-200">
                       <div
                         className="h-2.5 rounded-full bg-sky-500 transition-all"
                         style={{ width: `${item.percentage}%` }}
@@ -714,120 +915,187 @@ export default function PublicFeedbacksPage() {
                   </div>
                 ))}
               </div>
+
+              <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-4 text-sm text-slate-300 print:border-slate-300 print:bg-white print:text-slate-700">
+                <span className="font-semibold text-white print:text-slate-900">
+                  Total:
+                </span>{" "}
+                {totalFeedbacks} registro(s)
+              </div>
             </div>
           </section>
 
-          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-white">
-                  Resumo por filial
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Destaque das unidades com maior volume de registros dentro do recorte atual.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Última atualização visual
-                </p>
-                <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-slate-300">
-                  <CalendarClock className="h-4 w-4" />
-                  Agora
-                </p>
-              </div>
+          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
+                Ranking de filiais
+              </h2>
+              <p className="text-sm leading-6 text-slate-400 print:text-slate-700">
+                Ordenação por desempenho real considerando nota média, taxa de avaliações
+                positivas, volume e profundidade de registro.
+              </p>
             </div>
 
-            <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-              {branchSummary.length === 0 ? (
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/50 p-5 text-sm text-slate-400 lg:col-span-2 xl:col-span-3">
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {branchRanking.length === 0 ? (
+                <div className="rounded-3xl border border-slate-800 bg-slate-950/50 p-5 text-sm text-slate-400 md:col-span-2 xl:col-span-3">
                   Nenhuma filial encontrada no recorte atual.
                 </div>
               ) : (
-                branchSummary.map((item) => (
-                  <div
-                    key={item.branchName}
-                    className="rounded-3xl border border-slate-800 bg-slate-950/60 p-5"
-                  >
-                    <p className="text-lg font-semibold text-white">
-                      {item.branchName}
-                    </p>
+                branchRanking.map((item) => {
+                  const rankStyle =
+                    item.rank === 1
+                      ? "border-amber-500/35 bg-amber-500/10 text-amber-300"
+                      : item.rank === 2
+                        ? "border-slate-400/35 bg-slate-400/10 text-slate-200"
+                        : item.rank === 3
+                          ? "border-orange-500/35 bg-orange-500/10 text-orange-300"
+                          : "border-slate-700 bg-slate-900/70 text-slate-300";
 
-                    <div className="mt-5 grid grid-cols-3 gap-3">
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Registros
-                        </p>
-                        <p className="mt-2 text-xl font-bold text-white">
-                          {item.total}
-                        </p>
+                  return (
+                    <div
+                      key={item.branchName}
+                      className="rounded-3xl border border-slate-800 bg-slate-950/60 p-5"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <span
+                            className={[
+                              "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                              rankStyle,
+                            ].join(" ")}
+                          >
+                            #{item.rank}
+                          </span>
+
+                          <p className="mt-4 text-lg font-semibold text-white">
+                            {item.branchName}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                            Score
+                          </p>
+                          <p className="mt-2 text-lg font-bold text-white">
+                            {item.score.toFixed(1)}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Média
-                        </p>
-                        <p className="mt-2 text-xl font-bold text-white">
-                          {item.avg.toFixed(1)}
-                        </p>
+                      <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+                        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Registros
+                          </p>
+                          <p className="mt-2 text-xl font-bold text-white">
+                            {item.total}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Média
+                          </p>
+                          <p className="mt-2 text-xl font-bold text-white">
+                            {item.avg.toFixed(1)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Comentários
+                          </p>
+                          <p className="mt-2 text-xl font-bold text-white">
+                            {item.comments}
+                          </p>
+                        </div>
+
+                        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Contatos
+                          </p>
+                          <p className="mt-2 text-xl font-bold text-white">
+                            {item.contacts}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Comentários
-                        </p>
-                        <p className="mt-2 text-xl font-bold text-white">
-                          {item.comments}
-                        </p>
+                      <div className="mt-4">
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="text-slate-400">Avaliações positivas</span>
+                          <span className="font-semibold text-white">
+                            {(item.promoterRate * 100).toFixed(0)}%
+                          </span>
+                        </div>
+
+                        <div className="h-2.5 rounded-full bg-slate-800">
+                          <div
+                            className="h-2.5 rounded-full bg-emerald-500"
+                            style={{
+                              width: `${clamp(item.promoterRate * 100, 0, 100)}%`,
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </section>
 
-          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-white">
+                <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
                   Painel detalhado de feedbacks
                 </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-2 text-sm leading-6 text-slate-400 print:text-slate-700">
                   Leitura estruturada dos registros com ordenação por coluna, foco em unidade,
                   avaliação, comentário, contato e marcadores operacionais.
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Ordenação atual
-                </p>
-                <p className="mt-2 text-sm font-medium text-slate-300">
-                  {sortField} · {sortDirection === "asc" ? "crescente" : "decrescente"}
-                </p>
+              <div className="flex flex-wrap gap-3 print:hidden">
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
+                >
+                  <Download className="h-4 w-4" />
+                  CSV
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintPdf}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
+                >
+                  <Printer className="h-4 w-4" />
+                  PDF
+                </button>
               </div>
             </div>
 
-            <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/55">
+            <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/55 print:border-slate-300 print:bg-white">
               {loading ? (
                 <div className="px-6 py-14 text-center text-slate-400">
                   Carregando feedbacks...
                 </div>
               ) : sortedFeedbacks.length === 0 ? (
                 <div className="px-6 py-14 text-center">
-                  <p className="text-lg font-semibold text-white">
+                  <p className="text-lg font-semibold text-white print:text-slate-900">
                     Nenhum feedback encontrado
                   </p>
-                  <p className="mt-2 text-sm text-slate-400">
+                  <p className="mt-2 text-sm text-slate-400 print:text-slate-700">
                     Ajuste os filtros para ampliar o recorte ou limpe a pesquisa atual.
                   </p>
                 </div>
               ) : (
                 <div className="max-h-[720px] overflow-auto">
-                  <table className="min-w-[1480px] w-full">
-                    <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
+                  <table className="min-w-[1500px] w-full">
+                    <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur print:border-slate-300 print:bg-white">
                       <tr>
                         <th className="px-5 py-4 text-left">
                           <ColumnSortButton
@@ -892,13 +1160,13 @@ export default function PublicFeedbacksPage() {
                         <tr
                           key={feedback.id}
                           className={[
-                            "border-b border-slate-800/80 transition hover:bg-slate-900/90",
+                            "border-b border-slate-800/80 transition hover:bg-slate-900/90 print:border-slate-300",
                             index % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/40",
                           ].join(" ")}
                         >
                           <td className="px-5 py-5 align-top">
                             <div className="min-w-[170px]">
-                              <p className="text-sm font-medium text-white">
+                              <p className="text-sm font-medium text-white print:text-slate-900">
                                 {formatDate(feedback.createdAt)}
                               </p>
                               <p className="mt-1 text-xs text-slate-500">
@@ -922,7 +1190,7 @@ export default function PublicFeedbacksPage() {
 
                           <td className="px-5 py-5 align-top">
                             <div className="min-w-[190px]">
-                              <p className="text-sm font-semibold text-white">
+                              <p className="text-sm font-semibold text-white print:text-slate-900">
                                 {feedback.branch?.name ?? "-"}
                               </p>
                               <p className="mt-1 text-xs text-slate-500">
@@ -933,7 +1201,7 @@ export default function PublicFeedbacksPage() {
 
                           <td className="px-5 py-5 align-top">
                             <div className="min-w-[170px]">
-                              <p className="text-sm font-semibold text-white">
+                              <p className="text-sm font-semibold text-white print:text-slate-900">
                                 {feedback.kiosk?.name ?? "-"}
                               </p>
                               <p className="mt-1 text-xs text-slate-500">
@@ -944,19 +1212,20 @@ export default function PublicFeedbacksPage() {
 
                           <td className="px-5 py-5 align-top">
                             <div className="max-w-[380px]">
-                              <p className="line-clamp-3 text-sm leading-6 text-slate-200">
+                              <p className="line-clamp-3 text-sm leading-6 text-slate-200 print:text-slate-700">
                                 {feedback.comment?.trim() || "Sem comentário informado."}
                               </p>
                             </div>
                           </td>
 
                           <td className="px-5 py-5 align-top">
-                            <div className="flex max-w-[300px] flex-wrap gap-2">
-                              {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
+                            <div className="flex max-w-[320px] flex-wrap gap-2">
+                              {(feedback.tags ?? []).length > 0 ? (
                                 feedback.tags!.map((item) => (
                                   <span
                                     key={item.id}
-                                    className="inline-flex rounded-full border border-slate-700 bg-slate-800 px-3 py-1 text-xs font-medium text-slate-200"
+                                    className="inline-flex rounded-full border px-3 py-1 text-xs font-medium"
+                                    style={getTagStyle(item.tag?.color)}
                                   >
                                     {item.tag?.name ?? "Tag"}
                                   </span>
@@ -985,7 +1254,7 @@ export default function PublicFeedbacksPage() {
                               <button
                                 type="button"
                                 onClick={() => setSelectedFeedback(feedback)}
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700"
+                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 print:hidden"
                                 title="Ver detalhes"
                               >
                                 <Eye size={16} />
@@ -1002,7 +1271,7 @@ export default function PublicFeedbacksPage() {
             </div>
 
             {!loading && sortedFeedbacks.length > 0 ? (
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
                 <p className="text-sm text-slate-400">
                   Exibindo página <span className="font-semibold text-white">{page}</span> de{" "}
                   <span className="font-semibold text-white">{totalPages}</span>
@@ -1036,7 +1305,7 @@ export default function PublicFeedbacksPage() {
       </main>
 
       {selectedFeedback ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm print:hidden">
           <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-[32px] border border-slate-800 bg-slate-900 p-6 shadow-2xl sm:p-7">
             <div className="flex flex-col gap-4 border-b border-slate-800 pb-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -1186,7 +1455,8 @@ export default function PublicFeedbacksPage() {
                     {selectedFeedback.tags!.map((item) => (
                       <span
                         key={item.id}
-                        className="inline-flex rounded-full border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200"
+                        className="inline-flex rounded-full border px-3 py-1.5 text-xs font-semibold"
+                        style={getTagStyle(item.tag?.color)}
                       >
                         {item.tag?.name ?? "Tag"}
                       </span>
