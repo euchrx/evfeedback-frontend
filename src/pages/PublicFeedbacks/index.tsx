@@ -84,9 +84,9 @@ function getTokenFromUrl() {
 function hasContactInfo(feedback: FeedbackItem) {
   return Boolean(
     feedback.contactName?.trim() ||
-    feedback.contactPhone?.trim() ||
-    feedback.contactMessage?.trim() ||
-    feedback.contactConsent,
+      feedback.contactPhone?.trim() ||
+      feedback.contactMessage?.trim() ||
+      feedback.contactConsent,
   );
 }
 
@@ -472,8 +472,7 @@ export default function PublicFeedbacksPage() {
       let result = 0;
 
       if (sortField === "createdAt") {
-        result =
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        result = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       } else if (sortField === "rating") {
         result = a.rating - b.rating;
       } else if (sortField === "branch") {
@@ -748,6 +747,120 @@ export default function PublicFeedbacksPage() {
               </div>
             </div>
 
+            <div className="mt-6 rounded-[28px] border border-slate-800 bg-slate-950/45 p-4 print:hidden">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+                <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Nota
+                    </label>
+                    <select
+                      value={filters.rating ?? ""}
+                      onChange={(e) => handleChangeFilter("rating", e.target.value)}
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                    >
+                      <option value="">Todas</option>
+                      <option value="1">1 - Péssimo</option>
+                      <option value="2">2 - Ruim</option>
+                      <option value="3">3 - Regular</option>
+                      <option value="4">4 - Bom</option>
+                      <option value="5">5 - Excelente</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Filial
+                    </label>
+                    <select
+                      value={filters.branchId ?? ""}
+                      onChange={(e) => handleChangeFilter("branchId", e.target.value)}
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                    >
+                      <option value="">Todas</option>
+                      {branchOptions.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Kiosk
+                    </label>
+                    <select
+                      value={filters.kioskId ?? ""}
+                      onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                    >
+                      <option value="">Todos</option>
+                      {kioskOptions.map((kiosk) => (
+                        <option key={kiosk.id} value={kiosk.id}>
+                          {kiosk.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Data inicial
+                    </label>
+                    <input
+                      type="date"
+                      value={filters.startDate ?? ""}
+                      onChange={(e) => handleChangeFilter("startDate", e.target.value)}
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Data final
+                    </label>
+                    <input
+                      type="date"
+                      value={filters.endDate ?? ""}
+                      onChange={(e) => handleChangeFilter("endDate", e.target.value)}
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-500"
+                    />
+                  </div>
+
+                  <div className="space-y-2 xl:col-span-1">
+                    <label className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Busca textual
+                    </label>
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Buscar..."
+                      className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 transition focus:border-sky-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 xl:shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleApplyFilters}
+                    className="rounded-2xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700"
+                  >
+                    Aplicar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClearFilters}
+                    className="rounded-2xl border border-slate-700 bg-slate-950 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/55 print:border-slate-300 print:bg-white">
               {loading ? (
                 <div className="px-6 py-14 text-center text-slate-400">
@@ -1011,127 +1124,6 @@ export default function PublicFeedbacksPage() {
 
           <section className="grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
             <div className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
-              <div className="flex flex-col gap-2">
-                <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
-                  Filtros e recorte operacional
-                </h2>
-                <p className="text-sm leading-6 text-slate-400 print:text-slate-700">
-                  Refine a visualização por nota, filial, kiosk, período e texto livre.
-                </p>
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Nota
-                  </label>
-                  <select
-                    value={filters.rating ?? ""}
-                    onChange={(e) => handleChangeFilter("rating", e.target.value)}
-                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                  >
-                    <option value="">Todas as notas</option>
-                    <option value="1">1 - Péssimo</option>
-                    <option value="2">2 - Ruim</option>
-                    <option value="3">3 - Regular</option>
-                    <option value="4">4 - Bom</option>
-                    <option value="5">5 - Excelente</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Filial
-                  </label>
-                  <select
-                    value={filters.branchId ?? ""}
-                    onChange={(e) => handleChangeFilter("branchId", e.target.value)}
-                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                  >
-                    <option value="">Todas as filiais</option>
-                    {branchOptions.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Kiosk
-                  </label>
-                  <select
-                    value={filters.kioskId ?? ""}
-                    onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
-                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                  >
-                    <option value="">Todos os kiosks</option>
-                    {kioskOptions.map((kiosk) => (
-                      <option key={kiosk.id} value={kiosk.id}>
-                        {kiosk.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Data inicial
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.startDate ?? ""}
-                    onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Data final
-                  </label>
-                  <input
-                    type="date"
-                    value={filters.endDate ?? ""}
-                    onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_auto_auto]">
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Busca textual
-                  </label>
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
-                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none placeholder:text-slate-500 transition focus:border-sky-500"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleApplyFilters}
-                  className="self-end rounded-2xl bg-sky-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-sky-700"
-                >
-                  Aplicar filtros
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClearFilters}
-                  className="self-end rounded-2xl border border-slate-700 bg-slate-950 px-6 py-3.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
-                >
-                  Limpar
-                </button>
-              </div>
-            </div>
-
-            <div className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
               <div>
                 <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
                   Distribuição por nota
@@ -1176,126 +1168,126 @@ export default function PublicFeedbacksPage() {
                 {totalFeedbacks} registro(s)
               </div>
             </div>
-          </section>
 
-          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
-            <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
-                Ranking de filiais
-              </h2>
-              <p className="text-sm leading-6 text-slate-400 print:text-slate-700">
-                Ordenação por desempenho real considerando nota média, taxa de avaliações
-                positivas, volume e profundidade de registro.
-              </p>
-            </div>
+            <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
+                  Ranking de filiais
+                </h2>
+                <p className="text-sm leading-6 text-slate-400 print:text-slate-700">
+                  Ordenação por desempenho real considerando nota média, taxa de avaliações
+                  positivas, volume e profundidade de registro.
+                </p>
+              </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {branchRanking.length === 0 ? (
-                <div className="rounded-3xl border border-slate-800 bg-slate-950/50 p-5 text-sm text-slate-400 md:col-span-2 xl:col-span-3">
-                  Nenhuma filial encontrada no recorte atual.
-                </div>
-              ) : (
-                branchRanking.map((item) => {
-                  const rankStyle =
-                    item.rank === 1
-                      ? "border-amber-500/35 bg-amber-500/10 text-amber-300"
-                      : item.rank === 2
-                        ? "border-slate-400/35 bg-slate-400/10 text-slate-200"
-                        : item.rank === 3
-                          ? "border-orange-500/35 bg-orange-500/10 text-orange-300"
-                          : "border-slate-700 bg-slate-900/70 text-slate-300";
+              <div className="mt-6 grid gap-4 md:grid-cols-1 xl:grid-cols-1">
+                {branchRanking.length === 0 ? (
+                  <div className="rounded-3xl border border-slate-800 bg-slate-950/50 p-5 text-sm text-slate-400">
+                    Nenhuma filial encontrada no recorte atual.
+                  </div>
+                ) : (
+                  branchRanking.map((item) => {
+                    const rankStyle =
+                      item.rank === 1
+                        ? "border-amber-500/35 bg-amber-500/10 text-amber-300"
+                        : item.rank === 2
+                          ? "border-slate-400/35 bg-slate-400/10 text-slate-200"
+                          : item.rank === 3
+                            ? "border-orange-500/35 bg-orange-500/10 text-orange-300"
+                            : "border-slate-700 bg-slate-900/70 text-slate-300";
 
-                  return (
-                    <div
-                      key={item.branchName}
-                      className="rounded-3xl border border-slate-800 bg-slate-950/60 p-5"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <span
-                            className={[
-                              "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
-                              rankStyle,
-                            ].join(" ")}
-                          >
-                            #{item.rank}
-                          </span>
+                    return (
+                      <div
+                        key={item.branchName}
+                        className="rounded-3xl border border-slate-800 bg-slate-950/60 p-5"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <span
+                              className={[
+                                "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                                rankStyle,
+                              ].join(" ")}
+                            >
+                              #{item.rank}
+                            </span>
 
-                          <p className="mt-4 text-lg font-semibold text-white">
-                            {item.branchName}
-                          </p>
+                            <p className="mt-4 text-lg font-semibold text-white">
+                              {item.branchName}
+                            </p>
+                          </div>
+
+                          <div className="text-right">
+                            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                              Score
+                            </p>
+                            <p className="mt-2 text-lg font-bold text-white">
+                              {item.score.toFixed(1)}
+                            </p>
+                          </div>
                         </div>
 
-                        <div className="text-right">
-                          <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                            Score
-                          </p>
-                          <p className="mt-2 text-lg font-bold text-white">
-                            {item.score.toFixed(1)}
-                          </p>
+                        <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Registros
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-white">
+                              {item.total}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Média
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-white">
+                              {item.avg.toFixed(1)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Comentários
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-white">
+                              {item.comments}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              Contatos
+                            </p>
+                            <p className="mt-2 text-xl font-bold text-white">
+                              {item.contacts}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4">
+                          <div className="mb-2 flex items-center justify-between text-sm">
+                            <span className="text-slate-400">Avaliações positivas</span>
+                            <span className="font-semibold text-white">
+                              {(item.promoterRate * 100).toFixed(0)}%
+                            </span>
+                          </div>
+
+                          <div className="h-2.5 rounded-full bg-slate-800">
+                            <div
+                              className="h-2.5 rounded-full bg-emerald-500"
+                              style={{
+                                width: `${clamp(item.promoterRate * 100, 0, 100)}%`,
+                              }}
+                            />
+                          </div>
                         </div>
                       </div>
-
-                      <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            Registros
-                          </p>
-                          <p className="mt-2 text-xl font-bold text-white">
-                            {item.total}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            Média
-                          </p>
-                          <p className="mt-2 text-xl font-bold text-white">
-                            {item.avg.toFixed(1)}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            Comentários
-                          </p>
-                          <p className="mt-2 text-xl font-bold text-white">
-                            {item.comments}
-                          </p>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                            Contatos
-                          </p>
-                          <p className="mt-2 text-xl font-bold text-white">
-                            {item.contacts}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
-                        <div className="mb-2 flex items-center justify-between text-sm">
-                          <span className="text-slate-400">Avaliações positivas</span>
-                          <span className="font-semibold text-white">
-                            {(item.promoterRate * 100).toFixed(0)}%
-                          </span>
-                        </div>
-
-                        <div className="h-2.5 rounded-full bg-slate-800">
-                          <div
-                            className="h-2.5 rounded-full bg-emerald-500"
-                            style={{
-                              width: `${clamp(item.promoterRate * 100, 0, 100)}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    );
+                  })
+                )}
+              </div>
+            </section>
           </section>
         </div>
       </main>
