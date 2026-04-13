@@ -233,6 +233,183 @@ function escapeCsvValue(value: unknown) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderTagsText(feedback: FeedbackItem) {
+  return (feedback.tags ?? [])
+    .map((item) => item.tag?.name ?? "")
+    .filter(Boolean)
+    .join(", ");
+}
+
+function renderContactText(feedback: FeedbackItem) {
+  const parts = [
+    feedback.contactName?.trim(),
+    feedback.contactPhone?.trim(),
+    feedback.contactMessage?.trim(),
+  ].filter(Boolean);
+
+  if (!parts.length) {
+    return "Não informado";
+  }
+
+  return parts.join(" | ");
+}
+
+function openPrintWindow(title: string, bodyHtml: string) {
+  const printWindow = window.open("", "_blank", "width=1200,height=900");
+
+  if (!printWindow) return;
+
+  printWindow.document.open();
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8" />
+        <title>${escapeHtml(title)}</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 14mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #111827;
+            margin: 0;
+            background: #ffffff;
+          }
+
+          .report {
+            width: 100%;
+          }
+
+          .header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 12px;
+          }
+
+          .title {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 6px 0;
+          }
+
+          .subtitle {
+            font-size: 12px;
+            color: #4b5563;
+            margin: 0;
+            line-height: 1.5;
+          }
+
+          .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 22px 0 12px 0;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+
+          thead {
+            display: table-header-group;
+          }
+
+          th, td {
+            border: 1px solid #d1d5db;
+            padding: 8px 10px;
+            vertical-align: top;
+            text-align: left;
+            font-size: 12px;
+            line-height: 1.45;
+            word-wrap: break-word;
+          }
+
+          th {
+            background: #f3f4f6;
+            font-weight: 700;
+          }
+
+          tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .muted {
+            color: #6b7280;
+          }
+
+          .detail-card {
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 16px;
+            margin-top: 12px;
+          }
+
+          .label {
+            font-size: 11px;
+            color: #6b7280;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+          }
+
+          .value {
+            font-size: 13px;
+            color: #111827;
+            line-height: 1.5;
+            white-space: pre-wrap;
+          }
+
+          .full {
+            grid-column: 1 / -1;
+          }
+
+          .footer-note {
+            margin-top: 18px;
+            font-size: 11px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        ${bodyHtml}
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+
+  setTimeout(() => {
+    printWindow.print();
+  }, 250);
+}
+
 function normalizeText(value?: string | null) {
   return (value ?? "")
     .normalize("NFD")
@@ -498,7 +675,128 @@ export default function PublicFeedbacksPage() {
   }
 
   function handlePrintPdf() {
-    window.print();
+    const generatedAt = new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date());
+
+    const rowsHtml = sortedFeedbacks
+      .map((feedback) => {
+        return `
+        <tr>
+          <td>${escapeHtml(formatDate(feedback.createdAt))}</td>
+          <td>${escapeHtml(`${feedback.rating} - ${getRatingLabel(feedback.rating)}`)}</td>
+          <td>${escapeHtml(feedback.branch?.name ?? "-")}</td>
+          <td>${escapeHtml(feedback.comment?.trim() || "Sem comentário")}</td>
+          <td>${escapeHtml(renderContactText(feedback))}</td>
+          <td>${escapeHtml(renderTagsText(feedback) || "Sem tags")}</td>
+        </tr>
+      `;
+      })
+      .join("");
+
+    const bodyHtml = `
+    <div class="report">
+      <div class="header">
+        <h1 class="title">Relatório de feedbacks</h1>
+        <p class="subtitle">
+          Gerado em ${escapeHtml(generatedAt)}<br />
+          Total de registros: ${escapeHtml(String(sortedFeedbacks.length))}
+        </p>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 16%;">Data</th>
+            <th style="width: 14%;">Avaliação</th>
+            <th style="width: 16%;">Filial</th>
+            <th style="width: 24%;">Comentário</th>
+            <th style="width: 18%;">Contato</th>
+            <th style="width: 12%;">Tags</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+
+      <p class="footer-note">
+        Documento gerado para acompanhamento e continuidade de atendimento.
+      </p>
+    </div>
+  `;
+
+    openPrintWindow("Relatório de feedbacks", bodyHtml);
+  }
+
+  function handlePrintSingleFeedback(feedback: FeedbackItem) {
+    const generatedAt = new Intl.DateTimeFormat("pt-BR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(new Date());
+
+    const bodyHtml = `
+    <div class="report">
+      <div class="header">
+        <h1 class="title">Feedback detalhado</h1>
+        <p class="subtitle">
+          Documento individual para compartilhamento<br />
+          Gerado em ${escapeHtml(generatedAt)}
+        </p>
+      </div>
+
+      <div class="detail-card">
+        <div class="detail-grid">
+          <div>
+            <div class="label">Data</div>
+            <div class="value">${escapeHtml(formatDate(feedback.createdAt))}</div>
+          </div>
+
+          <div>
+            <div class="label">Avaliação</div>
+            <div class="value">${escapeHtml(`${feedback.rating} - ${getRatingLabel(feedback.rating)}`)}</div>
+          </div>
+
+          <div>
+            <div class="label">Filial</div>
+            <div class="value">${escapeHtml(feedback.branch?.name ?? "-")}</div>
+          </div>
+
+          <div>
+            <div class="label">Kiosk</div>
+            <div class="value">${escapeHtml(feedback.kiosk?.name ?? "-")}</div>
+          </div>
+
+          <div class="full">
+            <div class="label">Comentário</div>
+            <div class="value">${escapeHtml(feedback.comment?.trim() || "Sem comentário informado.")}</div>
+          </div>
+
+          <div class="full">
+            <div class="label">Contato</div>
+            <div class="value">${escapeHtml(renderContactText(feedback))}</div>
+          </div>
+
+          <div class="full">
+            <div class="label">Consentimento</div>
+            <div class="value">${escapeHtml(feedback.contactConsent ? "Sim" : "Não")}</div>
+          </div>
+
+          <div class="full">
+            <div class="label">Tags</div>
+            <div class="value">${escapeHtml(renderTagsText(feedback) || "Sem tags")}</div>
+          </div>
+        </div>
+      </div>
+
+      <p class="footer-note">
+        Documento gerado para continuidade de atendimento e compartilhamento interno.
+      </p>
+    </div>
+  `;
+
+    openPrintWindow("Feedback detalhado", bodyHtml);
   }
 
   const branchOptions = useMemo(() => {
@@ -1115,15 +1413,27 @@ export default function PublicFeedbacksPage() {
 
                           <td className="px-5 py-5 align-top">
                             <div className="flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedFeedback(feedback)}
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 print:hidden"
-                                title="Ver detalhes"
-                              >
-                                <Eye size={16} />
-                                Detalhes
-                              </button>
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handlePrintSingleFeedback(feedback)}
+                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-800 print:hidden"
+                                  title="Exportar feedback"
+                                >
+                                  <Printer size={16} />
+                                  Exportar
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedFeedback(feedback)}
+                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 print:hidden"
+                                  title="Ver detalhes"
+                                >
+                                  <Eye size={16} />
+                                  Detalhes
+                                </button>
+                              </div>
                             </div>
                           </td>
                         </tr>
