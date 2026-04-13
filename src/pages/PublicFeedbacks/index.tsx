@@ -84,9 +84,9 @@ function getTokenFromUrl() {
 function hasContactInfo(feedback: FeedbackItem) {
   return Boolean(
     feedback.contactName?.trim() ||
-      feedback.contactPhone?.trim() ||
-      feedback.contactMessage?.trim() ||
-      feedback.contactConsent,
+    feedback.contactPhone?.trim() ||
+    feedback.contactMessage?.trim() ||
+    feedback.contactConsent,
   );
 }
 
@@ -715,6 +715,263 @@ export default function PublicFeedbacksPage() {
             </div>
           </section>
 
+          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
+                  Painel detalhado de feedbacks
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400 print:text-slate-700">
+                  Leitura estruturada dos registros com ordenação por coluna, foco em unidade,
+                  avaliação, comentário, contato e marcadores operacionais.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3 print:hidden">
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
+                >
+                  <Download className="h-4 w-4" />
+                  CSV
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintPdf}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
+                >
+                  <Printer className="h-4 w-4" />
+                  PDF
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/55 print:border-slate-300 print:bg-white">
+              {loading ? (
+                <div className="px-6 py-14 text-center text-slate-400">
+                  Carregando feedbacks...
+                </div>
+              ) : sortedFeedbacks.length === 0 ? (
+                <div className="px-6 py-14 text-center">
+                  <p className="text-lg font-semibold text-white print:text-slate-900">
+                    Nenhum feedback encontrado
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400 print:text-slate-700">
+                    Ajuste os filtros para ampliar o recorte ou limpe a pesquisa atual.
+                  </p>
+                </div>
+              ) : (
+                <div className="max-h-[720px] overflow-auto">
+                  <table className="min-w-[1500px] w-full">
+                    <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur print:border-slate-300 print:bg-white">
+                      <tr>
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Data e hora"
+                            active={sortField === "createdAt"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("createdAt")}
+                          />
+                        </th>
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Avaliação"
+                            active={sortField === "rating"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("rating")}
+                          />
+                        </th>
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Filial"
+                            active={sortField === "branch"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("branch")}
+                          />
+                        </th>
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Kiosk"
+                            active={sortField === "kiosk"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("kiosk")}
+                          />
+                        </th>
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Comentário"
+                            active={sortField === "comment"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("comment")}
+                          />
+                        </th>
+                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Tags operacionais
+                        </th>
+                        <th className="px-5 py-4 text-center">
+                          <ColumnSortButton
+                            label="Contato"
+                            active={sortField === "contact"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("contact")}
+                            align="center"
+                          />
+                        </th>
+                        <th className="px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          Ações
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {paginatedFeedbacks.map((feedback, index) => (
+                        <tr
+                          key={feedback.id}
+                          className={[
+                            "border-b border-slate-800/80 transition hover:bg-slate-900/90 print:border-slate-300",
+                            index % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/40",
+                          ].join(" ")}
+                        >
+                          <td className="px-5 py-5 align-top">
+                            <div className="min-w-[170px]">
+                              <p className="text-sm font-medium text-white print:text-slate-900">
+                                {formatDate(feedback.createdAt)}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Registro cronológico
+                              </p>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-5 align-top">
+                            <div className="min-w-[150px]">
+                              <span
+                                className={[
+                                  "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                                  getRatingBadgeClass(feedback.rating),
+                                ].join(" ")}
+                              >
+                                {feedback.rating} · {getRatingLabel(feedback.rating)}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-5 align-top">
+                            <div className="min-w-[190px]">
+                              <p className="text-sm font-semibold text-white print:text-slate-900">
+                                {feedback.branch?.name ?? "-"}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Unidade operacional
+                              </p>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-5 align-top">
+                            <div className="min-w-[170px]">
+                              <p className="text-sm font-semibold text-white print:text-slate-900">
+                                {feedback.kiosk?.name ?? "-"}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Ponto de coleta
+                              </p>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-5 align-top">
+                            <div className="max-w-[380px]">
+                              <p className="line-clamp-3 text-sm leading-6 text-slate-200 print:text-slate-700">
+                                {feedback.comment?.trim() || "Sem comentário informado."}
+                              </p>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-5 align-top">
+                            <div className="flex max-w-[320px] flex-wrap gap-2">
+                              {(feedback.tags ?? []).length > 0 ? (
+                                feedback.tags!.map((item) => (
+                                  <span
+                                    key={item.id}
+                                    className="inline-flex rounded-full border px-3 py-1 text-xs font-medium"
+                                    style={getTagStyle(item.tag?.color)}
+                                  >
+                                    {item.tag?.name ?? "Tag"}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-sm text-slate-500">Sem tags</span>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-5 align-top text-center">
+                            <span
+                              className={[
+                                "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                                hasContactInfo(feedback)
+                                  ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                  : "border border-slate-700 bg-slate-800 text-slate-400",
+                              ].join(" ")}
+                            >
+                              {hasContactInfo(feedback) ? "Disponível" : "Não informado"}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-5 align-top">
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedFeedback(feedback)}
+                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 print:hidden"
+                                title="Ver detalhes"
+                              >
+                                <Eye size={16} />
+                                Detalhes
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {!loading && sortedFeedbacks.length > 0 ? (
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
+                <p className="text-sm text-slate-400">
+                  Exibindo página <span className="font-semibold text-white">{page}</span> de{" "}
+                  <span className="font-semibold text-white">{totalPages}</span>
+                </p>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page === 1}
+                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((current) => Math.min(totalPages, current + 1))
+                    }
+                    disabled={page === totalPages}
+                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+
           <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <SummaryCard
               icon={<MessageSquareText className="h-5 w-5" />}
@@ -1039,263 +1296,6 @@ export default function PublicFeedbacksPage() {
                 })
               )}
             </div>
-          </section>
-
-          <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-              <div>
-                <h2 className="text-2xl font-semibold tracking-tight text-white print:text-slate-900">
-                  Painel detalhado de feedbacks
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-slate-400 print:text-slate-700">
-                  Leitura estruturada dos registros com ordenação por coluna, foco em unidade,
-                  avaliação, comentário, contato e marcadores operacionais.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3 print:hidden">
-                <button
-                  type="button"
-                  onClick={handleExportCsv}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
-                >
-                  <Download className="h-4 w-4" />
-                  CSV
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handlePrintPdf}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:bg-slate-800"
-                >
-                  <Printer className="h-4 w-4" />
-                  PDF
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-6 overflow-hidden rounded-[28px] border border-slate-800 bg-slate-950/55 print:border-slate-300 print:bg-white">
-              {loading ? (
-                <div className="px-6 py-14 text-center text-slate-400">
-                  Carregando feedbacks...
-                </div>
-              ) : sortedFeedbacks.length === 0 ? (
-                <div className="px-6 py-14 text-center">
-                  <p className="text-lg font-semibold text-white print:text-slate-900">
-                    Nenhum feedback encontrado
-                  </p>
-                  <p className="mt-2 text-sm text-slate-400 print:text-slate-700">
-                    Ajuste os filtros para ampliar o recorte ou limpe a pesquisa atual.
-                  </p>
-                </div>
-              ) : (
-                <div className="max-h-[720px] overflow-auto">
-                  <table className="min-w-[1500px] w-full">
-                    <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur print:border-slate-300 print:bg-white">
-                      <tr>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Data e hora"
-                            active={sortField === "createdAt"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("createdAt")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Avaliação"
-                            active={sortField === "rating"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("rating")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Filial"
-                            active={sortField === "branch"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("branch")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Kiosk"
-                            active={sortField === "kiosk"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("kiosk")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left">
-                          <ColumnSortButton
-                            label="Comentário"
-                            active={sortField === "comment"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("comment")}
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Tags operacionais
-                        </th>
-                        <th className="px-5 py-4 text-center">
-                          <ColumnSortButton
-                            label="Contato"
-                            active={sortField === "contact"}
-                            direction={sortDirection}
-                            onClick={() => toggleSort("contact")}
-                            align="center"
-                          />
-                        </th>
-                        <th className="px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Ações
-                        </th>
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {paginatedFeedbacks.map((feedback, index) => (
-                        <tr
-                          key={feedback.id}
-                          className={[
-                            "border-b border-slate-800/80 transition hover:bg-slate-900/90 print:border-slate-300",
-                            index % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/40",
-                          ].join(" ")}
-                        >
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[170px]">
-                              <p className="text-sm font-medium text-white print:text-slate-900">
-                                {formatDate(feedback.createdAt)}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Registro cronológico
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[150px]">
-                              <span
-                                className={[
-                                  "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
-                                  getRatingBadgeClass(feedback.rating),
-                                ].join(" ")}
-                              >
-                                {feedback.rating} · {getRatingLabel(feedback.rating)}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[190px]">
-                              <p className="text-sm font-semibold text-white print:text-slate-900">
-                                {feedback.branch?.name ?? "-"}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Unidade operacional
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[170px]">
-                              <p className="text-sm font-semibold text-white print:text-slate-900">
-                                {feedback.kiosk?.name ?? "-"}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Ponto de coleta
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="max-w-[380px]">
-                              <p className="line-clamp-3 text-sm leading-6 text-slate-200 print:text-slate-700">
-                                {feedback.comment?.trim() || "Sem comentário informado."}
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="flex max-w-[320px] flex-wrap gap-2">
-                              {(feedback.tags ?? []).length > 0 ? (
-                                feedback.tags!.map((item) => (
-                                  <span
-                                    key={item.id}
-                                    className="inline-flex rounded-full border px-3 py-1 text-xs font-medium"
-                                    style={getTagStyle(item.tag?.color)}
-                                  >
-                                    {item.tag?.name ?? "Tag"}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-sm text-slate-500">Sem tags</span>
-                              )}
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top text-center">
-                            <span
-                              className={[
-                                "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
-                                hasContactInfo(feedback)
-                                  ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                                  : "border border-slate-700 bg-slate-800 text-slate-400",
-                              ].join(" ")}
-                            >
-                              {hasContactInfo(feedback) ? "Disponível" : "Não informado"}
-                            </span>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => setSelectedFeedback(feedback)}
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 print:hidden"
-                                title="Ver detalhes"
-                              >
-                                <Eye size={16} />
-                                Detalhes
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {!loading && sortedFeedbacks.length > 0 ? (
-              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between print:hidden">
-                <p className="text-sm text-slate-400">
-                  Exibindo página <span className="font-semibold text-white">{page}</span> de{" "}
-                  <span className="font-semibold text-white">{totalPages}</span>
-                </p>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPage((current) => Math.max(1, current - 1))}
-                    disabled={page === 1}
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Anterior
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setPage((current) => Math.min(totalPages, current + 1))
-                    }
-                    disabled={page === totalPages}
-                    className="rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Próxima
-                  </button>
-                </div>
-              </div>
-            ) : null}
           </section>
         </div>
       </main>
