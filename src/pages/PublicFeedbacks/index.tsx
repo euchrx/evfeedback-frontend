@@ -682,14 +682,34 @@ export default function PublicFeedbacksPage() {
 
     const rowsHtml = sortedFeedbacks
       .map((feedback) => {
+        const contactLines = [
+          feedback.contactName?.trim(),
+          feedback.contactPhone?.trim(),
+          feedback.contactMessage?.trim(),
+        ].filter(Boolean);
+
+        const contactHtml =
+          contactLines.length > 0
+            ? contactLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("")
+            : `<span class="muted">Não informado</span>`;
+
+        const tags = (feedback.tags ?? [])
+          .map((item) => item.tag?.name ?? "")
+          .filter(Boolean);
+
+        const tagsHtml =
+          tags.length > 0
+            ? tags.map((tag) => `<div>${escapeHtml(tag)}</div>`).join("")
+            : `<span class="muted">Sem tags</span>`;
+
         return `
         <tr>
           <td>${escapeHtml(formatDate(feedback.createdAt))}</td>
           <td>${escapeHtml(`${feedback.rating} - ${getRatingLabel(feedback.rating)}`)}</td>
           <td>${escapeHtml(feedback.branch?.name ?? "-")}</td>
           <td>${escapeHtml(feedback.comment?.trim() || "Sem comentário")}</td>
-          <td>${escapeHtml(renderContactText(feedback))}</td>
-          <td>${escapeHtml(renderTagsText(feedback) || "Sem tags")}</td>
+          <td>${contactHtml}</td>
+          <td>${tagsHtml}</td>
         </tr>
       `;
       })
@@ -708,12 +728,12 @@ export default function PublicFeedbacksPage() {
       <table>
         <thead>
           <tr>
-            <th style="width: 16%;">Data</th>
+            <th style="width: 14%;">Data</th>
             <th style="width: 14%;">Avaliação</th>
             <th style="width: 16%;">Filial</th>
-            <th style="width: 24%;">Comentário</th>
+            <th style="width: 28%;">Comentário</th>
             <th style="width: 18%;">Contato</th>
-            <th style="width: 12%;">Tags</th>
+            <th style="width: 10%;">Tags</th>
           </tr>
         </thead>
         <tbody>
@@ -727,7 +747,111 @@ export default function PublicFeedbacksPage() {
     </div>
   `;
 
-    openPrintWindow("Relatório de feedbacks", bodyHtml);
+    const printWindow = window.open("", "_blank", "width=1400,height=900");
+
+    if (!printWindow) return;
+
+    printWindow.document.open();
+    printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Relatório de feedbacks</title>
+        <style>
+          @page {
+            size: A4 landscape;
+            margin: 12mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #111827;
+            margin: 0;
+            background: #ffffff;
+          }
+
+          .report {
+            width: 100%;
+          }
+
+          .header {
+            margin-bottom: 16px;
+            border-bottom: 2px solid #d1d5db;
+            padding-bottom: 10px;
+          }
+
+          .title {
+            font-size: 20px;
+            font-weight: 700;
+            margin: 0 0 4px 0;
+          }
+
+          .subtitle {
+            font-size: 11px;
+            color: #4b5563;
+            margin: 0;
+            line-height: 1.5;
+          }
+
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+
+          thead {
+            display: table-header-group;
+          }
+
+          tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          th,
+          td {
+            border: 1px solid #d1d5db;
+            padding: 8px 9px;
+            vertical-align: top;
+            text-align: left;
+            font-size: 11px;
+            line-height: 1.45;
+            word-break: break-word;
+          }
+
+          th {
+            background: #f3f4f6;
+            font-weight: 700;
+            font-size: 11px;
+          }
+
+          .muted {
+            color: #6b7280;
+          }
+
+          .footer-note {
+            margin-top: 14px;
+            font-size: 10px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        ${bodyHtml}
+      </body>
+    </html>
+  `);
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
   }
 
   function handlePrintSingleFeedback(feedback: FeedbackItem) {
@@ -736,67 +860,246 @@ export default function PublicFeedbacksPage() {
       timeStyle: "short",
     }).format(new Date());
 
-    const bodyHtml = `
-    <div class="report">
-      <div class="header">
-        <h1 class="title">Feedback detalhado</h1>
-        <p class="subtitle">
-          Documento individual para compartilhamento<br />
-          Gerado em ${escapeHtml(generatedAt)}
-        </p>
-      </div>
+    const contactLines = [
+      feedback.contactName?.trim(),
+      feedback.contactPhone?.trim(),
+      feedback.contactMessage?.trim(),
+    ].filter(Boolean);
 
-      <div class="detail-card">
-        <div class="detail-grid">
-          <div>
-            <div class="label">Data</div>
-            <div class="value">${escapeHtml(formatDate(feedback.createdAt))}</div>
+    const contactHtml =
+      contactLines.length > 0
+        ? contactLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("")
+        : `<span class="muted">Não informado</span>`;
+
+    const tags = (feedback.tags ?? [])
+      .map((item) => item.tag?.name ?? "")
+      .filter(Boolean);
+
+    const tagsHtml =
+      tags.length > 0
+        ? tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")
+        : `<span class="muted">Sem tags</span>`;
+
+    const printWindow = window.open("", "_blank", "width=1000,height=900");
+
+    if (!printWindow) return;
+
+    printWindow.document.open();
+    printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Feedback detalhado</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 14mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: Arial, Helvetica, sans-serif;
+            color: #111827;
+            margin: 0;
+            background: #ffffff;
+          }
+
+          .report {
+            width: 100%;
+          }
+
+          .header {
+            margin-bottom: 18px;
+            border-bottom: 2px solid #d1d5db;
+            padding-bottom: 12px;
+          }
+
+          .title {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 4px 0;
+          }
+
+          .subtitle {
+            font-size: 11px;
+            color: #4b5563;
+            margin: 0;
+            line-height: 1.5;
+          }
+
+          .section {
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 14px;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .section-title {
+            font-size: 13px;
+            font-weight: 700;
+            margin: 0 0 12px 0;
+            color: #111827;
+          }
+
+          .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px 16px;
+          }
+
+          .field {
+            min-width: 0;
+          }
+
+          .field.full {
+            grid-column: 1 / -1;
+          }
+
+          .label {
+            font-size: 11px;
+            color: #6b7280;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+          }
+
+          .value {
+            font-size: 13px;
+            color: #111827;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            word-break: break-word;
+          }
+
+          .rating {
+            display: inline-block;
+            padding: 6px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 12px;
+          }
+
+          .comment-box {
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            padding: 14px;
+            background: #f9fafb;
+            font-size: 13px;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            word-break: break-word;
+          }
+
+          .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+          }
+
+          .tag {
+            display: inline-block;
+            padding: 6px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 999px;
+            font-size: 12px;
+            color: #111827;
+            background: #f3f4f6;
+          }
+
+          .muted {
+            color: #6b7280;
+          }
+
+          .footer-note {
+            margin-top: 18px;
+            font-size: 11px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="report">
+          <div class="header">
+            <h1 class="title">Feedback detalhado</h1>
+            <p class="subtitle">
+              Documento individual para compartilhamento<br />
+              Gerado em ${escapeHtml(generatedAt)}
+            </p>
           </div>
 
-          <div>
-            <div class="label">Avaliação</div>
-            <div class="value">${escapeHtml(`${feedback.rating} - ${getRatingLabel(feedback.rating)}`)}</div>
+          <div class="section">
+            <h2 class="section-title">Resumo do feedback</h2>
+            <div class="grid">
+              <div class="field">
+                <div class="label">Data</div>
+                <div class="value">${escapeHtml(formatDate(feedback.createdAt))}</div>
+              </div>
+
+              <div class="field">
+                <div class="label">Avaliação</div>
+                <div class="value">
+                  <span class="rating">${escapeHtml(`${feedback.rating} - ${getRatingLabel(feedback.rating)}`)}</span>
+                </div>
+              </div>
+
+              <div class="field">
+                <div class="label">Filial</div>
+                <div class="value">${escapeHtml(feedback.branch?.name ?? "-")}</div>
+              </div>
+
+              <div class="field">
+                <div class="label">Kiosk</div>
+                <div class="value">${escapeHtml(feedback.kiosk?.name ?? "-")}</div>
+              </div>
+
+              <div class="field full">
+                <div class="label">Consentimento para contato</div>
+                <div class="value">${escapeHtml(feedback.contactConsent ? "Sim" : "Não")}</div>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <div class="label">Filial</div>
-            <div class="value">${escapeHtml(feedback.branch?.name ?? "-")}</div>
+          <div class="section">
+            <h2 class="section-title">Comentário</h2>
+            <div class="comment-box">
+              ${escapeHtml(feedback.comment?.trim() || "Sem comentário informado.")}
+            </div>
           </div>
 
-          <div>
-            <div class="label">Kiosk</div>
-            <div class="value">${escapeHtml(feedback.kiosk?.name ?? "-")}</div>
+          <div class="section">
+            <h2 class="section-title">Informações de contato</h2>
+            <div class="value">
+              ${contactHtml}
+            </div>
           </div>
 
-          <div class="full">
-            <div class="label">Comentário</div>
-            <div class="value">${escapeHtml(feedback.comment?.trim() || "Sem comentário informado.")}</div>
+          <div class="section">
+            <h2 class="section-title">Tags</h2>
+            <div class="tags">
+              ${tagsHtml}
+            </div>
           </div>
 
-          <div class="full">
-            <div class="label">Contato</div>
-            <div class="value">${escapeHtml(renderContactText(feedback))}</div>
-          </div>
-
-          <div class="full">
-            <div class="label">Consentimento</div>
-            <div class="value">${escapeHtml(feedback.contactConsent ? "Sim" : "Não")}</div>
-          </div>
-
-          <div class="full">
-            <div class="label">Tags</div>
-            <div class="value">${escapeHtml(renderTagsText(feedback) || "Sem tags")}</div>
-          </div>
+          <p class="footer-note">
+            Documento gerado para continuidade de atendimento e compartilhamento interno.
+          </p>
         </div>
-      </div>
+      </body>
+    </html>
+  `);
+    printWindow.document.close();
+    printWindow.focus();
 
-      <p class="footer-note">
-        Documento gerado para continuidade de atendimento e compartilhamento interno.
-      </p>
-    </div>
-  `;
-
-    openPrintWindow("Feedback detalhado", bodyHtml);
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
   }
 
   const branchOptions = useMemo(() => {
