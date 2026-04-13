@@ -280,14 +280,14 @@ function getFeedbackPriorityScore(feedback: FeedbackItem) {
   );
 
   const hasContact = hasContactInfo(feedback);
-  const ratingWeight = 6 - feedback.rating;
+  const rating = feedback.rating;
   const hasComment = Boolean(feedback.comment?.trim());
   const createdAtWeight = new Date(feedback.createdAt).getTime();
 
   return {
     hasBadTag,
     hasContact,
-    ratingWeight,
+    rating,
     hasComment,
     createdAtWeight,
   };
@@ -297,22 +297,27 @@ function comparePriority(a: FeedbackItem, b: FeedbackItem) {
   const pa = getFeedbackPriorityScore(a);
   const pb = getFeedbackPriorityScore(b);
 
-  if (Number(pb.hasBadTag) !== Number(pa.hasBadTag)) {
-    return Number(pb.hasBadTag) - Number(pa.hasBadTag);
-  }
-
+  // 1) Quem tem contato vem primeiro
   if (Number(pb.hasContact) !== Number(pa.hasContact)) {
     return Number(pb.hasContact) - Number(pa.hasContact);
   }
 
-  if (pb.ratingWeight !== pa.ratingWeight) {
-    return pb.ratingWeight - pa.ratingWeight;
+  // 2) Nota pior primeiro: 1, 2, 3, 4, 5
+  if (pa.rating !== pb.rating) {
+    return pa.rating - pb.rating;
   }
 
+  // 3) Se empatar, tag ruim primeiro
+  if (Number(pb.hasBadTag) !== Number(pa.hasBadTag)) {
+    return Number(pb.hasBadTag) - Number(pa.hasBadTag);
+  }
+
+  // 4) Se empatar, quem comentou vem antes
   if (Number(pb.hasComment) !== Number(pa.hasComment)) {
     return Number(pb.hasComment) - Number(pa.hasComment);
   }
 
+  // 5) Mais recente primeiro
   return pb.createdAtWeight - pa.createdAtWeight;
 }
 
@@ -589,7 +594,14 @@ export default function PublicFeedbacksPage() {
           result = aTags.localeCompare(bTags);
         }
       } else if (sortField === "contact") {
-        result = Number(hasContactInfo(a)) - Number(hasContactInfo(b));
+        const aContact = Number(hasContactInfo(a));
+        const bContact = Number(hasContactInfo(b));
+
+        if (aContact !== bContact) {
+          result = aContact - bContact;
+        } else {
+          result = a.rating - b.rating;
+        }
       }
 
       return sortDirection === "asc" ? result : -result;
