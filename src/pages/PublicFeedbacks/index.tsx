@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Building2,
   CalendarClock,
   Eye,
@@ -17,6 +19,16 @@ import {
 import type { FeedbackItem } from "../../services/feedbacks";
 
 const PAGE_SIZE = 10;
+
+type SortField =
+  | "createdAt"
+  | "rating"
+  | "branch"
+  | "kiosk"
+  | "comment"
+  | "contact";
+
+type SortDirection = "asc" | "desc";
 
 function getRatingLabel(rating: number) {
   switch (rating) {
@@ -113,7 +125,7 @@ function SummaryCard({
   value,
   helper,
 }: {
-  icon: React.ReactNode;
+  icon: JSX.Element;
   label: string;
   value: string;
   helper: string;
@@ -139,6 +151,44 @@ function SummaryCard({
   );
 }
 
+function ColumnSortButton({
+  label,
+  active,
+  direction,
+  onClick,
+  align = "left",
+}: {
+  label: string;
+  active: boolean;
+  direction: SortDirection;
+  onClick: () => void;
+  align?: "left" | "center" | "right";
+}) {
+  const justify =
+    align === "right"
+      ? "justify-end"
+      : align === "center"
+        ? "justify-center"
+        : "justify-start";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 ${justify} text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 transition hover:text-slate-300`}
+    >
+      <span>{label}</span>
+      {active ? (
+        direction === "asc" ? (
+          <ArrowUp className="h-3.5 w-3.5" />
+        ) : (
+          <ArrowDown className="h-3.5 w-3.5" />
+        )
+      ) : null}
+    </button>
+  );
+}
+
 export default function PublicFeedbacksPage() {
   const token = useMemo(() => getTokenFromUrl(), []);
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
@@ -159,6 +209,8 @@ export default function PublicFeedbacksPage() {
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   useEffect(() => {
     if (!token) {
@@ -230,6 +282,16 @@ export default function PublicFeedbacksPage() {
     void loadFeedbacks(cleared);
   }
 
+  function toggleSort(field: SortField) {
+    if (sortField === field) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortField(field);
+    setSortDirection(field === "createdAt" ? "desc" : "asc");
+  }
+
   const branchOptions = useMemo(() => {
     const map = new Map<string, string>();
 
@@ -285,16 +347,44 @@ export default function PublicFeedbacksPage() {
     });
   }, [feedbacks, search]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredFeedbacks.length / PAGE_SIZE));
+  const sortedFeedbacks = useMemo(() => {
+    const items = [...filteredFeedbacks];
+
+    items.sort((a, b) => {
+      let result = 0;
+
+      if (sortField === "createdAt") {
+        result =
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else if (sortField === "rating") {
+        result = a.rating - b.rating;
+      } else if (sortField === "branch") {
+        result = (a.branch?.name ?? "").localeCompare(b.branch?.name ?? "");
+      } else if (sortField === "kiosk") {
+        result = (a.kiosk?.name ?? "").localeCompare(b.kiosk?.name ?? "");
+      } else if (sortField === "comment") {
+        result = (a.comment ?? "").localeCompare(b.comment ?? "");
+      } else if (sortField === "contact") {
+        result =
+          Number(hasContactInfo(a)) - Number(hasContactInfo(b));
+      }
+
+      return sortDirection === "asc" ? result : -result;
+    });
+
+    return items;
+  }, [filteredFeedbacks, sortField, sortDirection]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedFeedbacks.length / PAGE_SIZE));
 
   const paginatedFeedbacks = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return filteredFeedbacks.slice(start, start + PAGE_SIZE);
-  }, [filteredFeedbacks, page]);
+    return sortedFeedbacks.slice(start, start + PAGE_SIZE);
+  }, [sortedFeedbacks, page]);
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, sortField, sortDirection]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -302,34 +392,97 @@ export default function PublicFeedbacksPage() {
     }
   }, [page, totalPages]);
 
-  const totalFeedbacks = filteredFeedbacks.length;
+  const totalFeedbacks = sortedFeedbacks.length;
 
   const averageRating = useMemo(() => {
-    if (!filteredFeedbacks.length) return 0;
+    if (!sortedFeedbacks.length) return 0;
 
-    const total = filteredFeedbacks.reduce((sum, item) => sum + item.rating, 0);
-    return total / filteredFeedbacks.length;
-  }, [filteredFeedbacks]);
+    const total = sortedFeedbacks.reduce((sum, item) => sum + item.rating, 0);
+    return total / sortedFeedbacks.length;
+  }, [sortedFeedbacks]);
 
   const feedbacksWithComment = useMemo(() => {
-    return filteredFeedbacks.filter((item) => item.comment?.trim()).length;
-  }, [filteredFeedbacks]);
+    return sortedFeedbacks.filter((item) => item.comment?.trim()).length;
+  }, [sortedFeedbacks]);
+
+  const feedbacksWithContact = useMemo(() => {
+    return sortedFeedbacks.filter((item) => hasContactInfo(item)).length;
+  }, [sortedFeedbacks]);
 
   const uniqueBranches = useMemo(() => {
     return new Set(
-      filteredFeedbacks
+      sortedFeedbacks
         .map((item) => item.branch?.name?.trim())
         .filter(Boolean),
     ).size;
-  }, [filteredFeedbacks]);
+  }, [sortedFeedbacks]);
 
   const uniqueKiosks = useMemo(() => {
     return new Set(
-      filteredFeedbacks
+      sortedFeedbacks
         .map((item) => item.kiosk?.name?.trim())
         .filter(Boolean),
     ).size;
-  }, [filteredFeedbacks]);
+  }, [sortedFeedbacks]);
+
+  const ratingsDistribution = useMemo(() => {
+    const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+    sortedFeedbacks.forEach((item) => {
+      if (item.rating >= 1 && item.rating <= 5) {
+        counts[item.rating as 1 | 2 | 3 | 4 | 5] += 1;
+      }
+    });
+
+    return [5, 4, 3, 2, 1].map((rating) => {
+      const count = counts[rating as 1 | 2 | 3 | 4 | 5];
+      const percentage =
+        totalFeedbacks > 0 ? (count / totalFeedbacks) * 100 : 0;
+
+      return {
+        rating,
+        label: getRatingLabel(rating),
+        count,
+        percentage,
+      };
+    });
+  }, [sortedFeedbacks, totalFeedbacks]);
+
+  const branchSummary = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        branchName: string;
+        total: number;
+        avg: number;
+        comments: number;
+      }
+    >();
+
+    sortedFeedbacks.forEach((item) => {
+      const branchName = item.branch?.name?.trim() || "Sem filial";
+      const current = map.get(branchName) ?? {
+        branchName,
+        total: 0,
+        avg: 0,
+        comments: 0,
+      };
+
+      current.total += 1;
+      current.avg += item.rating;
+      if (item.comment?.trim()) current.comments += 1;
+
+      map.set(branchName, current);
+    });
+
+    return Array.from(map.values())
+      .map((item) => ({
+        ...item,
+        avg: item.total > 0 ? item.avg / item.total : 0,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6);
+  }, [sortedFeedbacks]);
 
   if (!token) {
     return (
@@ -352,7 +505,7 @@ export default function PublicFeedbacksPage() {
   return (
     <>
       <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-[1600px] space-y-8">
+        <div className="mx-auto max-w-[1700px] space-y-8">
           <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-2xl sm:p-8">
             <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
               <div className="space-y-4">
@@ -363,13 +516,12 @@ export default function PublicFeedbacksPage() {
 
                 <div>
                   <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                    Relatório de feedbacks
+                    Relatório executivo de feedbacks
                   </h1>
-                  <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-300 sm:text-base">
-                    Visualização compartilhada por link seguro para acompanhamento
-                    operacional e gerencial. Esta área permite apenas consulta e foi
-                    preparada para ambientes com múltiplas unidades, alto volume de
-                    atendimento e leitura executiva dos registros.
+                  <p className="mt-3 max-w-5xl text-sm leading-7 text-slate-300 sm:text-base">
+                    Visão estruturada para acompanhamento operacional e gerencial
+                    dos registros de atendimento, percepção do cliente, pontos de
+                    coleta e ocorrências por unidade.
                   </p>
                 </div>
               </div>
@@ -396,12 +548,12 @@ export default function PublicFeedbacksPage() {
             </div>
           </section>
 
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <SummaryCard
               icon={<MessageSquareText className="h-5 w-5" />}
               label="Total de registros"
               value={loading ? "--" : String(totalFeedbacks)}
-              helper="Quantidade de feedbacks dentro da visualização atual."
+              helper="Quantidade de feedbacks dentro do recorte atual."
             />
 
             <SummaryCard
@@ -415,136 +567,267 @@ export default function PublicFeedbacksPage() {
               icon={<Building2 className="h-5 w-5" />}
               label="Filiais presentes"
               value={loading ? "--" : String(uniqueBranches)}
-              helper="Unidades com registros dentro do recorte atual."
+              helper="Unidades com registros no recorte atual."
             />
 
             <SummaryCard
               icon={<Store className="h-5 w-5" />}
               label="Kiosks monitorados"
               value={loading ? "--" : String(uniqueKiosks)}
-              helper="Pontos de coleta incluídos na listagem filtrada."
+              helper="Pontos de coleta incluídos na visualização."
+            />
+
+            <SummaryCard
+              icon={<Eye className="h-5 w-5" />}
+              label="Contato disponível"
+              value={loading ? "--" : String(feedbacksWithContact)}
+              helper="Registros com informação de contato preenchida."
             />
           </section>
 
+          <section className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+            <div className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-2xl font-semibold tracking-tight text-white">
+                  Filtros e recorte operacional
+                </h2>
+                <p className="text-sm leading-6 text-slate-400">
+                  Refine a visualização por nota, filial, kiosk, período e texto livre.
+                </p>
+              </div>
+
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Nota
+                  </label>
+                  <select
+                    value={filters.rating ?? ""}
+                    onChange={(e) => handleChangeFilter("rating", e.target.value)}
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                  >
+                    <option value="">Todas as notas</option>
+                    <option value="1">1 - Péssimo</option>
+                    <option value="2">2 - Ruim</option>
+                    <option value="3">3 - Regular</option>
+                    <option value="4">4 - Bom</option>
+                    <option value="5">5 - Excelente</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Filial
+                  </label>
+                  <select
+                    value={filters.branchId ?? ""}
+                    onChange={(e) => handleChangeFilter("branchId", e.target.value)}
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                  >
+                    <option value="">Todas as filiais</option>
+                    {branchOptions.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Kiosk
+                  </label>
+                  <select
+                    value={filters.kioskId ?? ""}
+                    onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                  >
+                    <option value="">Todos os kiosks</option>
+                    {kioskOptions.map((kiosk) => (
+                      <option key={kiosk.id} value={kiosk.id}>
+                        {kiosk.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Data inicial
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.startDate ?? ""}
+                    onChange={(e) => handleChangeFilter("startDate", e.target.value)}
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Data final
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.endDate ?? ""}
+                    onChange={(e) => handleChangeFilter("endDate", e.target.value)}
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_auto_auto]">
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Busca textual
+                  </label>
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
+                    className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none placeholder:text-slate-500 transition focus:border-sky-500"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleApplyFilters}
+                  className="self-end rounded-2xl bg-sky-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-sky-700"
+                >
+                  Aplicar filtros
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="self-end rounded-2xl border border-slate-700 bg-slate-950 px-6 py-3.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-semibold tracking-tight text-white">
+                    Distribuição por nota
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    Visão rápida da concentração das avaliações.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Comentários
+                  </p>
+                  <p className="mt-2 text-lg font-bold text-white">
+                    {loading ? "--" : feedbacksWithComment}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                {ratingsDistribution.map((item) => (
+                  <div key={item.rating} className="space-y-2">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={[
+                            "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
+                            getRatingBadgeClass(item.rating),
+                          ].join(" ")}
+                        >
+                          {item.rating} · {item.label}
+                        </span>
+                      </div>
+
+                      <div className="text-sm text-slate-300">
+                        {item.count} registro(s)
+                      </div>
+                    </div>
+
+                    <div className="h-2.5 rounded-full bg-slate-800">
+                      <div
+                        className="h-2.5 rounded-full bg-sky-500 transition-all"
+                        style={{ width: `${item.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
           <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl">
-            <div className="flex flex-col gap-2">
-              <h2 className="text-2xl font-semibold tracking-tight text-white">
-                Filtros e recorte operacional
-              </h2>
-              <p className="text-sm leading-6 text-slate-400">
-                Refine a visualização por nota, filial, kiosk, período e texto livre
-                para inspeção mais objetiva dos registros.
-              </p>
-            </div>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Nota
-                </label>
-                <select
-                  value={filters.rating ?? ""}
-                  onChange={(e) => handleChangeFilter("rating", e.target.value)}
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                >
-                  <option value="">Todas as notas</option>
-                  <option value="1">1 - Péssimo</option>
-                  <option value="2">2 - Ruim</option>
-                  <option value="3">3 - Regular</option>
-                  <option value="4">4 - Bom</option>
-                  <option value="5">5 - Excelente</option>
-                </select>
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <h2 className="text-2xl font-semibold tracking-tight text-white">
+                  Resumo por filial
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Destaque das unidades com maior volume de registros dentro do recorte atual.
+                </p>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Filial
-                </label>
-                <select
-                  value={filters.branchId ?? ""}
-                  onChange={(e) => handleChangeFilter("branchId", e.target.value)}
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                >
-                  <option value="">Todas as filiais</option>
-                  {branchOptions.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Kiosk
-                </label>
-                <select
-                  value={filters.kioskId ?? ""}
-                  onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                >
-                  <option value="">Todos os kiosks</option>
-                  {kioskOptions.map((kiosk) => (
-                    <option key={kiosk.id} value={kiosk.id}>
-                      {kiosk.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Data inicial
-                </label>
-                <input
-                  type="date"
-                  value={filters.startDate ?? ""}
-                  onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Data final
-                </label>
-                <input
-                  type="date"
-                  value={filters.endDate ?? ""}
-                  onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none transition focus:border-sky-500"
-                />
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Última atualização visual
+                </p>
+                <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-slate-300">
+                  <CalendarClock className="h-4 w-4" />
+                  Agora
+                </p>
               </div>
             </div>
 
-            <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_auto_auto]">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Busca textual
-                </label>
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
-                  className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3.5 text-white outline-none placeholder:text-slate-500 transition focus:border-sky-500"
-                />
-              </div>
+            <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+              {branchSummary.length === 0 ? (
+                <div className="rounded-3xl border border-slate-800 bg-slate-950/50 p-5 text-sm text-slate-400 lg:col-span-2 xl:col-span-3">
+                  Nenhuma filial encontrada no recorte atual.
+                </div>
+              ) : (
+                branchSummary.map((item) => (
+                  <div
+                    key={item.branchName}
+                    className="rounded-3xl border border-slate-800 bg-slate-950/60 p-5"
+                  >
+                    <p className="text-lg font-semibold text-white">
+                      {item.branchName}
+                    </p>
 
-              <button
-                type="button"
-                onClick={handleApplyFilters}
-                className="self-end rounded-2xl bg-sky-600 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-sky-700"
-              >
-                Aplicar filtros
-              </button>
+                    <div className="mt-5 grid grid-cols-3 gap-3">
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Registros
+                        </p>
+                        <p className="mt-2 text-xl font-bold text-white">
+                          {item.total}
+                        </p>
+                      </div>
 
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                className="self-end rounded-2xl border border-slate-700 bg-slate-950 px-6 py-3.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
-              >
-                Limpar
-              </button>
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Média
+                        </p>
+                        <p className="mt-2 text-xl font-bold text-white">
+                          {item.avg.toFixed(1)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Comentários
+                        </p>
+                        <p className="mt-2 text-xl font-bold text-white">
+                          {item.comments}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </section>
 
@@ -555,30 +838,18 @@ export default function PublicFeedbacksPage() {
                   Painel detalhado de feedbacks
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Leitura estruturada dos registros com foco em unidade, ponto de
-                  coleta, avaliação, comentário e marcadores operacionais.
+                  Leitura estruturada dos registros com ordenação por coluna, foco em unidade,
+                  avaliação, comentário, contato e marcadores operacionais.
                 </p>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[420px]">
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Comentários preenchidos
-                  </p>
-                  <p className="mt-2 text-lg font-bold text-white">
-                    {loading ? "--" : feedbacksWithComment}
-                  </p>
-                </div>
-
-                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Última atualização visual
-                  </p>
-                  <p className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-slate-300">
-                    <CalendarClock className="h-4 w-4" />
-                    Agora
-                  </p>
-                </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/70 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Ordenação atual
+                </p>
+                <p className="mt-2 text-sm font-medium text-slate-300">
+                  {sortField} · {sortDirection === "asc" ? "crescente" : "decrescente"}
+                </p>
               </div>
             </div>
 
@@ -587,7 +858,7 @@ export default function PublicFeedbacksPage() {
                 <div className="px-6 py-14 text-center text-slate-400">
                   Carregando feedbacks...
                 </div>
-              ) : filteredFeedbacks.length === 0 ? (
+              ) : sortedFeedbacks.length === 0 ? (
                 <div className="px-6 py-14 text-center">
                   <p className="text-lg font-semibold text-white">
                     Nenhum feedback encontrado
@@ -597,30 +868,61 @@ export default function PublicFeedbacksPage() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-[1380px] w-full">
-                    <thead className="border-b border-slate-800 bg-slate-950/90">
+                <div className="max-h-[720px] overflow-auto">
+                  <table className="min-w-[1480px] w-full">
+                    <thead className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
                       <tr>
-                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Data e hora
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Data e hora"
+                            active={sortField === "createdAt"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("createdAt")}
+                          />
                         </th>
-                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Avaliação
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Avaliação"
+                            active={sortField === "rating"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("rating")}
+                          />
                         </th>
-                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Filial
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Filial"
+                            active={sortField === "branch"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("branch")}
+                          />
                         </th>
-                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Kiosk
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Kiosk"
+                            active={sortField === "kiosk"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("kiosk")}
+                          />
                         </th>
-                        <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Comentário
+                        <th className="px-5 py-4 text-left">
+                          <ColumnSortButton
+                            label="Comentário"
+                            active={sortField === "comment"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("comment")}
+                          />
                         </th>
                         <th className="px-5 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Tags operacionais
                         </th>
-                        <th className="px-5 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Contato
+                        <th className="px-5 py-4 text-center">
+                          <ColumnSortButton
+                            label="Contato"
+                            active={sortField === "contact"}
+                            direction={sortDirection}
+                            onClick={() => toggleSort("contact")}
+                            align="center"
+                          />
                         </th>
                         <th className="px-5 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Ações
@@ -638,7 +940,7 @@ export default function PublicFeedbacksPage() {
                           ].join(" ")}
                         >
                           <td className="px-5 py-5 align-top">
-                            <div className="min-w-[150px]">
+                            <div className="min-w-[170px]">
                               <p className="text-sm font-medium text-white">
                                 {formatDate(feedback.createdAt)}
                               </p>
@@ -649,7 +951,7 @@ export default function PublicFeedbacksPage() {
                           </td>
 
                           <td className="px-5 py-5 align-top">
-                            <div className="min-w-[140px]">
+                            <div className="min-w-[150px]">
                               <span
                                 className={[
                                   "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
@@ -662,7 +964,7 @@ export default function PublicFeedbacksPage() {
                           </td>
 
                           <td className="px-5 py-5 align-top">
-                            <div className="min-w-[180px]">
+                            <div className="min-w-[190px]">
                               <p className="text-sm font-semibold text-white">
                                 {feedback.branch?.name ?? "-"}
                               </p>
@@ -673,7 +975,7 @@ export default function PublicFeedbacksPage() {
                           </td>
 
                           <td className="px-5 py-5 align-top">
-                            <div className="min-w-[160px]">
+                            <div className="min-w-[170px]">
                               <p className="text-sm font-semibold text-white">
                                 {feedback.kiosk?.name ?? "-"}
                               </p>
@@ -684,7 +986,7 @@ export default function PublicFeedbacksPage() {
                           </td>
 
                           <td className="px-5 py-5 align-top">
-                            <div className="max-w-[360px]">
+                            <div className="max-w-[380px]">
                               <p className="line-clamp-3 text-sm leading-6 text-slate-200">
                                 {feedback.comment?.trim() || "Sem comentário informado."}
                               </p>
@@ -692,7 +994,7 @@ export default function PublicFeedbacksPage() {
                           </td>
 
                           <td className="px-5 py-5 align-top">
-                            <div className="flex max-w-[280px] flex-wrap gap-2">
+                            <div className="flex max-w-[300px] flex-wrap gap-2">
                               {(Array.isArray(feedback.tags) ? feedback.tags : []).length > 0 ? (
                                 feedback.tags!.map((item) => (
                                   <span
@@ -742,7 +1044,7 @@ export default function PublicFeedbacksPage() {
               )}
             </div>
 
-            {!loading && filteredFeedbacks.length > 0 ? (
+            {!loading && sortedFeedbacks.length > 0 ? (
               <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-slate-400">
                   Exibindo página <span className="font-semibold text-white">{page}</span> de{" "}
