@@ -2061,7 +2061,7 @@ export default function FeedbackKiosk() {
             <div className="mb-3 flex items-center justify-end">
               <button
                 type="button"
-                onPointerDown={(e) => { handleKeyPress("DONE") }}
+                onPointerDown={handleKeyPress("DONE")}
                 className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium transition-transform active:scale-95"
                 style={{ color: resolvedTextColor }}
               >
