@@ -2062,8 +2062,11 @@ export default function FeedbackKiosk() {
               <button
                 type="button"
                 onPointerDown={handleKeyPress("DONE")}
-                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium transition-transform active:scale-95"
-                style={{ color: resolvedTextColor }}
+                className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
+                style={{
+                  backgroundColor: resolvedPrimaryColor,
+                  color: resolvedButtonTextColor,
+                }}
               >
                 Fechar
               </button>
