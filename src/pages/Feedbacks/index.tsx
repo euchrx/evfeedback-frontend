@@ -2058,15 +2058,16 @@ export default function FeedbackKiosk() {
             className="rounded-t-[28px] border border-white/10 border-b-0 p-4 shadow-2xl backdrop-blur-xl md:p-5"
             style={{ backgroundColor: "rgba(2, 6, 23, 0.97)" }}
           >
-            <div className="mb-3 flex items-center justify-end">
+            <div className="mb-3 flex items-center justify-end" onPointerDown={(e) => e.stopPropagation()}>
               <button
                 type="button"
-                onPointerDown={handleKeyPress("DONE")}
-                className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
-                style={{
-                  backgroundColor: resolvedPrimaryColor,
-                  color: resolvedButtonTextColor,
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  closeKeyboard(true);
                 }}
+                className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium transition-transform active:scale-95"
+                style={{ color: resolvedTextColor }}
               >
                 Fechar
               </button>
