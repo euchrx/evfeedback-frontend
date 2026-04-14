@@ -637,6 +637,8 @@ export default function FeedbackKiosk() {
 
       if (!activeField || keyboardClosing) return;
 
+      flashKey(key);
+
       const options = getAccentOptions(key);
       longPressTriggeredRef.current = false;
 
@@ -663,6 +665,8 @@ export default function FeedbackKiosk() {
     return (event: React.PointerEvent<HTMLButtonElement>) => {
       event.preventDefault();
 
+      if (!activeField || keyboardClosing) return;
+
       const options = getAccentOptions(key);
 
       if (options.length === 0) return;
@@ -675,7 +679,6 @@ export default function FeedbackKiosk() {
       }
     };
   }
-
   function handleLetterPointerLeave() {
     clearLongPressTimer();
   }
@@ -1263,14 +1266,28 @@ export default function FeedbackKiosk() {
                     );
                   })}
 
-                  <button
-                    type="button"
-                    onPointerDown={handleKeyPress("BACKSPACE")}
-                    className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
-                    style={{ color: resolvedTextColor }}
-                  >
-                    <Delete className="h-5 w-5" />
-                  </button>
+                  {(() => {
+                    const isActive = activeVisualKey === "BACKSPACE";
+
+                    return (
+                      <button
+                        type="button"
+                        onPointerDown={handleKeyPress("BACKSPACE")}
+                        className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+                        style={{
+                          borderColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.08)",
+                          backgroundColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.12)",
+                          color: isActive ? resolvedButtonTextColor : resolvedTextColor,
+                        }}
+                      >
+                        <Delete className="h-5 w-5" />
+                      </button>
+                    );
+                  })()}
                 </>
               ) : null}
             </div>
@@ -1296,32 +1313,66 @@ export default function FeedbackKiosk() {
               <ChevronUp className="h-5 w-5" />
             </button>
 
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("SPACE")}
-              className="flex h-12 items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-5 text-sm font-medium transition-transform active:scale-95 md:h-14"
-              style={{ color: resolvedTextColor }}
-            >
-              espaço
-            </button>
+            {(() => {
+              const isSpaceActive = activeVisualKey === "SPACE";
+              const isLeftActive = activeVisualKey === "LEFT";
+              const isRightActive = activeVisualKey === "RIGHT";
 
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("LEFT")}
-              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
-              style={{ color: resolvedTextColor }}
-            >
-              ←
-            </button>
+              return (
+                <>
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("SPACE")}
+                    className="flex h-12 items-center justify-center rounded-2xl border px-5 text-sm font-medium transition-transform active:scale-95 md:h-14"
+                    style={{
+                      borderColor: isSpaceActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isSpaceActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isSpaceActive ? resolvedButtonTextColor : resolvedTextColor,
+                    }}
+                  >
+                    espaço
+                  </button>
 
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("RIGHT")}
-              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
-              style={{ color: resolvedTextColor }}
-            >
-              →
-            </button>
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("LEFT")}
+                    className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+                    style={{
+                      borderColor: isLeftActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isLeftActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isLeftActive ? resolvedButtonTextColor : resolvedTextColor,
+                    }}
+                  >
+                    ←
+                  </button>
+
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("RIGHT")}
+                    className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+                    style={{
+                      borderColor: isRightActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isRightActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isRightActive ? resolvedButtonTextColor : resolvedTextColor,
+                    }}
+                  >
+                    →
+                  </button>
+                </>
+              );
+            })()}
           </div>
 
           <div className="flex justify-center gap-2">
@@ -1349,14 +1400,28 @@ export default function FeedbackKiosk() {
               );
             })}
 
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("CLEAR")}
-              className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl border border-white/8 bg-white/12 px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
-              style={{ color: resolvedTextColor }}
-            >
-              Limpar
-            </button>
+            {(() => {
+              const isActive = activeVisualKey === "CLEAR";
+
+              return (
+                <button
+                  type="button"
+                  onPointerDown={handleKeyPress("CLEAR")}
+                  className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl border px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
+                  style={{
+                    borderColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.08)",
+                    backgroundColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.12)",
+                    color: isActive ? resolvedButtonTextColor : resolvedTextColor,
+                  }}
+                >
+                  Limpar
+                </button>
+              );
+            })()}
 
             <button
               type="button"
@@ -1386,15 +1451,31 @@ export default function FeedbackKiosk() {
             >
               {row.map((key, keyIndex) =>
                 key ? (
-                  <button
-                    key={key}
-                    type="button"
-                    onPointerDown={handleKeyPress(key)}
-                    className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 text-xl font-medium transition-transform active:scale-95 md:h-16"
-                    style={{ color: resolvedTextColor }}
-                  >
-                    {key}
-                  </button>
+                  (() => {
+                    const isActive = activeVisualKey === key;
+
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onPointerDown={handleKeyPress(key)}
+                        className="flex h-14 items-center justify-center rounded-2xl border text-xl font-medium transition-transform active:scale-95 md:h-16"
+                        style={{
+                          borderColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.08)",
+                          backgroundColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.12)",
+                          color: isActive
+                            ? resolvedButtonTextColor
+                            : resolvedTextColor,
+                        }}
+                      >
+                        {key}
+                      </button>
+                    );
+                  })()
                 ) : (
                   <div
                     key={`empty-${rowIndex}-${keyIndex}`}
@@ -1406,23 +1487,52 @@ export default function FeedbackKiosk() {
           ))}
 
           <div className="grid grid-cols-3 gap-3">
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("CLEAR")}
-              className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 text-sm font-medium transition-transform active:scale-95 md:h-16"
-              style={{ color: resolvedTextColor }}
-            >
-              Limpar
-            </button>
+            {(() => {
+              const isClearActive = activeVisualKey === "CLEAR";
+              const isBackspaceActive = activeVisualKey === "BACKSPACE";
 
-            <button
-              type="button"
-              onPointerDown={handleKeyPress("BACKSPACE")}
-              className="flex h-14 items-center justify-center rounded-2xl border border-white/8 bg-white/12 transition-transform active:scale-95 md:h-16"
-              style={{ color: resolvedTextColor }}
-            >
-              <Delete className="h-5 w-5" />
-            </button>
+              return (
+                <>
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("CLEAR")}
+                    className="flex h-14 items-center justify-center rounded-2xl border text-sm font-medium transition-transform active:scale-95 md:h-16"
+                    style={{
+                      borderColor: isClearActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isClearActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isClearActive
+                        ? resolvedButtonTextColor
+                        : resolvedTextColor,
+                    }}
+                  >
+                    Limpar
+                  </button>
+
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("BACKSPACE")}
+                    className="flex h-14 items-center justify-center rounded-2xl border transition-transform active:scale-95 md:h-16"
+                    style={{
+                      borderColor: isBackspaceActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isBackspaceActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isBackspaceActive
+                        ? resolvedButtonTextColor
+                        : resolvedTextColor,
+                    }}
+                  >
+                    <Delete className="h-5 w-5" />
+                  </button>
+                </>
+              );
+            })()}
 
             <button
               type="button"
@@ -1951,11 +2061,7 @@ export default function FeedbackKiosk() {
             <div className="mb-3 flex items-center justify-end">
               <button
                 type="button"
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  closeKeyboard(true);
-                }}
+                onPointerDown={(e) => { handleKeyPress("DONE") }}
                 className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium transition-transform active:scale-95"
                 style={{ color: resolvedTextColor }}
               >
