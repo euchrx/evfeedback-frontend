@@ -170,6 +170,8 @@ export default function FeedbackKiosk() {
   const [cursorPosition, setCursorPosition] = useState(0);
   const [activeVisualKey, setActiveVisualKey] = useState<string | null>(null);
   const [capsLock, setCapsLock] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   const shiftClickTimerRef = useRef<number | null>(null);
   const lastShiftPressRef = useRef(0);
@@ -728,23 +730,45 @@ export default function FeedbackKiosk() {
     );
   }
 
-  function handleSubmitCommentStep() {
-    const trimmedComment = comment.trim();
+  function isValidEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  }
 
-    if (!trimmedComment) {
-      setCommentError("Informe seu comentário para continuar.");
-      return;
+  async function handleSubmitCommentStep() {
+    let hasError = false;
+
+    if (!email.trim()) {
+      setEmailError("Informe seu e-mail.");
+      hasError = true;
+    } else if (!isValidEmail(email)) {
+      setEmailError("Informe um e-mail válido.");
+      hasError = true;
+    } else {
+      setEmailError("");
     }
 
-    setCommentError("");
-    closeKeyboard(true);
+    if (!comment.trim()) {
+      setCommentError("Esse campo é obrigatório.");
+      hasError = true;
+    } else {
+      setCommentError("");
+    }
+
+    if (hasError) return;
 
     if (isNegativeRating) {
+      closeKeyboard(false);
       setStep("contact");
       return;
     }
 
-    void handleSubmit(false, "send");
+    setSubmittingAction("send");
+
+    try {
+      await handleSubmit();
+    } finally {
+      setSubmittingAction(null);
+    }
   }
 
   function handleSubmitWithContact() {
@@ -865,6 +889,7 @@ export default function FeedbackKiosk() {
         token: kioskToken,
         rating,
         comment: skipComment ? "" : comment.trim(),
+        email,
         tagIds,
         contactName: isNegativeRating ? contactName.trim() : "",
         contactPhone: isNegativeRating ? sanitizePhoneValue(contactPhone) : "",
@@ -1753,12 +1778,36 @@ export default function FeedbackKiosk() {
                 </p>
 
                 <h2 className="mt-4 text-3xl font-bold md:text-5xl">
-                  Por favor, deixe sua opinião abaixo.
+                  Por favor, deixe sua avaliação abaixo.
                 </h2>
 
-                <p className="mt-4 text-lg opacity-90">Essa etapa é obrigatória.</p>
+                <p className="mt-4 text-lg opacity-90">
+                  Comentário e e-mail são obrigatórios.
+                </p>
 
-                <div className="mx-auto mt-8 max-w-3xl">
+                <div className="mx-auto mt-8 max-w-3xl space-y-5">
+                  <div className="text-left">
+                    <label className="mb-2 block text-sm font-semibold opacity-90">
+                      E-mail
+                    </label>
+
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(event) => {
+                        setEmail(event.target.value);
+                        if (emailError) setEmailError("");
+                      }}
+                      placeholder="Digite seu e-mail"
+                      className="w-full rounded-3xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none transition placeholder:text-white/40 focus:border-white/30 md:text-lg"
+                      style={{ color: resolvedTextColor }}
+                    />
+
+                    {emailError ? (
+                      <p className="mt-3 text-sm text-rose-300">{emailError}</p>
+                    ) : null}
+                  </div>
+
                   <div
                     role="button"
                     tabIndex={0}
@@ -1787,7 +1836,7 @@ export default function FeedbackKiosk() {
                   </div>
 
                   {commentError ? (
-                    <p className="mt-3 text-sm text-rose-300">{commentError}</p>
+                    <p className="text-sm text-rose-300">{commentError}</p>
                   ) : null}
                 </div>
 
