@@ -609,9 +609,6 @@ export default function FeedbacksPage() {
                         Kiosk
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        E-mail
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Comentário
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -655,12 +652,6 @@ export default function FeedbacksPage() {
 
                         <td className="px-4 py-4 text-sm text-slate-600">
                           {feedback.kiosk?.name ?? "-"}
-                        </td>
-
-                        <td className="max-w-[240px] px-4 py-4 text-sm text-slate-600">
-                          <span className="line-clamp-2 break-all">
-                            {feedback.email?.trim() || "-"}
-                          </span>
                         </td>
 
                         <td className="max-w-[260px] px-4 py-4 text-sm text-slate-600">
