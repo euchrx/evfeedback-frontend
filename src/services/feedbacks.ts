@@ -24,6 +24,7 @@ export type FeedbackItem = {
   id: string;
   rating: number;
   comment?: string | null;
+  email: string;
   contactName?: string | null;
   contactPhone?: string | null;
   contactMessage?: string | null;

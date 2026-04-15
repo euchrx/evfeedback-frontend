@@ -48,7 +48,8 @@ function formatDate(value: string) {
 
 function hasContactInfo(feedback: FeedbackItem) {
   return Boolean(
-    feedback.contactName?.trim() ||
+    feedback.email?.trim() ||
+      feedback.contactName?.trim() ||
       feedback.contactPhone?.trim() ||
       feedback.contactMessage?.trim() ||
       feedback.contactConsent,
@@ -311,6 +312,7 @@ export default function FeedbacksPage() {
 
       return (
         (feedback.comment ?? "").toLowerCase().includes(normalizedSearch) ||
+        (feedback.email ?? "").toLowerCase().includes(normalizedSearch) ||
         (feedback.company?.name ?? "").toLowerCase().includes(normalizedSearch) ||
         (feedback.branch?.name ?? "").toLowerCase().includes(normalizedSearch) ||
         (feedback.kiosk?.name ?? "").toLowerCase().includes(normalizedSearch) ||
@@ -500,7 +502,7 @@ export default function FeedbacksPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por comentário, filial, kiosk, contato ou tag"
+              placeholder="Buscar por comentário, e-mail, filial, kiosk, contato ou tag"
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
             />
 
@@ -575,7 +577,7 @@ export default function FeedbacksPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-[1100px] divide-y divide-slate-200">
+                <table className="min-w-[1260px] divide-y divide-slate-200">
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-3 text-left">
@@ -605,6 +607,9 @@ export default function FeedbacksPage() {
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Kiosk
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        E-mail
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Comentário
@@ -650,6 +655,12 @@ export default function FeedbacksPage() {
 
                         <td className="px-4 py-4 text-sm text-slate-600">
                           {feedback.kiosk?.name ?? "-"}
+                        </td>
+
+                        <td className="max-w-[240px] px-4 py-4 text-sm text-slate-600">
+                          <span className="line-clamp-2 break-all">
+                            {feedback.email?.trim() || "-"}
+                          </span>
                         </td>
 
                         <td className="max-w-[260px] px-4 py-4 text-sm text-slate-600">
@@ -800,6 +811,10 @@ export default function FeedbacksPage() {
 
                 {hasContactInfo(selectedFeedback) ? (
                   <div className="mt-4 space-y-3 text-sm text-slate-700">
+                    <p>
+                      <span className="font-semibold">E-mail:</span>{" "}
+                      {selectedFeedback.email?.trim() || "-"}
+                    </p>
                     <p>
                       <span className="font-semibold">Nome:</span>{" "}
                       {selectedFeedback.contactName?.trim() || "-"}
