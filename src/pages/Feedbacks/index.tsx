@@ -23,6 +23,7 @@ type TagOption = {
 };
 
 type ActiveField =
+  | "email"
   | "comment"
   | "contactName"
   | "contactPhone"
@@ -299,6 +300,8 @@ export default function FeedbackKiosk() {
       setTagIds([]);
       setComment("");
       setCommentError("");
+      setEmail("");
+      setEmailError("");
       setContactName("");
       setContactPhone("");
       setContactNameError("");
@@ -315,6 +318,8 @@ export default function FeedbackKiosk() {
     setTagIds([]);
     setComment("");
     setCommentError("");
+    setEmail("");
+    setEmailError("");
     setContactName("");
     setContactPhone("");
     setContactNameError("");
@@ -399,15 +404,17 @@ export default function FeedbackKiosk() {
     setActiveField(field);
 
     const currentValue =
-      field === "comment"
-        ? comment
-        : field === "contactName"
-          ? contactName
-          : field === "contactPhone"
-            ? contactPhone
-            : field === "contactMessage"
-              ? contactMessage
-              : "";
+      field === "email"
+        ? email
+        : field === "comment"
+          ? comment
+          : field === "contactName"
+            ? contactName
+            : field === "contactPhone"
+              ? contactPhone
+              : field === "contactMessage"
+                ? contactMessage
+                : "";
 
     setCursorPosition(currentValue.length);
 
@@ -598,6 +605,7 @@ export default function FeedbackKiosk() {
 
     if (!field) return "";
 
+    if (field === "email") return email;
     if (field === "comment") return comment;
     if (field === "contactName") return contactName;
     if (field === "contactPhone") return contactPhone;
@@ -609,6 +617,12 @@ export default function FeedbackKiosk() {
   function setActiveFieldValue(value: string, fieldOverride?: ActiveField) {
     const field = fieldOverride ?? activeField;
     if (!field) return;
+
+    if (field === "email") {
+      setEmail(clampText(value, 120));
+      if (emailError) setEmailError("");
+      return;
+    }
 
     if (field === "comment") {
       setComment(clampText(value, 300));
@@ -681,6 +695,7 @@ export default function FeedbackKiosk() {
       }
     };
   }
+
   function handleLetterPointerLeave() {
     clearLongPressTimer();
   }
@@ -710,6 +725,8 @@ export default function FeedbackKiosk() {
     setTagIds([]);
     setComment("");
     setCommentError("");
+    setEmail("");
+    setEmailError("");
     setContactName("");
     setContactPhone("");
     setContactNameError("");
@@ -917,6 +934,7 @@ export default function FeedbackKiosk() {
     step,
     rating,
     tagIds,
+    email,
     comment,
     contactName,
     contactPhone,
@@ -1622,10 +1640,11 @@ export default function FeedbackKiosk() {
 
       <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-center overflow-hidden">
         <div
-          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${keyboardOpen || keyboardClosing
-            ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
-            : "max-h-full"
-            }`}
+          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${
+            keyboardOpen || keyboardClosing
+              ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
+              : "max-h-full"
+          }`}
           style={{ backgroundColor: cardBackgroundColor }}
         >
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
@@ -1714,17 +1733,18 @@ export default function FeedbackKiosk() {
                           key={tag.id}
                           type="button"
                           onClick={() => handleToggleTag(tag.id)}
-                          className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${active
-                            ? ""
-                            : "border-white/10 bg-black/10 hover:bg-black/20"
-                            }`}
+                          className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
+                            active
+                              ? ""
+                              : "border-white/10 bg-black/10 hover:bg-black/20"
+                          }`}
                           style={
                             active
                               ? {
-                                borderColor: resolvedPrimaryColor,
-                                backgroundColor: resolvedPrimaryColor,
-                                color: resolvedButtonTextColor,
-                              }
+                                  borderColor: resolvedPrimaryColor,
+                                  backgroundColor: resolvedPrimaryColor,
+                                  color: resolvedButtonTextColor,
+                                }
                               : { color: resolvedTextColor }
                           }
                         >
@@ -1771,7 +1791,7 @@ export default function FeedbackKiosk() {
             {step === "comment" && (
               <section className="text-center">
                 <p className="text-sm md:text-base opacity-80">
-                  Avaliação:
+                  Label da avaliação:
                   <span className="ml-2 font-semibold">
                     {selectedRating?.emoji} {selectedRating?.label}
                   </span>
@@ -1786,58 +1806,81 @@ export default function FeedbackKiosk() {
                 </p>
 
                 <div className="mx-auto mt-8 max-w-3xl space-y-5">
-                  <div className="text-left">
-                    <label className="mb-2 block text-sm font-semibold opacity-90">
+                  <div>
+                    <label className="mb-2 block text-left text-sm font-semibold opacity-90">
                       E-mail
                     </label>
 
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(event) => {
-                        setEmail(event.target.value);
-                        if (emailError) setEmailError("");
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openKeyboard("email")}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openKeyboard("email");
+                        }
                       }}
-                      placeholder="Digite seu e-mail"
-                      className="w-full rounded-3xl border border-white/10 bg-black/10 px-5 py-4 text-base outline-none transition placeholder:text-white/40 focus:border-white/30 md:text-lg"
+                      className={`min-h-[64px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${
+                        activeField === "email"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
-                    />
+                    >
+                      {email ? (
+                        renderTextWithCursor(email, "email")
+                      ) : activeField === "email" ? (
+                        <span className="opacity-45">
+                          <span className="kiosk-caret" />
+                        </span>
+                      ) : (
+                        <span className="opacity-45">Toque para digitar</span>
+                      )}
+                    </div>
 
                     {emailError ? (
                       <p className="mt-3 text-sm text-rose-300">{emailError}</p>
                     ) : null}
                   </div>
 
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => openKeyboard("comment")}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        openKeyboard("comment");
-                      }
-                    }}
-                    className={`min-h-[180px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${activeField === "comment"
-                      ? "border-white/30"
-                      : "border-white/10"
-                      }`}
-                    style={{ color: resolvedTextColor }}
-                  >
-                    {comment ? (
-                      renderTextWithCursor(comment, "comment")
-                    ) : activeField === "comment" ? (
-                      <span className="opacity-45">
-                        <span className="kiosk-caret" />
-                      </span>
-                    ) : (
-                      <span className="opacity-45">Escreva aqui sua experiência...</span>
-                    )}
-                  </div>
+                  <div>
+                    <label className="mb-2 block text-left text-sm font-semibold opacity-90">
+                      Avaliação
+                    </label>
 
-                  {commentError ? (
-                    <p className="text-sm text-rose-300">{commentError}</p>
-                  ) : null}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openKeyboard("comment")}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          openKeyboard("comment");
+                        }
+                      }}
+                      className={`min-h-[180px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${
+                        activeField === "comment"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
+                      style={{ color: resolvedTextColor }}
+                    >
+                      {comment ? (
+                        renderTextWithCursor(comment, "comment")
+                      ) : activeField === "comment" ? (
+                        <span className="opacity-45">
+                          <span className="kiosk-caret" />
+                        </span>
+                      ) : (
+                        <span className="opacity-45">Toque aqui para digitar</span>
+                      )}
+                    </div>
+
+                    {commentError ? (
+                      <p className="mt-3 text-sm text-rose-300">{commentError}</p>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="mt-8 flex flex-col gap-3 md:flex-row md:justify-center">
@@ -1898,10 +1941,11 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactName")}
-                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactName"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactName"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactName ? (
@@ -1928,10 +1972,11 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactPhone")}
-                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactPhone"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactPhone"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactPhone ? (
@@ -1959,10 +2004,11 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactMessage")}
-                      className={`flex min-h-[120px] w-full items-start rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactMessage"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`flex min-h-[120px] w-full items-start rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactMessage"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactMessage ? (
@@ -2097,17 +2143,21 @@ export default function FeedbackKiosk() {
       </div>
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${keyboardOpen && !keyboardClosing
-          ? "translate-y-0 opacity-100 pointer-events-auto"
-          : "translate-y-full opacity-0 pointer-events-none"
-          }`}
+        className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${
+          keyboardOpen && !keyboardClosing
+            ? "translate-y-0 opacity-100 pointer-events-auto"
+            : "translate-y-full opacity-0 pointer-events-none"
+        }`}
       >
         <div className="mx-auto w-full max-w-6xl px-3 md:px-6">
           <div
             className="rounded-t-[28px] border border-white/10 border-b-0 p-4 shadow-2xl backdrop-blur-xl md:p-5"
             style={{ backgroundColor: "rgba(2, 6, 23, 0.97)" }}
           >
-            <div className="mb-3 flex items-center justify-end" onPointerDown={(e) => e.stopPropagation()}>
+            <div
+              className="mb-3 flex items-center justify-end"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               <button
                 type="button"
                 onClick={(e) => {
@@ -2123,9 +2173,10 @@ export default function FeedbackKiosk() {
             </div>
 
             {activeField === "contactPhone" ? renderPhoneKeyboard() : null}
-            {activeField === "comment" ||
-              activeField === "contactName" ||
-              activeField === "contactMessage"
+            {activeField === "email" ||
+            activeField === "comment" ||
+            activeField === "contactName" ||
+            activeField === "contactMessage"
               ? renderTextKeyboard()
               : null}
           </div>
