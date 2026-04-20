@@ -904,7 +904,7 @@ export default function FeedbackKiosk() {
         token: kioskToken,
         rating,
         comment: skipComment ? "" : comment.trim(),
-        email: email.trim(),
+        email: email.trim() || undefined,
         tagIds,
         contactName: isNegativeRating ? contactName.trim() : "",
         contactPhone: isNegativeRating ? sanitizePhoneValue(contactPhone) : "",
@@ -1798,6 +1798,10 @@ export default function FeedbackKiosk() {
                 <h2 className="mt-4 text-3xl font-bold md:text-5xl">
                   Por favor, deixe sua avaliação abaixo.
                 </h2>
+
+                <p className="mt-4 text-lg opacity-90">
+                  Deixe seu comentário abaixo. O e-mail é opcional.
+                </p>
 
                 <div className="mx-auto mt-8 max-w-3xl space-y-5">
                   <div>
