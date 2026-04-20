@@ -50,6 +50,9 @@ export default function KiosksPage() {
   const [createCompanyId, setCreateCompanyId] = useState(
     superAdmin ? "" : resolvedCompanyId ?? "",
   );
+  const [listCompanyId, setListCompanyId] = useState(
+    superAdmin ? "" : resolvedCompanyId ?? "",
+  );
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -71,10 +74,13 @@ export default function KiosksPage() {
     return `${window.location.origin}/feedback`;
   }, []);
 
-  // Listagem global para SUPER_ADMIN; escopo fixo só para usuários vinculados.
   const selectedCompanyId = useMemo(() => {
-    return superAdmin ? undefined : resolvedCompanyId;
-  }, [superAdmin, resolvedCompanyId]);
+    if (superAdmin) {
+      return listCompanyId || undefined;
+    }
+
+    return resolvedCompanyId;
+  }, [superAdmin, listCompanyId, resolvedCompanyId]);
 
   const createBranches = useMemo(() => {
     if (!superAdmin) return branches;
@@ -416,6 +422,9 @@ export default function KiosksPage() {
   function handleClearFilters() {
     setSearch("");
     setStatusFilter("ALL");
+    if (superAdmin) {
+      setListCompanyId("");
+    }
     setPage(1);
     setSelectedIds([]);
   }
@@ -453,11 +462,11 @@ export default function KiosksPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, listCompanyId]);
 
   useEffect(() => {
     setSelectedIds([]);
-  }, [search, statusFilter, page]);
+  }, [search, statusFilter, page, listCompanyId]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -573,7 +582,7 @@ export default function KiosksPage() {
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -590,6 +599,21 @@ export default function KiosksPage() {
                 <option value="ACTIVE">Ativos</option>
                 <option value="INACTIVE">Inativos</option>
               </select>
+
+              {superAdmin ? (
+                <select
+                  value={listCompanyId}
+                  onChange={(e) => setListCompanyId(e.target.value)}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
+                >
+                  <option value="">Todas as empresas</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
 
               <button
                 type="button"
@@ -724,9 +748,9 @@ export default function KiosksPage() {
                                   setEditing((prev) =>
                                     prev
                                       ? {
-                                        ...prev,
-                                        locationDescription: e.target.value,
-                                      }
+                                          ...prev,
+                                          locationDescription: e.target.value,
+                                        }
                                       : prev,
                                   )
                                 }
@@ -802,10 +826,11 @@ export default function KiosksPage() {
 
                           <td className="px-4 py-4 align-top text-sm">
                             <span
-                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${kiosk.active
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                                kiosk.active
                                   ? "bg-emerald-100 text-emerald-700"
                                   : "bg-amber-100 text-amber-700"
-                                }`}
+                              }`}
                             >
                               {kiosk.active ? "Ativo" : "Inativo"}
                             </span>
