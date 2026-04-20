@@ -173,10 +173,7 @@ export default function SettingsPage() {
         }
       }
 
-      const [settings, apkInfo] = await Promise.all([
-        getMySettings(selectedCompanyId),
-        getAppApkInfo().catch(() => null),
-      ]);
+      const settings = await getMySettings(selectedCompanyId);
 
       setCompanyName(settings.companyName ?? "");
       setLogoUrl(settings.logoUrl ?? "");
@@ -195,7 +192,14 @@ export default function SettingsPage() {
       setNotificationEmails(settings.notificationEmails ?? "");
       setDailyNotificationEnabled(settings.dailyNotificationEnabled ?? true);
       setMonthlyNotificationEnabled(settings.monthlyNotificationEnabled ?? true);
-      setAppApkInfo(apkInfo ?? null);
+
+      try {
+        const apkInfo = await getAppApkInfo();
+        setAppApkInfo(apkInfo ?? null);
+      } catch (apkErr: unknown) {
+        setAppApkInfo(null);
+        setError(getErrorMessage(apkErr, "Não foi possível carregar as informações do APK."));
+      }
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Não foi possível carregar as configurações."));
     } finally {
@@ -259,7 +263,7 @@ export default function SettingsPage() {
         selectedCompanyId,
       );
 
-      setSuccess("Configurações salvas com sucesso.");
+      setSuccess("Configurações visuais salvas com sucesso.");
     } catch (err: unknown) {
       setError(getErrorMessage(err, "Não foi possível salvar as configurações."));
     } finally {
