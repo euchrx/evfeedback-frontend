@@ -753,11 +753,9 @@ export default function FeedbackKiosk() {
 
   async function handleSubmitCommentStep() {
     let hasError = false;
+    const trimmedEmail = email.trim();
 
-    if (!email.trim()) {
-      setEmailError("Informe seu e-mail.");
-      hasError = true;
-    } else if (!isValidEmail(email)) {
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
       setEmailError("Informe um e-mail válido.");
       hasError = true;
     } else {
@@ -906,7 +904,7 @@ export default function FeedbackKiosk() {
         token: kioskToken,
         rating,
         comment: skipComment ? "" : comment.trim(),
-        email,
+        email: email.trim(),
         tagIds,
         contactName: isNegativeRating ? contactName.trim() : "",
         contactPhone: isNegativeRating ? sanitizePhoneValue(contactPhone) : "",
@@ -1802,13 +1800,13 @@ export default function FeedbackKiosk() {
                 </h2>
 
                 <p className="mt-4 text-lg opacity-90">
-                  Comentário e e-mail são obrigatórios.
+                  Deixe seu comentário abaixo. O e-mail é opcional.
                 </p>
 
                 <div className="mx-auto mt-8 max-w-3xl space-y-5">
                   <div>
                     <label className="mb-2 block text-left text-sm font-semibold opacity-90">
-                      E-mail
+                      E-mail (opcional)
                     </label>
 
                     <div
@@ -1835,7 +1833,7 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque para digitar</span>
+                        <span className="opacity-45">Toque aqui para digitar...</span>
                       )}
                     </div>
 
@@ -1873,7 +1871,7 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque aqui para digitar</span>
+                        <span className="opacity-45">Toque aqui para digitar...</span>
                       )}
                     </div>
 
@@ -1955,7 +1953,7 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque para digitar</span>
+                        <span className="opacity-45">Toque aqui para digitar...</span>
                       )}
                     </button>
                     {contactNameError ? (
@@ -1986,7 +1984,7 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque para digitar</span>
+                        <span className="opacity-45">Toque aqui para digitar...</span>
                       )}
                     </button>
                     {contactPhoneError ? (
@@ -2018,7 +2016,7 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque para digitar</span>
+                        <span className="opacity-45">Toque aqui para digitar...</span>
                       )}
                     </button>
                   </div>
