@@ -4,6 +4,7 @@ import { getCompanies, type Company } from "../../../services/companies";
 import {
   activateBranch,
   createBranch,
+  updateBranch,
   deactivateBranch,
   getBranches,
   hardDeleteBranch,
@@ -20,6 +21,13 @@ import {
 const PAGE_SIZE = 10;
 
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
+
+type EditingState = {
+  id: string;
+  name: string;
+  code: string;
+  companyId?: string;
+} | null;
 
 export default function BranchesPage() {
   const currentUser = getStoredUser();
@@ -49,8 +57,11 @@ export default function BranchesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [page, setPage] = useState(1);
 
+  const [editing, setEditing] = useState<EditingState>(null);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -118,6 +129,54 @@ export default function BranchesPage() {
       setError("Não foi possível criar a filial.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+
+  function handleStartEdit(branch: Branch) {
+    setEditing({
+      id: branch.id,
+      name: branch.name ?? "",
+      code: branch.code ?? "",
+      companyId: branch.companyId,
+    });
+  }
+
+  function handleCancelEdit() {
+    setEditing(null);
+  }
+
+  async function handleSaveEdit(branch: Branch) {
+    if (!canManage || !editing) return;
+
+    if (!editing.name.trim()) {
+      setError("Informe o nome da filial.");
+      return;
+    }
+
+    const targetCompanyId = superAdmin ? editing.companyId : resolvedCompanyId ?? undefined;
+
+    if (superAdmin && !targetCompanyId) {
+      setError("Selecione uma empresa.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setError("");
+
+      await updateBranch(branch.id, {
+        name: editing.name.trim(),
+        code: editing.code.trim() || undefined,
+        companyId: targetCompanyId,
+      });
+
+      setEditing(null);
+      await load();
+    } catch {
+      setError("Não foi possível atualizar a filial.");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -507,6 +566,7 @@ export default function BranchesPage() {
 
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {paginatedBranches.map((branch) => {
+                    const isEditing = editing?.id === branch.id;
                     const isProcessing = processingId === branch.id;
                     const canDelete =
                       canDeletePermanently && currentUser?.id !== branch.id;
@@ -523,15 +583,58 @@ export default function BranchesPage() {
                         </td>
 
                         <td className="px-4 py-4 text-sm font-medium text-slate-900">
-                          {branch.name}
+                          {isEditing ? (
+                            <input
+                              value={editing?.name ?? ""}
+                              onChange={(e) =>
+                                setEditing((prev) =>
+                                  prev ? { ...prev, name: e.target.value } : prev,
+                                )
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-sky-500"
+                            />
+                          ) : (
+                            branch.name
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          {branch.code ?? "-"}
+                          {isEditing ? (
+                            <input
+                              value={editing?.code ?? ""}
+                              onChange={(e) =>
+                                setEditing((prev) =>
+                                  prev ? { ...prev, code: e.target.value } : prev,
+                                )
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-sky-500"
+                            />
+                          ) : (
+                            branch.code ?? "-"
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          {branch.company?.name ?? "-"}
+                          {isEditing && superAdmin ? (
+                            <select
+                              value={editing?.companyId ?? ""}
+                              onChange={(e) =>
+                                setEditing((prev) =>
+                                  prev ? { ...prev, companyId: e.target.value } : prev,
+                                )
+                              }
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-sky-500"
+                            >
+                              <option value="">Selecione a empresa</option>
+                              {companies.map((company) => (
+                                <option key={company.id} value={company.id}>
+                                  {company.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            branch.company?.name ?? "-"
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-sm">
@@ -548,38 +651,71 @@ export default function BranchesPage() {
 
                         <td className="px-4 py-4">
                           <div className="flex justify-end gap-2">
-                            {canManage && branch.active ? (
-                              <button
-                                type="button"
-                                onClick={() => handleDeactivate(branch)}
-                                disabled={isProcessing}
-                                className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-60"
-                              >
-                                Desativar
-                              </button>
-                            ) : null}
+                            {isEditing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEdit(branch)}
+                                  disabled={savingEdit}
+                                  className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
+                                >
+                                  {savingEdit ? "Salvando..." : "Salvar"}
+                                </button>
 
-                            {canManage && !branch.active ? (
-                              <button
-                                type="button"
-                                onClick={() => handleActivate(branch)}
-                                disabled={isProcessing}
-                                className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
-                              >
-                                Ativar
-                              </button>
-                            ) : null}
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEdit}
+                                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                                >
+                                  Cancelar
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {canManage ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEdit(branch)}
+                                    className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                                  >
+                                    Editar
+                                  </button>
+                                ) : null}
 
-                            {canDelete ? (
-                              <button
-                                type="button"
-                                onClick={() => handleHardDelete(branch)}
-                                disabled={isProcessing || bulkDeleting}
-                                className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-200 disabled:opacity-60"
-                              >
-                                Excluir
-                              </button>
-                            ) : null}
+                                {canManage && branch.active ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeactivate(branch)}
+                                    disabled={isProcessing}
+                                    className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-60"
+                                  >
+                                    Desativar
+                                  </button>
+                                ) : null}
+
+                                {canManage && !branch.active ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleActivate(branch)}
+                                    disabled={isProcessing}
+                                    className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
+                                  >
+                                    Ativar
+                                  </button>
+                                ) : null}
+
+                                {canDelete ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleHardDelete(branch)}
+                                    disabled={isProcessing || bulkDeleting}
+                                    className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-200 disabled:opacity-60"
+                                  >
+                                    Excluir
+                                  </button>
+                                ) : null}
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

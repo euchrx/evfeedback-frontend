@@ -7,6 +7,7 @@ import {
   deactivateUser,
   getUsers,
   hardDeleteUser,
+  updateUser,
   type UserItem,
   type UserRole,
 } from "../../../services/users";
@@ -19,6 +20,14 @@ import {
 const PAGE_SIZE = 10;
 
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
+
+type EditingState = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  companyId: string;
+} | null;
 
 export default function UsersPage() {
   const currentUser = getStoredUser();
@@ -41,8 +50,10 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<"" | UserRole>("");
 
   const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState<EditingState>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -111,6 +122,56 @@ export default function UsersPage() {
       setError("Não foi possível criar o usuário.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+
+  function handleStartEdit(user: UserItem) {
+    setEditing({
+      id: user.id,
+      name: user.name ?? "",
+      email: user.email ?? "",
+      role: user.role,
+      companyId: user.companyId ?? "",
+    });
+  }
+
+  function handleCancelEdit() {
+    setEditing(null);
+  }
+
+  async function handleSaveEdit(user: UserItem) {
+    if (!editing) return;
+
+    if (!editing.name.trim() || !editing.email.trim()) {
+      setError("Preencha nome e e-mail.");
+      return;
+    }
+
+    const targetCompanyId = editing.role === "SUPER_ADMIN" ? undefined : editing.companyId;
+
+    if (editing.role !== "SUPER_ADMIN" && !targetCompanyId) {
+      setError("Selecione uma empresa.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setError("");
+
+      await updateUser(user.id, {
+        name: editing.name.trim(),
+        email: editing.email.trim(),
+        role: editing.role,
+        companyId: targetCompanyId,
+      });
+
+      setEditing(null);
+      await load();
+    } catch {
+      setError("Não foi possível atualizar o usuário.");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -536,6 +597,7 @@ export default function UsersPage() {
 
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {paginatedUsers.map((user) => {
+                    const isEditing = editing?.id === user.id;
                     const isProcessing = processingId === user.id;
                     const canDelete =
                       canDeletePermanently && currentUser?.id !== user.id;
@@ -552,21 +614,88 @@ export default function UsersPage() {
                         </td>
 
                         <td className="px-4 py-4 text-sm font-medium text-slate-900">
-                          {user.name}
+                          {isEditing ? (
+                            <input
+                              value={editing?.name ?? ""}
+                              onChange={(e) =>
+                                setEditing((prev) =>
+                                  prev ? { ...prev, name: e.target.value } : prev,
+                                )
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-sky-500"
+                            />
+                          ) : (
+                            user.name
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          {user.email}
+                          {isEditing ? (
+                            <input
+                              value={editing?.email ?? ""}
+                              onChange={(e) =>
+                                setEditing((prev) =>
+                                  prev ? { ...prev, email: e.target.value } : prev,
+                                )
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-sky-500"
+                            />
+                          ) : (
+                            user.email
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                            {user.role}
-                          </span>
+                          {isEditing ? (
+                            <select
+                              value={editing?.role ?? "MANAGER"}
+                              onChange={(e) =>
+                                setEditing((prev) =>
+                                  prev
+                                    ? { ...prev, role: e.target.value as UserRole, companyId: e.target.value === "SUPER_ADMIN" ? "" : prev.companyId }
+                                    : prev,
+                                )
+                              }
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-sky-500"
+                            >
+                              {availableRoles.map((item) => (
+                                <option key={item} value={item}>
+                                  {item}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                              {user.role}
+                            </span>
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
-                          {user.company?.name ?? "-"}
+                          {isEditing ? (
+                            editing?.role === "SUPER_ADMIN" ? (
+                              "-"
+                            ) : (
+                              <select
+                                value={editing?.companyId ?? ""}
+                                onChange={(e) =>
+                                  setEditing((prev) =>
+                                    prev ? { ...prev, companyId: e.target.value } : prev,
+                                  )
+                                }
+                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-sky-500"
+                              >
+                                <option value="">Selecione a empresa</option>
+                                {companies.map((company) => (
+                                  <option key={company.id} value={company.id}>
+                                    {company.name}
+                                  </option>
+                                ))}
+                              </select>
+                            )
+                          ) : (
+                            user.company?.name ?? "-"
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-sm">
@@ -583,36 +712,67 @@ export default function UsersPage() {
 
                         <td className="px-4 py-4">
                           <div className="flex justify-end gap-2">
-                            {user.active ? (
-                              <button
-                                type="button"
-                                onClick={() => handleDeactivate(user)}
-                                disabled={isProcessing}
-                                className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-60"
-                              >
-                                Desativar
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleActivate(user)}
-                                disabled={isProcessing}
-                                className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
-                              >
-                                Reativar
-                              </button>
-                            )}
+                            {isEditing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEdit(user)}
+                                  disabled={savingEdit}
+                                  className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
+                                >
+                                  {savingEdit ? "Salvando..." : "Salvar"}
+                                </button>
 
-                            {canDelete ? (
-                              <button
-                                type="button"
-                                onClick={() => handleHardDelete(user)}
-                                disabled={isProcessing || bulkDeleting}
-                                className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
-                              >
-                                Excluir
-                              </button>
-                            ) : null}
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEdit}
+                                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                                >
+                                  Cancelar
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(user)}
+                                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                                >
+                                  Editar
+                                </button>
+
+                                {user.active ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeactivate(user)}
+                                    disabled={isProcessing}
+                                    className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-60"
+                                  >
+                                    Desativar
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleActivate(user)}
+                                    disabled={isProcessing}
+                                    className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
+                                  >
+                                    Reativar
+                                  </button>
+                                )}
+
+                                {canDelete ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleHardDelete(user)}
+                                    disabled={isProcessing || bulkDeleting}
+                                    className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                                  >
+                                    Excluir
+                                  </button>
+                                ) : null}
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>

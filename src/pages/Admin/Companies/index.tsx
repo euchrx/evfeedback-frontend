@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   activateCompany,
   createCompany,
+  updateCompany,
   deactivateCompany,
   getCompanies,
   hardDeleteCompany,
@@ -13,6 +14,11 @@ import { canAccessCompanies, canHardDelete } from "../../../utils/permissions";
 const PAGE_SIZE = 10;
 
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
+
+type EditingState = {
+  id: string;
+  name: string;
+} | null;
 
 function formatDate(value?: string) {
   if (!value) return "-";
@@ -37,8 +43,11 @@ export default function CompaniesPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [page, setPage] = useState(1);
 
+  const [editing, setEditing] = useState<EditingState>(null);
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -83,6 +92,43 @@ export default function CompaniesPage() {
       setError("Não foi possível criar a empresa.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+
+  function handleStartEdit(company: Company) {
+    setEditing({
+      id: company.id,
+      name: company.name ?? "",
+    });
+  }
+
+  function handleCancelEdit() {
+    setEditing(null);
+  }
+
+  async function handleSaveEdit(company: Company) {
+    if (!editing) return;
+
+    if (!editing.name.trim()) {
+      setError("Informe o nome da empresa.");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setError("");
+
+      await updateCompany(company.id, {
+        name: editing.name.trim(),
+      });
+
+      setEditing(null);
+      await load();
+    } catch {
+      setError("Não foi possível atualizar a empresa.");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -430,6 +476,7 @@ export default function CompaniesPage() {
 
                 <tbody className="divide-y divide-slate-200 bg-white">
                   {paginatedCompanies.map((company) => {
+                    const isEditing = editing?.id === company.id;
                     const isProcessing = processingId === company.id;
 
                     return (
@@ -444,7 +491,19 @@ export default function CompaniesPage() {
                         </td>
 
                         <td className="px-4 py-4 text-sm font-medium text-slate-900">
-                          {company.name}
+                          {isEditing ? (
+                            <input
+                              value={editing?.name ?? ""}
+                              onChange={(e) =>
+                                setEditing((prev) =>
+                                  prev ? { ...prev, name: e.target.value } : prev,
+                                )
+                              }
+                              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-sky-500"
+                            />
+                          ) : (
+                            company.name
+                          )}
                         </td>
 
                         <td className="px-4 py-4 text-sm text-slate-600">
@@ -469,36 +528,67 @@ export default function CompaniesPage() {
 
                         <td className="px-4 py-4">
                           <div className="flex justify-end gap-2">
-                            {company.active ? (
-                              <button
-                                type="button"
-                                onClick={() => handleDeactivate(company)}
-                                disabled={isProcessing}
-                                className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-60"
-                              >
-                                Desativar
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleActivate(company)}
-                                disabled={isProcessing}
-                                className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
-                              >
-                                Ativar
-                              </button>
-                            )}
+                            {isEditing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEdit(company)}
+                                  disabled={savingEdit}
+                                  className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
+                                >
+                                  {savingEdit ? "Salvando..." : "Salvar"}
+                                </button>
 
-                            {canDeletePermanently ? (
-                              <button
-                                type="button"
-                                onClick={() => handleHardDelete(company)}
-                                disabled={isProcessing || bulkDeleting}
-                                className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-200 disabled:opacity-60"
-                              >
-                                Excluir
-                              </button>
-                            ) : null}
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEdit}
+                                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                                >
+                                  Cancelar
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(company)}
+                                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                                >
+                                  Editar
+                                </button>
+
+                                {company.active ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeactivate(company)}
+                                    disabled={isProcessing}
+                                    className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-60"
+                                  >
+                                    Desativar
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleActivate(company)}
+                                    disabled={isProcessing}
+                                    className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
+                                  >
+                                    Ativar
+                                  </button>
+                                )}
+
+                                {canDeletePermanently ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleHardDelete(company)}
+                                    disabled={isProcessing || bulkDeleting}
+                                    className="rounded-lg bg-rose-100 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-200 disabled:opacity-60"
+                                  >
+                                    Excluir
+                                  </button>
+                                ) : null}
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
