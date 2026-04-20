@@ -1799,10 +1799,6 @@ export default function FeedbackKiosk() {
                   Por favor, deixe sua avaliação abaixo.
                 </h2>
 
-                <p className="mt-4 text-lg opacity-90">
-                  Deixe seu comentário abaixo. O e-mail é opcional.
-                </p>
-
                 <div className="mx-auto mt-8 max-w-3xl space-y-5">
                   <div>
                     <label className="mb-2 block text-left text-sm font-semibold opacity-90">
