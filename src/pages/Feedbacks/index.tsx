@@ -753,8 +753,65 @@ export default function FeedbackKiosk() {
     setStep("tags");
   }
 
-  async function handleSubmit(skipComment = false, action: "skip" | "send" = "send") {
+  async function handleSubmit(
+    skipComment = false,
+    action: "skip" | "send" = "send",
+  ) {
     if (!rating || !kioskToken || submittingAction) return;
+
+    const trimmedEmail = email.trim();
+    const trimmedComment = comment.trim();
+    const trimmedContactName = contactName.trim();
+    const trimmedContactPhone = contactPhone.trim();
+
+    let hasError = false;
+
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
+      setEmailError("Informe um e-mail válido.");
+      hasError = true;
+    } else {
+      setEmailError("");
+    }
+
+    if (!skipComment && !trimmedComment) {
+      setCommentError("Esse campo é obrigatório.");
+      hasError = true;
+    } else {
+      setCommentError("");
+    }
+
+    if (isNegativeRating && action === "send") {
+      if (!trimmedContactName) {
+        setContactNameError("Informe seu nome.");
+        hasError = true;
+      } else {
+        setContactNameError("");
+      }
+
+      if (!trimmedContactPhone) {
+        setContactPhoneError("Informe seu telefone ou WhatsApp.");
+        hasError = true;
+      } else {
+        setContactPhoneError("");
+      }
+    }
+
+    if (hasError) {
+      if (trimmedEmail && !isValidEmail(trimmedEmail)) {
+        setStep("comment");
+        openKeyboard("email");
+      } else if (!skipComment && !trimmedComment) {
+        setStep("comment");
+        openKeyboard("comment");
+      } else if (isNegativeRating && action === "send" && !trimmedContactName) {
+        setStep("contact");
+        openKeyboard("contactName");
+      } else if (isNegativeRating && action === "send" && !trimmedContactPhone) {
+        setStep("contact");
+        openKeyboard("contactPhone");
+      }
+      return;
+    }
 
     try {
       setSubmittingAction(action);
@@ -765,10 +822,10 @@ export default function FeedbackKiosk() {
       await api.post("/kiosk/feedback", {
         token: kioskToken,
         rating,
-        comment: skipComment ? "" : comment.trim(),
-        email: email.trim() || undefined,
+        comment: skipComment ? "" : trimmedComment,
+        email: trimmedEmail || undefined,
         tagIds,
-        contactName: isNegativeRating ? contactName.trim() : "",
+        contactName: isNegativeRating ? trimmedContactName : "",
         contactPhone: isNegativeRating ? sanitizePhoneValue(contactPhone) : "",
         contactMessage: isNegativeRating ? contactMessage.trim() : "",
         contactConsent: isNegativeRating ? contactConsent : false,
