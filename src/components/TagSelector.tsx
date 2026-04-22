@@ -4,41 +4,58 @@ type Tag = {
 };
 
 type Props = {
+  tags: Tag[];
   selected: string[];
   onChange: (ids: string[]) => void;
+  primaryColor?: string;
+  buttonTextColor?: string;
+  disabled?: boolean;
 };
 
-const tags: Tag[] = [
-  { id: '1', name: 'Atendimento' },
-  { id: '2', name: 'Rapidez' },
-  { id: '3', name: 'Limpeza' },
-  { id: '4', name: 'Produto' },
-  { id: '5', name: 'Ambiente' },
-];
+export default function TagSelector({
+  tags,
+  selected,
+  onChange,
+  primaryColor = "#0ea5e9",
+  buttonTextColor = "#0f172a",
+  disabled = false,
+}: Props) {
+  function toggle(id: string) {
+    if (disabled) return;
 
-export default function TagSelector({ selected, onChange }: Props) {
-  const toggle = (id: string) => {
     if (selected.includes(id)) {
-      onChange(selected.filter((i) => i !== id));
-    } else {
-      onChange([...selected, id]);
+      onChange(selected.filter((item) => item !== id));
+      return;
     }
-  };
+
+    onChange([...selected, id]);
+  }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-10">
+    <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-5">
       {tags.map((tag) => {
         const active = selected.includes(tag.id);
 
         return (
           <button
             key={tag.id}
+            type="button"
             onClick={() => toggle(tag.id)}
-            className={`rounded-2xl p-4 text-center border transition active:scale-95 ${
+            disabled={disabled}
+            className="rounded-2xl border px-4 py-5 text-center text-base font-medium transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 md:px-6 md:py-6 md:text-lg"
+            style={
               active
-                ? 'bg-sky-500 border-sky-400 text-white'
-                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-            }`}
+                ? {
+                    borderColor: primaryColor,
+                    backgroundColor: primaryColor,
+                    color: buttonTextColor,
+                  }
+                : {
+                    borderColor: "rgba(255,255,255,0.08)",
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    color: "#cbd5e1",
+                  }
+            }
           >
             {tag.name}
           </button>

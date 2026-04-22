@@ -24,5 +24,5 @@ export async function getSharedFeedbacks(
     },
   });
 
-  return Array.isArray(response.data) ? response.data : [];
+  return Array.isArray(response.data) ? (response.data as FeedbackItem[]) : [];
 }

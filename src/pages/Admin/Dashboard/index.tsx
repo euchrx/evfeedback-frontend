@@ -13,6 +13,7 @@ import {
   getResolvedCompanyId,
   isSuperAdmin,
 } from "../../../utils/permissions";
+import { useToast } from "../../../components/ui/ToastProvider";
 
 function formatAverage(value: number) {
   return Number.isFinite(value) ? value.toFixed(1) : "0.0";
@@ -49,8 +50,9 @@ function getRatingLabel(rating: number) {
 }
 
 export default function DashboardPage() {
-  const currentUser = getStoredUser();
+  const toast = useToast();
 
+  const currentUser = getStoredUser();
   const canView = canViewOperationalModules(currentUser);
   const superAdmin = isSuperAdmin(currentUser);
   const resolvedCompanyId = getResolvedCompanyId(currentUser);
@@ -58,8 +60,8 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [branches, setBranches] = useState<BranchDashboardItem[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
 
   const [filters, setFilters] = useState<DashboardFilters>({
     companyId: superAdmin ? "" : resolvedCompanyId ?? "",
@@ -78,6 +80,7 @@ export default function DashboardPage() {
       const data = await getCompanies();
       setCompanies(Array.isArray(data) ? data : []);
     } catch {
+      toast.error("Erro ao carregar empresas.");
       setCompanies([]);
     }
   }
@@ -85,7 +88,6 @@ export default function DashboardPage() {
   async function loadDashboard(customFilters?: DashboardFilters) {
     try {
       setIsLoading(true);
-      setError("");
 
       const finalFilters = customFilters ?? filters;
 
@@ -105,7 +107,7 @@ export default function DashboardPage() {
       setSummary(summaryData);
       setBranches(Array.isArray(branchData) ? branchData : []);
     } catch {
-      setError("Não foi possível carregar os indicadores do dashboard.");
+      toast.error("Não foi possível carregar o dashboard.");
       setSummary(null);
       setBranches([]);
     } finally {
@@ -140,13 +142,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!canView) return;
 
-    const initial: DashboardFilters = {
-      companyId: superAdmin ? filters.companyId || "" : resolvedCompanyId ?? "",
-      dateFrom: filters.dateFrom || "",
-      dateTo: filters.dateTo || "",
-    };
-
-    void loadDashboard(initial);
+    void loadDashboard(filters);
   }, [canView, selectedCompanyId]);
 
   const ratingMap = useMemo(() => {
@@ -191,13 +187,15 @@ export default function DashboardPage() {
     return candidate;
   }, [branches, bestBranch]);
 
+  const totalActiveBranches = useMemo(() => {
+    return branches.filter((item) => item.totalFeedbacks > 0).length;
+  }, [branches]);
+
   if (!canView) {
     return (
-      <section className="space-y-3">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Acesso negado
-        </h1>
-        <p className="text-slate-600">
+      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+        <h2 className="text-xl font-semibold text-white">Acesso negado</h2>
+        <p className="mt-2 text-sm leading-6 text-rose-100/80">
           Você não tem permissão para acessar o dashboard.
         </p>
       </section>
@@ -205,148 +203,164 @@ export default function DashboardPage() {
   }
 
   return (
-    <section className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Dashboard
-        </h1>
-        <p className="text-slate-600">
-          Visão geral dos feedbacks recebidos.
-        </p>
-      </div>
+    <section className="space-y-6">
+      <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+              dashboard executivo
+            </div>
 
-      {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
-        </div>
-      ) : null}
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
+              Visão geral da operação
+            </h2>
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 space-y-1">
-          <h2 className="text-xl font-semibold text-slate-900">
-            Filtro do dashboard
-          </h2>
-          <p className="text-sm text-slate-500">
-            Filtre os indicadores por empresa e período.
-          </p>
-        </div>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              Acompanhe volume, média, distribuição e desempenho por filial em um
+              único painel executivo.
+            </p>
+          </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {superAdmin ? (
-            <select
-              value={filters.companyId ?? ""}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {superAdmin ? (
+              <select
+                value={filters.companyId ?? ""}
+                onChange={(e) =>
+                  setFilters((prev) => ({
+                    ...prev,
+                    companyId: e.target.value,
+                  }))
+                }
+                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+              >
+                <option value="">Selecione uma empresa</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={
+                  currentUser?.companyId
+                    ? "Empresa vinculada ao seu usuário"
+                    : "Sem empresa vinculada"
+                }
+                disabled
+                className="h-12 rounded-2xl border border-white/10 bg-slate-900/40 px-4 text-sm text-slate-400 outline-none disabled:cursor-not-allowed"
+              />
+            )}
+
+            <input
+              type="date"
+              value={filters.dateFrom ?? ""}
               onChange={(e) =>
                 setFilters((prev) => ({
                   ...prev,
-                  companyId: e.target.value,
+                  dateFrom: e.target.value,
                 }))
               }
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-            >
-              <option value="">Selecione uma empresa</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              value={
-                currentUser?.companyId
-                  ? "Empresa vinculada ao seu usuário"
-                  : "Sem empresa vinculada"
-              }
-              disabled
-              className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-500"
+              className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition [color-scheme:dark] focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
             />
-          )}
 
-          <input
-            type="date"
-            value={filters.dateFrom ?? ""}
-            onChange={(e) =>
-              setFilters((prev) => ({
-                ...prev,
-                dateFrom: e.target.value,
-              }))
-            }
-            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-          />
+            <input
+              type="date"
+              value={filters.dateTo ?? ""}
+              onChange={(e) =>
+                setFilters((prev) => ({
+                  ...prev,
+                  dateTo: e.target.value,
+                }))
+              }
+              className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition [color-scheme:dark] focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+            />
 
-          <input
-            type="date"
-            value={filters.dateTo ?? ""}
-            onChange={(e) =>
-              setFilters((prev) => ({
-                ...prev,
-                dateTo: e.target.value,
-              }))
-            }
-            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-          />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleApplyPeriod}
+                className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+              >
+                Aplicar
+              </button>
 
-          <div className="flex gap-3">
-            <button
-              onClick={handleApplyPeriod}
-              className="w-full rounded-xl bg-sky-500 px-4 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
-            >
-              Aplicar
-            </button>
-
-            <button
-              onClick={handleClearPeriod}
-              className="w-full rounded-xl bg-slate-100 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-200"
-            >
-              Limpar
-            </button>
+              <button
+                type="button"
+                onClick={handleClearPeriod}
+                className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
+              >
+                Limpar
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-slate-500 shadow-sm">
+        <div className="rounded-[28px] border border-white/10 bg-white/5 px-6 py-12 text-center text-sm text-slate-400 shadow-2xl shadow-black/20 backdrop-blur-xl">
           Carregando indicadores...
         </div>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-3">
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Total de feedbacks
               </p>
-              <h2 className="mt-2 text-3xl font-bold text-slate-900">
+              <h2 className="mt-4 text-4xl font-bold tracking-tight text-white">
                 {summary?.total ?? 0}
               </h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Volume total de registros no período.
+              </p>
             </article>
 
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">
+            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Média geral
               </p>
-              <h2 className="mt-2 text-3xl font-bold text-slate-900">
+              <h2 className="mt-4 text-4xl font-bold tracking-tight text-white">
                 {formatAverage(summary?.averageRating ?? 0)}
               </h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Média consolidada das avaliações.
+              </p>
             </article>
 
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">
+            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Filiais com feedback
               </p>
-              <h2 className="mt-2 text-3xl font-bold text-slate-900">
-                {branches.filter((item) => item.totalFeedbacks > 0).length}
+              <h2 className="mt-4 text-4xl font-bold tracking-tight text-white">
+                {totalActiveBranches}
               </h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Unidades com registros recebidos.
+              </p>
+            </article>
+
+            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Tags mais marcadas
+              </p>
+              <h2 className="mt-4 text-4xl font-bold tracking-tight text-white">
+                {summary?.topTags?.length ?? 0}
+              </h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Motivos com ocorrência no período.
+              </p>
             </article>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-2">
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-4 space-y-1">
-                <h2 className="text-xl font-semibold text-slate-900">
+          <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+              <div className="mb-5 space-y-1">
+                <h2 className="text-xl font-semibold text-white">
                   Distribuição por nota
                 </h2>
-                <p className="text-sm text-slate-500">
-                  Quantidade de feedbacks por avaliação.
+                <p className="text-sm text-slate-400">
+                  Quantidade de feedbacks por avaliação recebida.
                 </p>
               </div>
 
@@ -355,14 +369,17 @@ export default function DashboardPage() {
                   const width = `${(item.count / maxRatingCount) * 100}%`;
 
                   return (
-                    <div key={item.rating} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm text-slate-600">
-                        <span>Nota {item.rating}</span>
-                        <span>{item.count}</span>
+                    <div key={item.rating} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-slate-200">
+                          Nota {item.rating} · {getRatingLabel(item.rating)}
+                        </span>
+                        <span className="text-slate-400">{item.count}</span>
                       </div>
-                      <div className="h-3 rounded-full bg-slate-100">
+
+                      <div className="h-3 rounded-full bg-slate-900/80">
                         <div
-                          className="h-3 rounded-full bg-sky-500 transition-all"
+                          className="h-3 rounded-full bg-cyan-400 transition-all"
                           style={{ width }}
                         />
                       </div>
@@ -372,12 +389,12 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="mb-4 space-y-1">
-                <h2 className="text-xl font-semibold text-slate-900">
+            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+              <div className="mb-5 space-y-1">
+                <h2 className="text-xl font-semibold text-white">
                   Principais motivos
                 </h2>
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-slate-400">
                   Tags mais marcadas pelos clientes.
                 </p>
               </div>
@@ -387,97 +404,96 @@ export default function DashboardPage() {
                   {summary.topTags.map((tag, index) => (
                     <div
                       key={`${tag.name}-${index}`}
-                      className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3"
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3"
                     >
-                      <span className="font-medium text-slate-800">
+                      <span className="font-medium text-slate-200">
                         {tag.name}
                       </span>
-                      <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
                         {tag.count}
                       </span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
+                <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-slate-500">
                   Nenhuma tag registrada ainda.
                 </div>
               )}
             </article>
           </div>
-
           <div className="grid gap-6 xl:grid-cols-2">
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <article className="rounded-[28px] border border-emerald-400/15 bg-emerald-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
               <div className="mb-4 space-y-1">
-                <h2 className="text-xl font-semibold text-slate-900">
+                <h2 className="text-xl font-semibold text-white">
                   Melhor filial
                 </h2>
-                <p className="text-sm text-slate-500">
-                  Unidade com melhor média de avaliação.
+                <p className="text-sm text-emerald-100/70">
+                  Unidade com melhor média de avaliação no período.
                 </p>
               </div>
 
               {bestBranch ? (
-                <div className="rounded-2xl bg-green-50 px-5 py-4">
-                  <h3 className="text-lg font-semibold text-green-900">
+                <div className="rounded-2xl border border-emerald-300/15 bg-slate-950/30 px-5 py-4">
+                  <h3 className="text-lg font-semibold text-white">
                     {bestBranch.name}
                   </h3>
-                  <p className="mt-2 text-sm text-green-800">
+                  <p className="mt-2 text-sm text-emerald-100/80">
                     Média: {formatAverage(bestBranch.averageRating)}
                   </p>
-                  <p className="text-sm text-green-800">
+                  <p className="text-sm text-emerald-100/80">
                     Feedbacks: {bestBranch.totalFeedbacks}
                   </p>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
+                <div className="rounded-2xl border border-dashed border-emerald-300/15 px-4 py-8 text-center text-emerald-100/70">
                   Ainda não há filiais suficientes para comparação.
                 </div>
               )}
             </article>
 
-            <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <article className="rounded-[28px] border border-rose-400/15 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
               <div className="mb-4 space-y-1">
-                <h2 className="text-xl font-semibold text-slate-900">
+                <h2 className="text-xl font-semibold text-white">
                   Pior filial
                 </h2>
-                <p className="text-sm text-slate-500">
-                  Unidade com menor média de avaliação.
+                <p className="text-sm text-rose-100/70">
+                  Unidade com menor média de avaliação no período.
                 </p>
               </div>
 
               {worstBranch ? (
-                <div className="rounded-2xl bg-rose-50 px-5 py-4">
-                  <h3 className="text-lg font-semibold text-rose-900">
+                <div className="rounded-2xl border border-rose-300/15 bg-slate-950/30 px-5 py-4">
+                  <h3 className="text-lg font-semibold text-white">
                     {worstBranch.name}
                   </h3>
-                  <p className="mt-2 text-sm text-rose-800">
+                  <p className="mt-2 text-sm text-rose-100/80">
                     Média: {formatAverage(worstBranch.averageRating)}
                   </p>
-                  <p className="text-sm text-rose-800">
+                  <p className="text-sm text-rose-100/80">
                     Feedbacks: {worstBranch.totalFeedbacks}
                   </p>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
+                <div className="rounded-2xl border border-dashed border-rose-300/15 px-4 py-8 text-center text-rose-100/70">
                   Ainda não há filiais suficientes para comparação.
                 </div>
               )}
             </article>
           </div>
 
-          <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 space-y-1">
-              <h2 className="text-xl font-semibold text-slate-900">
+          <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <div className="mb-5 space-y-1">
+              <h2 className="text-xl font-semibold text-white">
                 Últimos feedbacks
               </h2>
-              <p className="text-sm text-slate-500">
-                Acompanhe os registros mais recentes.
+              <p className="text-sm text-slate-400">
+                Acompanhe os registros mais recentes recebidos pela operação.
               </p>
             </div>
 
             {!summary?.recentFeedbacks?.length ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
+              <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-slate-500">
                 Nenhum feedback recente encontrado.
               </div>
             ) : (
@@ -485,19 +501,18 @@ export default function DashboardPage() {
                 {summary.recentFeedbacks.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-2xl border border-slate-200 p-4"
+                    className="rounded-2xl border border-white/10 bg-slate-900/60 p-4"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                              item.rating <= 2
-                                ? "bg-rose-100 text-rose-700"
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${item.rating <= 2
+                                ? "bg-rose-500/10 text-rose-200 border border-rose-400/20"
                                 : item.rating === 3
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-emerald-100 text-emerald-700"
-                            }`}
+                                  ? "bg-amber-500/10 text-amber-200 border border-amber-400/20"
+                                  : "bg-emerald-500/10 text-emerald-200 border border-emerald-400/20"
+                              }`}
                           >
                             {getRatingLabel(item.rating)}
                           </span>
@@ -507,18 +522,18 @@ export default function DashboardPage() {
                           </span>
                         </div>
 
-                        <p className="text-sm text-slate-700">
-                          <span className="font-medium text-slate-900">Filial:</span>{" "}
+                        <p className="text-sm text-slate-300">
+                          <span className="font-medium text-white">Filial:</span>{" "}
                           {item.branchName ?? "-"}
                         </p>
 
-                        <p className="text-sm text-slate-700">
-                          <span className="font-medium text-slate-900">Kiosk:</span>{" "}
+                        <p className="text-sm text-slate-300">
+                          <span className="font-medium text-white">Kiosk:</span>{" "}
                           {item.kioskName ?? "-"}
                         </p>
 
-                        <p className="text-sm text-slate-700">
-                          <span className="font-medium text-slate-900">Comentário:</span>{" "}
+                        <p className="text-sm text-slate-300">
+                          <span className="font-medium text-white">Comentário:</span>{" "}
                           {item.comment?.trim() || "Sem comentário."}
                         </p>
 
@@ -527,7 +542,7 @@ export default function DashboardPage() {
                             {item.tags.map((tag, index) => (
                               <span
                                 key={`${tag}-${index}`}
-                                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
+                                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-200"
                               >
                                 {tag}
                               </span>
@@ -542,18 +557,18 @@ export default function DashboardPage() {
             )}
           </article>
 
-          <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 space-y-1">
-              <h2 className="text-xl font-semibold text-slate-900">
+          <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <div className="mb-5 space-y-1">
+              <h2 className="text-xl font-semibold text-white">
                 Desempenho por filial
               </h2>
-              <p className="text-sm text-slate-500">
-                Compare volume e média entre as unidades.
+              <p className="text-sm text-slate-400">
+                Compare volume de feedbacks e média entre as unidades.
               </p>
             </div>
 
             {branches.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-slate-500">
+              <div className="rounded-2xl border border-dashed border-white/10 px-4 py-8 text-center text-slate-500">
                 Nenhuma filial encontrada.
               </div>
             ) : (
@@ -561,13 +576,13 @@ export default function DashboardPage() {
                 {branches.map((branch) => (
                   <div
                     key={branch.id}
-                    className="rounded-2xl border border-slate-200 p-4"
+                    className="rounded-2xl border border-white/10 bg-slate-900/60 p-4"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                      <h3 className="text-base font-semibold text-slate-900">
+                      <h3 className="text-base font-semibold text-white">
                         {branch.name}
                       </h3>
-                      <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+                      <div className="flex flex-wrap gap-3 text-sm text-slate-300">
                         <span>Feedbacks: {branch.totalFeedbacks}</span>
                         <span>Média: {formatAverage(branch.averageRating)}</span>
                       </div>

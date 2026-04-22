@@ -1,5 +1,5 @@
-import axios from "axios";
-import { readAuthToken } from "./authToken";
+import axios, { AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { clearAuthSession, getAuthToken } from "./auth";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL;
 
@@ -7,23 +7,44 @@ export const api = axios.create({
   baseURL,
 });
 
-api.interceptors.request.use((config) => {
-  const url = config.url ?? "";
+function isPublicKioskRoute(url?: string) {
+  if (!url) return false;
 
-  const isPublicKioskRoute =
+  return (
     url.startsWith("/kiosk/config") ||
     url.startsWith("/kiosk/tags") ||
-    url.startsWith("/kiosk/feedback");
+    url.startsWith("/kiosk/feedback")
+  );
+}
 
-  if (!isPublicKioskRoute) {
-    const token = readAuthToken();
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = getAuthToken();
+  const publicRoute = isPublicKioskRoute(config.url);
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  if (publicRoute) {
+    if (config.headers?.Authorization) {
+      delete config.headers.Authorization;
     }
+
+    return config;
+  }
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   } else if (config.headers?.Authorization) {
     delete config.headers.Authorization;
   }
 
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      clearAuthSession();
+    }
+
+    return Promise.reject(error);
+  },
+);

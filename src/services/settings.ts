@@ -32,6 +32,11 @@ export type AppApkInfo = {
   downloadUrl: string;
 } | null;
 
+export type SendTestEmailResponse = {
+  recipients: string[];
+  message?: string;
+};
+
 export type UpdateSettingsPayload = {
   companyName?: string | null;
   logoUrl?: string | null;
@@ -50,51 +55,64 @@ export type UpdateSettingsPayload = {
   monthlyNotificationEnabled?: boolean;
 };
 
+function buildCompanyParams(companyId?: string) {
+  return companyId ? { companyId } : undefined;
+}
+
 export async function getMySettings(companyId?: string): Promise<Settings> {
   const response = await api.get("/settings/me", {
-    params: companyId ? { companyId } : undefined,
+    params: buildCompanyParams(companyId),
   });
 
-  return response.data;
+  return response.data as Settings;
 }
 
 export async function updateMySettings(
   payload: UpdateSettingsPayload,
-  companyId?: string
+  companyId?: string,
 ): Promise<Settings> {
   const response = await api.patch("/settings/me", payload, {
-    params: companyId ? { companyId } : undefined,
+    params: buildCompanyParams(companyId),
   });
 
-  return response.data;
+  return response.data as Settings;
 }
 
-export async function sendTestEmail(companyId?: string) {
+export async function sendTestEmail(
+  companyId?: string,
+): Promise<SendTestEmailResponse> {
   const response = await api.post(
     "/settings/test-email",
     {},
     {
-      params: companyId ? { companyId } : undefined,
-    }
+      params: buildCompanyParams(companyId),
+    },
   );
 
-  return response.data;
+  return response.data as SendTestEmailResponse;
 }
 
-export async function getAppApkInfo(): Promise<AppApkInfo> {
-  const response = await api.get("/settings/app-apk");
-  return response.data;
+export async function getAppApkInfo(companyId?: string): Promise<AppApkInfo> {
+  const response = await api.get("/settings/app-apk", {
+    params: buildCompanyParams(companyId),
+  });
+
+  return response.data as AppApkInfo;
 }
 
-export async function uploadAppApk(file: File): Promise<AppApkInfo> {
+export async function uploadAppApk(
+  file: File,
+  companyId?: string,
+): Promise<AppApkInfo> {
   const formData = new FormData();
   formData.append("file", file);
 
   const response = await api.post("/settings/app-apk", formData, {
+    params: buildCompanyParams(companyId),
     headers: {
       "Content-Type": "multipart/form-data",
     },
   });
 
-  return response.data;
+  return response.data as AppApkInfo;
 }

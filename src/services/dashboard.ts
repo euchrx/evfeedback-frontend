@@ -52,21 +52,21 @@ export type BranchDashboardItem = {
 };
 
 export async function getDashboardSummary(
-  filters?: DashboardFilters
+  filters?: DashboardFilters,
 ): Promise<DashboardSummary> {
   const response = await api.get("/dashboard/summary", {
     params: filters,
   });
 
-  return response.data;
+  return response.data as DashboardSummary;
 }
 
 export async function getDashboardByBranch(
-  filters?: DashboardFilters
+  filters?: DashboardFilters,
 ): Promise<BranchDashboardItem[]> {
   const response = await api.get("/dashboard/by-branch", {
     params: filters,
   });
 
-  return Array.isArray(response.data) ? response.data : [];
+  return Array.isArray(response.data) ? (response.data as BranchDashboardItem[]) : [];
 }

@@ -15,6 +15,7 @@ import {
   getResolvedCompanyId,
   isSuperAdmin,
 } from "../../../utils/permissions";
+import { useToast } from "../../../components/ui/ToastProvider";
 
 function getErrorMessage(error: unknown, fallback: string) {
   if (
@@ -53,7 +54,52 @@ function formatDateTime(value?: string) {
   }).format(date);
 }
 
+function SectionCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+      <div className="mb-5 space-y-1">
+        <h2 className="text-xl font-semibold text-white">{title}</h2>
+        {description ? (
+          <p className="text-sm leading-6 text-slate-400">{description}</p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-slate-200">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputClassName =
+  "h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10";
+
+const textareaClassName =
+  "min-h-[120px] w-full resize-none rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10";
+
 export default function SettingsPage() {
+  const toast = useToast();
+
   const currentUser = getStoredUser();
 
   const canView = canViewOperationalModules(currentUser);
@@ -96,9 +142,8 @@ export default function SettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
   const [uploadingApk, setUploadingApk] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const resolvedPrimaryColor = primaryColor.trim() || "#0ea5e9";
   const resolvedBackgroundColor = backgroundColor.trim() || "#020617";
@@ -147,20 +192,9 @@ export default function SettingsPage() {
     setMonthlyNotificationEnabled(true);
   }
 
-  useEffect(() => {
-    if (!canView) {
-      setLoading(false);
-      return;
-    }
-
-    void load();
-  }, [canView, superAdmin, selectedCompanyId]);
-
   async function load() {
     try {
       setLoading(true);
-      setError("");
-      setSuccess("");
 
       if (superAdmin) {
         const companiesData = await getCompanies();
@@ -194,14 +228,20 @@ export default function SettingsPage() {
       setMonthlyNotificationEnabled(settings.monthlyNotificationEnabled ?? true);
 
       try {
-        const apkInfo = await getAppApkInfo();
+        const apkInfo = await getAppApkInfo(selectedCompanyId);
         setAppApkInfo(apkInfo ?? null);
       } catch (apkErr: unknown) {
         setAppApkInfo(null);
-        setError(getErrorMessage(apkErr, "Não foi possível carregar as informações do APK."));
+        toast.warning(
+          "Não foi possível carregar as informações do APK.",
+          getErrorMessage(apkErr, "Tente novamente em instantes."),
+        );
       }
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Não foi possível carregar as configurações."));
+      toast.error(
+        "Não foi possível carregar as configurações.",
+        getErrorMessage(err, "Tente novamente em instantes."),
+      );
     } finally {
       setLoading(false);
     }
@@ -211,21 +251,26 @@ export default function SettingsPage() {
     if (!canManage) return;
 
     if (superAdmin && !selectedCompanyId) {
-      setError("Selecione uma empresa.");
+      toast.warning("Selecione uma empresa.");
       return;
     }
 
     try {
-      setError("");
-      setSuccess("");
+      setSendingTestEmail(true);
 
       const result = await sendTestEmail(selectedCompanyId);
 
-      setSuccess(
-        `E-mail de teste enviado com sucesso para: ${result.recipients.join(", ")}`,
+      toast.success(
+        "E-mail de teste enviado com sucesso.",
+        `Destinatários: ${result.recipients.join(", ")}`,
       );
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Não foi possível enviar o e-mail de teste."));
+      toast.error(
+        "Não foi possível enviar o e-mail de teste.",
+        getErrorMessage(err, "Tente novamente em instantes."),
+      );
+    } finally {
+      setSendingTestEmail(false);
     }
   }
 
@@ -233,14 +278,12 @@ export default function SettingsPage() {
     if (!canManage) return;
 
     if (superAdmin && !selectedCompanyId) {
-      setError("Selecione uma empresa.");
+      toast.warning("Selecione uma empresa.");
       return;
     }
 
     try {
       setSaving(true);
-      setError("");
-      setSuccess("");
 
       await updateMySettings(
         {
@@ -263,9 +306,12 @@ export default function SettingsPage() {
         selectedCompanyId,
       );
 
-      setSuccess("Configurações visuais salvas com sucesso.");
+      toast.success("Configurações salvas com sucesso.");
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Não foi possível salvar as configurações."));
+      toast.error(
+        "Não foi possível salvar as configurações.",
+        getErrorMessage(err, "Tente novamente em instantes."),
+      );
     } finally {
       setSaving(false);
     }
@@ -276,14 +322,15 @@ export default function SettingsPage() {
 
     try {
       setUploadingApk(true);
-      setError("");
-      setSuccess("");
 
-      const apkInfo = await uploadAppApk(file);
+      const apkInfo = await uploadAppApk(file, selectedCompanyId);
       setAppApkInfo(apkInfo);
-      setSuccess("APK enviado com sucesso.");
+      toast.success("APK enviado com sucesso.");
     } catch (err: unknown) {
-      setError(getErrorMessage(err, "Não foi possível enviar o APK."));
+      toast.error(
+        "Não foi possível enviar o APK.",
+        getErrorMessage(err, "Tente novamente em instantes."),
+      );
     } finally {
       setUploadingApk(false);
     }
@@ -292,17 +339,28 @@ export default function SettingsPage() {
   async function handleCopyApkLink() {
     if (!appApkInfo?.downloadUrl) return;
 
-    await navigator.clipboard.writeText(appApkInfo.downloadUrl);
-    setSuccess("Link do APK copiado com sucesso.");
+    try {
+      await navigator.clipboard.writeText(appApkInfo.downloadUrl);
+      toast.success("Link do APK copiado com sucesso.");
+    } catch {
+      toast.error("Não foi possível copiar o link do APK.");
+    }
   }
+
+  useEffect(() => {
+    if (!canView) {
+      setLoading(false);
+      return;
+    }
+
+    void load();
+  }, [canView, superAdmin, selectedCompanyId]);
 
   if (!canView) {
     return (
-      <section className="space-y-3">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Acesso negado
-        </h1>
-        <p className="text-slate-600">
+      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+        <h2 className="text-xl font-semibold text-white">Acesso negado</h2>
+        <p className="mt-2 text-sm leading-6 text-rose-100/80">
           Você não tem permissão para acessar a página de configurações.
         </p>
       </section>
@@ -310,227 +368,177 @@ export default function SettingsPage() {
   }
 
   return (
-    <section className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Configurações
-        </h1>
-        <p className="text-slate-600">
-          Personalize o kiosk, configure notificações e distribua o APK.
-        </p>
+    <section className="space-y-6">
+      <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+              configurações
+            </div>
+
+            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
+              Identidade, comunicação e distribuição
+            </h2>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+              Personalize o kiosk, configure notificações por e-mail e distribua o aplicativo Android.
+            </p>
+          </div>
+
+          {superAdmin ? (
+            <div className="w-full max-w-sm">
+              <Field label="Empresa">
+                <select
+                  value={companyId}
+                  onChange={(event) => setCompanyId(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Selecione a empresa</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+          ) : null}
+        </div>
       </div>
 
-      {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
-        </div>
-      ) : null}
-
-      {success ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-          {success}
-        </div>
-      ) : null}
-
       {loading ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center text-slate-500 shadow-sm">
+        <div className="rounded-[28px] border border-white/10 bg-white/5 px-4 py-12 text-center text-sm text-slate-400 shadow-2xl shadow-black/20 backdrop-blur-xl">
           Carregando configurações...
         </div>
       ) : (
         <>
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 space-y-1">
-              <h2 className="text-xl font-semibold text-slate-900">
-                Identidade e layout
-              </h2>
-            </div>
-
+          <SectionCard
+            title="Identidade visual"
+            description="Defina a aparência principal do kiosk e a comunicação visual da experiência."
+          >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {superAdmin ? (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Empresa
-                  </label>
-                  <select
-                    value={companyId}
-                    onChange={(e) => setCompanyId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-                  >
-                    <option value="">Selecione a empresa</option>
-                    {companies.map((company) => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Nome exibido da empresa
-                </label>
+              <Field label="Nome exibido da empresa">
                 <input
                   value={companyName}
                   onChange={(e) => setCompanyName(e.target.value)}
                   placeholder="Ex.: Pedro Pelanda"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                  className={inputClassName}
                 />
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  URL da logo
-                </label>
+              <Field label="URL da logo">
                 <input
                   value={logoUrl}
                   onChange={(e) => setLogoUrl(e.target.value)}
                   placeholder="https://..."
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                  className={inputClassName}
                 />
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Título principal
-                </label>
-                <input
-                  value={heroTitle}
-                  onChange={(e) => setHeroTitle(e.target.value)}
-                  placeholder="Ex.: Como foi sua experiência hoje?"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Subtítulo
-                </label>
-                <input
-                  value={heroSubtitle}
-                  onChange={(e) => setHeroSubtitle(e.target.value)}
-                  placeholder="Ex.: Toque em uma opção para avaliar rapidamente."
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Mensagem de agradecimento
-                </label>
+              <Field label="Mensagem de agradecimento">
                 <input
                   value={thankYouMessage}
                   onChange={(e) => setThankYouMessage(e.target.value)}
                   placeholder="Ex.: Obrigado pela sua avaliação!"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                  className={inputClassName}
                 />
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor principal
-                </label>
-                <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
-                  <input
-                    type="color"
-                    value={primaryColor}
-                    onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
-                  />
-                  <span className="text-sm text-slate-700">{primaryColor}</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor de fundo
-                </label>
-                <div className="flex items-center gap-3 rounded-xl border border-slate-300 px-4 py-3">
-                  <input
-                    type="color"
-                    value={backgroundColor}
-                    onChange={(e) => setBackgroundColor(e.target.value)}
-                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
-                  />
-                  <span className="text-sm text-slate-700">{backgroundColor}</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  URL da imagem de fundo
-                </label>
+              <Field label="Título principal">
                 <input
-                  value={backgroundImageUrl}
-                  onChange={(e) => setBackgroundImageUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                  value={heroTitle}
+                  onChange={(e) => setHeroTitle(e.target.value)}
+                  placeholder="Ex.: Como foi sua experiência hoje?"
+                  className={inputClassName}
                 />
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor do card
-                </label>
+              <Field label="Subtítulo">
                 <input
-                  value={cardBackgroundColor}
-                  onChange={(e) => setCardBackgroundColor(e.target.value)}
-                  placeholder="rgba(15,23,42,0.72)"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                  value={heroSubtitle}
+                  onChange={(e) => setHeroSubtitle(e.target.value)}
+                  placeholder="Ex.: Toque em uma opção para avaliar rapidamente."
+                  className={inputClassName}
                 />
-              </div>
+              </Field>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor do texto
-                </label>
-                <input
-                  value={textColor}
-                  onChange={(e) => setTextColor(e.target.value)}
-                  placeholder="#ffffff"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Cor do texto do botão
-                </label>
-                <input
-                  value={buttonTextColor}
-                  onChange={(e) => setButtonTextColor(e.target.value)}
-                  placeholder="#0f172a"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  Tempo para reset do kiosk (segundos)
-                </label>
+              <Field label="Tempo para reset do kiosk (segundos)">
                 <input
                   type="number"
                   min={1}
                   value={kioskResetSeconds}
-                  onChange={(e) =>
-                    setKioskResetSeconds(Number(e.target.value) || 5)
-                  }
-                  placeholder="5"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
+                  onChange={(e) => setKioskResetSeconds(Number(e.target.value) || 5)}
+                  className={inputClassName}
                 />
-              </div>
-            </div>
-          </div>
+              </Field>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 space-y-1">
-              <h2 className="text-xl font-semibold text-slate-900">Preview</h2>
-              <p className="text-sm text-slate-500">
-                Veja em tempo real como a configuração aparece no kiosk.
-              </p>
-            </div>
+              <Field label="Cor principal">
+                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3">
+                  <input
+                    type="color"
+                    value={primaryColor}
+                    onChange={(e) => setPrimaryColor(e.target.value)}
+                    className="h-8 w-10 cursor-pointer rounded border border-white/10 bg-transparent p-0"
+                  />
+                  <span className="text-sm text-slate-300">{primaryColor}</span>
+                </div>
+              </Field>
 
-            <div className="overflow-hidden rounded-[32px] border border-slate-200 shadow-inner">
+              <Field label="Cor de fundo">
+                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3">
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(e) => setBackgroundColor(e.target.value)}
+                    className="h-8 w-10 cursor-pointer rounded border border-white/10 bg-transparent p-0"
+                  />
+                  <span className="text-sm text-slate-300">{backgroundColor}</span>
+                </div>
+              </Field>
+
+              <Field label="URL da imagem de fundo">
+                <input
+                  value={backgroundImageUrl}
+                  onChange={(e) => setBackgroundImageUrl(e.target.value)}
+                  placeholder="https://..."
+                  className={inputClassName}
+                />
+              </Field>
+
+              <Field label="Cor do card">
+                <input
+                  value={cardBackgroundColor}
+                  onChange={(e) => setCardBackgroundColor(e.target.value)}
+                  placeholder="rgba(15,23,42,0.72)"
+                  className={inputClassName}
+                />
+              </Field>
+
+              <Field label="Cor do texto">
+                <input
+                  value={textColor}
+                  onChange={(e) => setTextColor(e.target.value)}
+                  placeholder="#ffffff"
+                  className={inputClassName}
+                />
+              </Field>
+
+              <Field label="Cor do texto do botão">
+                <input
+                  value={buttonTextColor}
+                  onChange={(e) => setButtonTextColor(e.target.value)}
+                  placeholder="#0f172a"
+                  className={inputClassName}
+                />
+              </Field>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Preview do kiosk"
+            description="Visualize em tempo real como a experiência aparecerá no dispositivo."
+          >
+            <div className="overflow-hidden rounded-[32px] border border-white/10 shadow-inner">
               <div
                 className="relative min-h-[720px] overflow-hidden px-4 py-6 md:px-8 md:py-10"
                 style={{
@@ -632,27 +640,23 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </SectionCard>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 space-y-1">
-              <h2 className="text-xl font-semibold text-slate-900">
-                Notificações por e-mail
-              </h2>
-              <p className="text-sm text-slate-500">
-                Informe um ou mais e-mails separados por vírgula.
-              </p>
-            </div>
-
+          <SectionCard
+            title="Notificações por e-mail"
+            description="Configure os e-mails que receberão os resumos automáticos."
+          >
             <div className="grid gap-4">
-              <textarea
-                value={notificationEmails}
-                onChange={(e) => setNotificationEmails(e.target.value)}
-                placeholder="exemplo1@empresa.com, exemplo2@empresa.com"
-                className="min-h-[120px] resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-              />
+              <Field label="Destinatários">
+                <textarea
+                  value={notificationEmails}
+                  onChange={(e) => setNotificationEmails(e.target.value)}
+                  placeholder="exemplo1@empresa.com, exemplo2@empresa.com"
+                  className={textareaClassName}
+                />
+              </Field>
 
-              <label className="inline-flex items-center gap-3 text-sm text-slate-700">
+              <label className="inline-flex items-center gap-3 text-sm text-slate-300">
                 <input
                   type="checkbox"
                   checked={dailyNotificationEnabled}
@@ -661,7 +665,7 @@ export default function SettingsPage() {
                 Enviar resumo diário com os feedbacks do dia anterior
               </label>
 
-              <label className="inline-flex items-center gap-3 text-sm text-slate-700">
+              <label className="inline-flex items-center gap-3 text-sm text-slate-300">
                 <input
                   type="checkbox"
                   checked={monthlyNotificationEnabled}
@@ -669,24 +673,31 @@ export default function SettingsPage() {
                 />
                 Enviar resumo mensal com os feedbacks do mês anterior
               </label>
-            </div>
-          </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-4 space-y-1">
-              <h2 className="text-xl font-semibold text-slate-900">
-                Aplicativo Android
-              </h2>
-              <p className="text-sm text-slate-500">
-                Envie o APK e use o QR code para baixar diretamente no tablet.
-              </p>
+              {superAdmin ? (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSendTestEmail()}
+                    disabled={sendingTestEmail}
+                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {sendingTestEmail ? "Enviando..." : "Enviar e-mail de teste"}
+                  </button>
+                </div>
+              ) : null}
             </div>
+          </SectionCard>
 
+          <SectionCard
+            title="Aplicativo Android"
+            description="Envie o APK e use o QR code para instalar diretamente no tablet."
+          >
             <div className="grid gap-6 xl:grid-cols-[1.1fr_320px]">
               <div className="space-y-4">
-                {superAdmin ? (
-                  <label className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-600 transition hover:border-sky-400 hover:bg-sky-50">
-                    <span className="font-medium text-slate-800">
+                {canManage ? (
+                  <label className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-dashed border-white/10 bg-slate-900/40 px-4 py-4 text-sm text-slate-400 transition hover:border-cyan-400/40 hover:bg-slate-900/70">
+                    <span className="font-medium text-white">
                       {uploadingApk ? "Enviando APK..." : "Selecionar APK"}
                     </span>
                     <span>Escolha um arquivo `.apk` para substituir a versão atual.</span>
@@ -704,11 +715,11 @@ export default function SettingsPage() {
                   </label>
                 ) : null}
 
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
                   {appApkInfo ? (
-                    <div className="space-y-3 text-sm text-slate-700">
+                    <div className="space-y-3 text-sm text-slate-300">
                       <div>
-                        <p className="font-semibold text-slate-900">APK atual</p>
+                        <p className="font-semibold text-white">APK atual</p>
                         <p className="mt-1 break-all">{appApkInfo.originalName}</p>
                       </div>
 
@@ -740,7 +751,7 @@ export default function SettingsPage() {
                           href={appApkInfo.downloadUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-1 block break-all text-sky-700 hover:text-sky-800"
+                          className="mt-1 block break-all text-cyan-300 hover:text-cyan-200"
                         >
                           {appApkInfo.downloadUrl}
                         </a>
@@ -751,7 +762,7 @@ export default function SettingsPage() {
                           href={appApkInfo.downloadUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                          className="inline-flex h-10 items-center justify-center rounded-xl bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
                         >
                           Abrir link
                         </a>
@@ -759,7 +770,7 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           onClick={() => void handleCopyApkLink()}
-                          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                          className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
                         >
                           Copiar link
                         </button>
@@ -773,15 +784,15 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
                 {appApkInfo?.downloadUrl ? (
                   <div className="space-y-3 text-center">
                     <img
                       src={appApkQrCodeUrl}
                       alt="QR code para download do APK"
-                      className="mx-auto h-72 w-72 rounded-2xl border border-slate-200 bg-white p-3"
+                      className="mx-auto h-72 w-72 rounded-2xl border border-white/10 bg-white p-3"
                     />
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-slate-400">
                       Escaneie com o tablet para abrir o download do APK.
                     </p>
                   </div>
@@ -792,26 +803,15 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
-          </div>
-
-          {superAdmin ? (
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleSendTestEmail}
-                className="rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-white transition hover:bg-emerald-400"
-              >
-                Enviar e-mail de teste
-              </button>
-            </div>
-          ) : null}
+          </SectionCard>
 
           {canManage ? (
             <div className="flex justify-end">
               <button
-                onClick={handleSave}
+                type="button"
+                onClick={() => void handleSave()}
                 disabled={saving}
-                className="rounded-xl bg-sky-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-12 items-center justify-center rounded-2xl bg-cyan-400 px-6 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? "Salvando..." : "Salvar configurações"}
               </button>

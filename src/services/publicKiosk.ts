@@ -1,4 +1,10 @@
-import { api } from "./api";
+import axios from "axios";
+
+const baseURL = import.meta.env.VITE_API_BASE_URL;
+
+const publicApi = axios.create({
+  baseURL,
+});
 
 export type PublicEnvironmentType = "POSTO" | "CONVENIENCIA" | "RESTAURANTE";
 
@@ -46,21 +52,21 @@ export type PublicKioskTag = {
 };
 
 export async function getPublicKioskConfig(
-  token: string
+  token: string,
 ): Promise<PublicKioskConfig> {
-  const response = await api.get("/kiosk/config", {
+  const response = await publicApi.get("/kiosk/config", {
     params: { token },
   });
 
-  return response.data;
+  return response.data as PublicKioskConfig;
 }
 
 export async function getPublicKioskTags(
-  token: string
+  token: string,
 ): Promise<PublicKioskTag[]> {
-  const response = await api.get("/kiosk/tags", {
+  const response = await publicApi.get("/kiosk/tags", {
     params: { token },
   });
 
-  return Array.isArray(response.data) ? response.data : [];
+  return Array.isArray(response.data) ? (response.data as PublicKioskTag[]) : [];
 }

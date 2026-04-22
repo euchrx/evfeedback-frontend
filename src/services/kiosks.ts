@@ -37,9 +37,13 @@ export type UpdateKioskPayload = {
   active?: boolean;
 };
 
+function buildCompanyParams(companyId?: string) {
+  return companyId ? { companyId } : undefined;
+}
+
 export async function getKiosks(companyId?: string): Promise<Kiosk[]> {
   const response = await api.get("/kiosks", {
-    params: companyId ? { companyId } : undefined,
+    params: buildCompanyParams(companyId),
   });
 
   return Array.isArray(response.data) ? response.data : [];
@@ -47,7 +51,7 @@ export async function getKiosks(companyId?: string): Promise<Kiosk[]> {
 
 export async function createKiosk(payload: CreateKioskPayload): Promise<Kiosk> {
   const response = await api.post("/kiosks", payload);
-  return response.data;
+  return response.data as Kiosk;
 }
 
 export async function updateKiosk(
@@ -56,30 +60,34 @@ export async function updateKiosk(
   companyId?: string,
 ): Promise<Kiosk> {
   const response = await api.patch(`/kiosks/${id}`, payload, {
-    params: companyId ? { companyId } : undefined,
+    params: buildCompanyParams(companyId ?? payload.companyId),
   });
 
-  return response.data;
+  return response.data as Kiosk;
 }
 
 export async function activateKiosk(id: string, companyId?: string): Promise<Kiosk> {
   const response = await api.patch(
     `/kiosks/${id}/activate`,
     {},
-    { params: companyId ? { companyId } : undefined },
+    {
+      params: buildCompanyParams(companyId),
+    },
   );
 
-  return response.data;
+  return response.data as Kiosk;
 }
 
 export async function deactivateKiosk(id: string, companyId?: string): Promise<Kiosk> {
   const response = await api.patch(
     `/kiosks/${id}/deactivate`,
     {},
-    { params: companyId ? { companyId } : undefined },
+    {
+      params: buildCompanyParams(companyId),
+    },
   );
 
-  return response.data;
+  return response.data as Kiosk;
 }
 
 export async function regenerateKioskToken(
@@ -89,14 +97,16 @@ export async function regenerateKioskToken(
   const response = await api.patch(
     `/kiosks/${id}/regenerate-token`,
     {},
-    { params: companyId ? { companyId } : undefined },
+    {
+      params: buildCompanyParams(companyId),
+    },
   );
 
-  return response.data;
+  return response.data as Kiosk;
 }
 
 export async function hardDeleteKiosk(id: string, companyId?: string): Promise<void> {
   await api.delete(`/kiosks/${id}`, {
-    params: companyId ? { companyId } : undefined,
+    params: buildCompanyParams(companyId),
   });
 }

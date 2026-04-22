@@ -18,12 +18,12 @@ export function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="/login" element={<LoginPage />} />
 
         <Route element={<PrivateRoute />}>
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Navigate to="/admin/dashboard" replace />} />
+            <Route index element={<Navigate to="dashboard" replace />} />
 
             <Route
               element={
@@ -34,31 +34,31 @@ export function AppRoutes() {
             >
               <Route path="dashboard" element={<DashboardPage />} />
               <Route path="feedbacks" element={<FeedbacksPage />} />
+              <Route path="kiosks" element={<KiosksPage />} />
+              <Route path="tags" element={<TagsPage />} />
             </Route>
 
             <Route
               element={
-                <RoleRoute
-                  allowedRoles={["SUPER_ADMIN", "COMPANY_ADMIN"]}
-                />
+                <RoleRoute allowedRoles={["SUPER_ADMIN", "COMPANY_ADMIN"]} />
               }
             >
-              <Route path="tags" element={<TagsPage />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="branches" element={<BranchesPage />} />
               <Route path="settings" element={<SettingsPage />} />
             </Route>
 
             <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
               <Route path="companies" element={<CompaniesPage />} />
-              <Route path="users" element={<UsersPage />} />
-              <Route path="branches" element={<BranchesPage />} />
-              <Route path="kiosks" element={<KiosksPage />} />
             </Route>
+
+            <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
           </Route>
         </Route>
 
         <Route path="/feedback" element={<FeedbackKiosk />} />
         <Route path="/shared/feedbacks" element={<PublicFeedbacksPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
   );

@@ -77,9 +77,22 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+function safeDate(value?: string | null) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
 function getTokenFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("token")?.trim() || "";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    if (!token || typeof token !== "string") return "";
+    return token.trim();
+  } catch {
+    return "";
+  }
 }
 
 function hasContactInfo(feedback: FeedbackItem) {
@@ -285,14 +298,12 @@ function isBadTag(tagName?: string | null) {
 }
 
 function getFeedbackPriorityScore(feedback: FeedbackItem) {
-  const hasBadTag = (feedback.tags ?? []).some((item) =>
-    isBadTag(item.tag?.name),
-  );
-
+  const tags = feedback.tags ?? [];
+  const hasBadTag = tags.some((item) => isBadTag(item.tag?.name));
   const hasContact = hasContactInfo(feedback);
   const rating = feedback.rating;
   const hasComment = Boolean(feedback.comment?.trim());
-  const createdAtWeight = new Date(feedback.createdAt).getTime();
+  const createdAtWeight = safeDate(feedback.createdAt);
 
   return {
     hasBadTag,
@@ -307,27 +318,22 @@ function comparePriority(a: FeedbackItem, b: FeedbackItem) {
   const pa = getFeedbackPriorityScore(a);
   const pb = getFeedbackPriorityScore(b);
 
-  // 1) Quem tem contato vem primeiro
   if (Number(pb.hasContact) !== Number(pa.hasContact)) {
     return Number(pb.hasContact) - Number(pa.hasContact);
   }
 
-  // 2) Nota pior primeiro: 1, 2, 3, 4, 5
   if (pa.rating !== pb.rating) {
     return pa.rating - pb.rating;
   }
 
-  // 3) Se empatar, tag ruim primeiro
   if (Number(pb.hasBadTag) !== Number(pa.hasBadTag)) {
     return Number(pb.hasBadTag) - Number(pa.hasBadTag);
   }
 
-  // 4) Se empatar, quem comentou vem antes
   if (Number(pb.hasComment) !== Number(pa.hasComment)) {
     return Number(pb.hasComment) - Number(pa.hasComment);
   }
 
-  // 5) Mais recente primeiro
   return pb.createdAtWeight - pa.createdAtWeight;
 }
 
@@ -365,6 +371,22 @@ export default function PublicFeedbacksPage() {
     void loadFeedbacks(filters);
   }, [token]);
 
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSelectedFeedback(null);
+      }
+    }
+
+    if (selectedFeedback) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedFeedback]);
+
   async function loadFeedbacks(customFilters?: SharedFeedbackFilters) {
     if (!token) return;
 
@@ -384,7 +406,8 @@ export default function PublicFeedbacksPage() {
       });
 
       setFeedbacks(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (err: unknown) {
+      console.error("Erro ao carregar feedbacks compartilhados:", err);
       setFeedbacks([]);
       setAccessDenied(true);
       setLoadError("Link inválido, expirado ou sem permissão para visualização.");
@@ -441,20 +464,24 @@ export default function PublicFeedbacksPage() {
   }
 
   function handleExportCsv() {
-    const rows = sortedFeedbacks.map((feedback) => ({
-      dataHora: formatDate(feedback.createdAt),
-      nota: feedback.rating,
-      avaliacao: getRatingLabel(feedback.rating),
-      filial: feedback.branch?.name ?? "",
-      kiosk: feedback.kiosk?.name ?? "",
-      comentario: feedback.comment?.trim() ?? "",
-      tags: (feedback.tags ?? []).map((item) => item.tag?.name ?? "").join(", "),
-      contatoDisponivel: hasContactInfo(feedback) ? "Sim" : "Não",
-      nomeContato: feedback.contactName?.trim() ?? "",
-      telefoneContato: feedback.contactPhone?.trim() ?? "",
-      mensagemContato: feedback.contactMessage?.trim() ?? "",
-      consentimento: feedback.contactConsent ? "Sim" : "Não",
-    }));
+    const rows = sortedFeedbacks.map((feedback) => {
+      const tags = feedback.tags ?? [];
+
+      return {
+        dataHora: formatDate(feedback.createdAt),
+        nota: feedback.rating,
+        avaliacao: getRatingLabel(feedback.rating),
+        filial: feedback.branch?.name ?? "",
+        kiosk: feedback.kiosk?.name ?? "",
+        comentario: feedback.comment?.trim() ?? "",
+        tags: tags.map((item) => item.tag?.name ?? "").join(", "),
+        contatoDisponivel: hasContactInfo(feedback) ? "Sim" : "Não",
+        nomeContato: feedback.contactName?.trim() ?? "",
+        telefoneContato: feedback.contactPhone?.trim() ?? "",
+        mensagemContato: feedback.contactMessage?.trim() ?? "",
+        consentimento: feedback.contactConsent ? "Sim" : "Não",
+      };
+    });
 
     const header = [
       "Data/Hora",
@@ -515,6 +542,7 @@ export default function PublicFeedbacksPage() {
 
     const rowsHtml = sortedFeedbacks
       .map((feedback) => {
+        const feedbackTags = feedback.tags ?? [];
         const contactLines = [
           feedback.contactName?.trim(),
           feedback.contactPhone?.trim(),
@@ -526,7 +554,7 @@ export default function PublicFeedbacksPage() {
             ? contactLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("")
             : `<span class="muted">Não informado</span>`;
 
-        const tags = (feedback.tags ?? [])
+        const tags = feedbackTags
           .map((item) => item.tag?.name ?? "")
           .filter(Boolean);
 
@@ -693,6 +721,7 @@ export default function PublicFeedbacksPage() {
       timeStyle: "short",
     }).format(new Date());
 
+    const feedbackTags = feedback.tags ?? [];
     const contactLines = [
       feedback.contactName?.trim(),
       feedback.contactPhone?.trim(),
@@ -704,7 +733,7 @@ export default function PublicFeedbacksPage() {
         ? contactLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("")
         : `<span class="muted">Não informado</span>`;
 
-    const tags = (feedback.tags ?? [])
+    const tags = feedbackTags
       .map((item) => item.tag?.name ?? "")
       .filter(Boolean);
 
@@ -973,7 +1002,8 @@ export default function PublicFeedbacksPage() {
     if (!normalizedSearch) return feedbacks;
 
     return feedbacks.filter((feedback) => {
-      const tagsText = (feedback.tags ?? [])
+      const tags = feedback.tags ?? [];
+      const tagsText = tags
         .map((item) => item.tag?.name ?? "")
         .join(" ")
         .toLowerCase();
@@ -1002,7 +1032,7 @@ export default function PublicFeedbacksPage() {
       }
 
       if (sortField === "createdAt") {
-        result = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        result = safeDate(a.createdAt) - safeDate(b.createdAt);
       } else if (sortField === "rating") {
         result = a.rating - b.rating;
       } else if (sortField === "branch") {
@@ -1012,15 +1042,14 @@ export default function PublicFeedbacksPage() {
       } else if (sortField === "comment") {
         result = (a.comment ?? "").localeCompare(b.comment ?? "");
       } else if (sortField === "tags") {
-        const aTags = (a.tags ?? [])
-          .map((item) => item.tag?.name ?? "")
-          .join(", ");
-        const bTags = (b.tags ?? [])
-          .map((item) => item.tag?.name ?? "")
-          .join(", ");
+        const aTagsList = a.tags ?? [];
+        const bTagsList = b.tags ?? [];
 
-        const aHasBadTag = (a.tags ?? []).some((item) => isBadTag(item.tag?.name));
-        const bHasBadTag = (b.tags ?? []).some((item) => isBadTag(item.tag?.name));
+        const aTags = aTagsList.map((item) => item.tag?.name ?? "").join(", ");
+        const bTags = bTagsList.map((item) => item.tag?.name ?? "").join(", ");
+
+        const aHasBadTag = aTagsList.some((item) => isBadTag(item.tag?.name));
+        const bHasBadTag = bTagsList.some((item) => isBadTag(item.tag?.name));
 
         if (aHasBadTag !== bHasBadTag) {
           result = Number(aHasBadTag) - Number(bHasBadTag);
@@ -1076,17 +1105,13 @@ export default function PublicFeedbacksPage() {
 
   const uniqueBranches = useMemo(() => {
     return new Set(
-      sortedFeedbacks
-        .map((item) => item.branch?.name?.trim())
-        .filter(Boolean),
+      sortedFeedbacks.map((item) => item.branch?.name?.trim()).filter(Boolean),
     ).size;
   }, [sortedFeedbacks]);
 
   const uniqueKiosks = useMemo(() => {
     return new Set(
-      sortedFeedbacks
-        .map((item) => item.kiosk?.name?.trim())
-        .filter(Boolean),
+      sortedFeedbacks.map((item) => item.kiosk?.name?.trim()).filter(Boolean),
     ).size;
   }, [sortedFeedbacks]);
 
@@ -1225,7 +1250,6 @@ export default function PublicFeedbacksPage() {
 
       <main className="min-h-screen bg-slate-950 px-4 py-6 text-white sm:px-6 lg:px-8 print:bg-white print:text-slate-900">
         <div className="mx-auto max-w-[1700px] space-y-8">
-
           <section className="rounded-[32px] border border-slate-800 bg-slate-900/85 p-6 shadow-xl print:border-slate-300 print:bg-white print:shadow-none">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
               <div>
@@ -1325,7 +1349,7 @@ export default function PublicFeedbacksPage() {
                         type="date"
                         value={filters.startDate ?? ""}
                         onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pr-11 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-11 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pr-11 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-11 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
                       />
                       <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
                     </div>
@@ -1340,7 +1364,7 @@ export default function PublicFeedbacksPage() {
                         type="date"
                         value={filters.endDate ?? ""}
                         onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pr-11 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-11 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 pr-11 text-sm text-white outline-none transition focus:border-sky-500 [color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-11 [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0"
                       />
                       <Calendar className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white" />
                     </div>
@@ -1379,8 +1403,9 @@ export default function PublicFeedbacksPage() {
 
             <div className="overflow-hidden rounded-b-[28px] border border-slate-800 bg-slate-950/55 print:border-slate-300 print:bg-white">
               {loading ? (
-                <div className="px-6 py-14 text-center text-slate-400">
-                  Carregando feedbacks...
+                <div className="flex flex-col items-center gap-4 px-6 py-14 text-slate-400">
+                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-slate-700 border-t-sky-500" />
+                  <p>Carregando feedbacks...</p>
                 </div>
               ) : sortedFeedbacks.length === 0 ? (
                 <div className="px-6 py-14 text-center">
@@ -1460,126 +1485,130 @@ export default function PublicFeedbacksPage() {
                     </thead>
 
                     <tbody>
-                      {paginatedFeedbacks.map((feedback, index) => (
-                        <tr
-                          key={feedback.id}
-                          className={[
-                            "border-b border-slate-800/80 transition hover:bg-slate-900/90 print:border-slate-300",
-                            index % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/40",
-                          ].join(" ")}
-                        >
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[170px]">
-                              <p className="text-sm font-medium text-white print:text-slate-900">
-                                {formatDate(feedback.createdAt)}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Registro cronológico
-                              </p>
-                            </div>
-                          </td>
+                      {paginatedFeedbacks.map((feedback, index) => {
+                        const tags = feedback.tags ?? [];
 
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[150px]">
+                        return (
+                          <tr
+                            key={feedback.id}
+                            className={[
+                              "border-b border-slate-800/80 transition hover:bg-slate-900/90 print:border-slate-300",
+                              index % 2 === 0 ? "bg-slate-950/40" : "bg-slate-900/40",
+                            ].join(" ")}
+                          >
+                            <td className="px-5 py-5 align-top">
+                              <div className="min-w-[170px]">
+                                <p className="text-sm font-medium text-white print:text-slate-900">
+                                  {formatDate(feedback.createdAt)}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Registro cronológico
+                                </p>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top">
+                              <div className="min-w-[150px]">
+                                <span
+                                  className={[
+                                    "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
+                                    getRatingBadgeClass(feedback.rating),
+                                  ].join(" ")}
+                                >
+                                  {feedback.rating} · {getRatingLabel(feedback.rating)}
+                                </span>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top">
+                              <div className="min-w-[190px]">
+                                <p className="text-sm font-semibold text-white print:text-slate-900">
+                                  {feedback.branch?.name ?? "-"}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Unidade operacional
+                                </p>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top">
+                              <div className="min-w-[170px]">
+                                <p className="text-sm font-semibold text-white print:text-slate-900">
+                                  {feedback.kiosk?.name ?? "-"}
+                                </p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Ponto de coleta
+                                </p>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top">
+                              <div className="max-w-[380px]">
+                                <p className="line-clamp-3 text-sm leading-6 text-slate-200 print:text-slate-700">
+                                  {feedback.comment?.trim() || "Sem comentário informado."}
+                                </p>
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top">
+                              <div className="flex max-w-[320px] flex-wrap gap-2">
+                                {tags.length > 0 ? (
+                                  tags.map((item) => (
+                                    <span
+                                      key={item.id}
+                                      className="inline-flex rounded-full border px-3 py-1 text-xs font-medium"
+                                      style={getTagStyle(item.tag?.color)}
+                                    >
+                                      {item.tag?.name ?? "Tag"}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-sm text-slate-500">Sem tags</span>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="px-5 py-5 align-top text-center">
                               <span
                                 className={[
                                   "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
-                                  getRatingBadgeClass(feedback.rating),
+                                  hasContactInfo(feedback)
+                                    ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                                    : "border border-slate-700 bg-slate-800 text-slate-400",
                                 ].join(" ")}
                               >
-                                {feedback.rating} · {getRatingLabel(feedback.rating)}
+                                {hasContactInfo(feedback) ? "Disponível" : "Não informado"}
                               </span>
-                            </div>
-                          </td>
+                            </td>
 
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[190px]">
-                              <p className="text-sm font-semibold text-white print:text-slate-900">
-                                {feedback.branch?.name ?? "-"}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Unidade operacional
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="min-w-[170px]">
-                              <p className="text-sm font-semibold text-white print:text-slate-900">
-                                {feedback.kiosk?.name ?? "-"}
-                              </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Ponto de coleta
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="max-w-[380px]">
-                              <p className="line-clamp-3 text-sm leading-6 text-slate-200 print:text-slate-700">
-                                {feedback.comment?.trim() || "Sem comentário informado."}
-                              </p>
-                            </div>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="flex max-w-[320px] flex-wrap gap-2">
-                              {(feedback.tags ?? []).length > 0 ? (
-                                feedback.tags!.map((item) => (
-                                  <span
-                                    key={item.id}
-                                    className="inline-flex rounded-full border px-3 py-1 text-xs font-medium"
-                                    style={getTagStyle(item.tag?.color)}
+                            <td className="px-5 py-5 align-top">
+                              <div className="flex justify-end">
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePrintSingleFeedback(feedback)}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-800 print:hidden"
+                                    title="Exportar feedback"
                                   >
-                                    {item.tag?.name ?? "Tag"}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="text-sm text-slate-500">Sem tags</span>
-                              )}
-                            </div>
-                          </td>
+                                    <Printer size={16} />
+                                    Exportar
+                                  </button>
 
-                          <td className="px-5 py-5 align-top text-center">
-                            <span
-                              className={[
-                                "inline-flex rounded-full px-3 py-1.5 text-xs font-semibold",
-                                hasContactInfo(feedback)
-                                  ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                                  : "border border-slate-700 bg-slate-800 text-slate-400",
-                              ].join(" ")}
-                            >
-                              {hasContactInfo(feedback) ? "Disponível" : "Não informado"}
-                            </span>
-                          </td>
-
-                          <td className="px-5 py-5 align-top">
-                            <div className="flex justify-end">
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handlePrintSingleFeedback(feedback)}
-                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-800 print:hidden"
-                                  title="Exportar feedback"
-                                >
-                                  <Printer size={16} />
-                                  Exportar
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedFeedback(feedback)}
-                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 print:hidden"
-                                  title="Ver detalhes"
-                                >
-                                  <Eye size={16} />
-                                  Detalhes
-                                </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedFeedback(feedback)}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700 print:hidden"
+                                    title="Ver detalhes"
+                                  >
+                                    <Eye size={16} />
+                                    Detalhes
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

@@ -1,5 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { getAuthToken, getStoredUser, logout } from "../services/auth";
+import { clearAuthSession, getAuthToken, getStoredUser } from "../services/auth";
 
 export function PrivateRoute() {
   const location = useLocation();
@@ -7,11 +7,12 @@ export function PrivateRoute() {
   const user = getStoredUser();
 
   if (!token || !user) {
+    clearAuthSession();
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   if (user.active === false) {
-    logout();
+    clearAuthSession();
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 

@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { removeAuthToken, saveAuthToken } from "./authToken";
+import { hasAuthToken, readAuthToken, removeAuthToken, saveAuthToken } from "./authToken";
 import type { AuthUser } from "../utils/permissions";
 
 export type LoginPayload = {
@@ -14,51 +14,79 @@ export type LoginResponse = {
 
 const USER_KEY = "evfeedback_user";
 
-export async function login(payload: LoginPayload) {
+function canUseStorage() {
+  return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
+}
+
+export function saveStoredUser(user: AuthUser) {
+  if (!canUseStorage()) return;
+
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function removeStoredUser() {
+  if (!canUseStorage()) return;
+
+  localStorage.removeItem(USER_KEY);
+}
+
+export async function login(payload: LoginPayload): Promise<LoginResponse> {
   const response = await api.post("/auth/login", payload);
   const data = response.data as LoginResponse;
 
   if (data?.access_token) {
     saveAuthToken(data.access_token);
+  } else {
+    removeAuthToken();
   }
 
   if (data?.user) {
-    localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+    saveStoredUser(data.user);
+  } else {
+    removeStoredUser();
   }
 
   return data;
 }
 
-export async function fetchMe() {
+export async function fetchMe(): Promise<AuthUser> {
   const response = await api.get("/auth/me");
+  const user = response.data as AuthUser;
 
-  if (response.data) {
-    localStorage.setItem(USER_KEY, JSON.stringify(response.data));
+  if (user) {
+    saveStoredUser(user);
   }
 
-  return response.data as AuthUser;
+  return user;
 }
 
 export function getAuthToken() {
-  return localStorage.getItem("evfeedback_token");
+  return readAuthToken();
 }
 
 export function getStoredUser(): AuthUser | null {
+  if (!canUseStorage()) return null;
+
   const raw = localStorage.getItem(USER_KEY);
   if (!raw) return null;
 
   try {
     return JSON.parse(raw) as AuthUser;
   } catch {
+    removeStoredUser();
     return null;
   }
 }
 
 export function isAuthenticated() {
-  return !!getAuthToken() && !!getStoredUser();
+  return hasAuthToken() && !!getStoredUser();
+}
+
+export function clearAuthSession() {
+  removeAuthToken();
+  removeStoredUser();
 }
 
 export function logout() {
-  removeAuthToken();
-  localStorage.removeItem(USER_KEY);
+  clearAuthSession();
 }

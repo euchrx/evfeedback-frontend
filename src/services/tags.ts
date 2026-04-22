@@ -32,6 +32,10 @@ export type UpdateTagPayload = {
   active?: boolean;
 };
 
+function buildCompanyParams(companyId?: string) {
+  return companyId ? { companyId } : undefined;
+}
+
 export async function getTags(params?: GetTagsParams): Promise<Tag[]> {
   const response = await api.get("/tags", {
     params,
@@ -42,7 +46,7 @@ export async function getTags(params?: GetTagsParams): Promise<Tag[]> {
 
 export async function createTag(payload: CreateTagPayload): Promise<Tag> {
   const response = await api.post("/tags", payload);
-  return response.data;
+  return response.data as Tag;
 }
 
 export async function updateTag(
@@ -51,34 +55,38 @@ export async function updateTag(
   companyId?: string,
 ): Promise<Tag> {
   const response = await api.patch(`/tags/${id}`, payload, {
-    params: companyId ? { companyId } : undefined,
+    params: buildCompanyParams(companyId ?? payload.companyId),
   });
 
-  return response.data;
+  return response.data as Tag;
 }
 
 export async function activateTag(id: string, companyId?: string): Promise<Tag> {
   const response = await api.patch(
     `/tags/${id}/activate`,
     {},
-    { params: companyId ? { companyId } : undefined },
+    {
+      params: buildCompanyParams(companyId),
+    },
   );
 
-  return response.data;
+  return response.data as Tag;
 }
 
 export async function deactivateTag(id: string, companyId?: string): Promise<Tag> {
   const response = await api.patch(
     `/tags/${id}/deactivate`,
     {},
-    { params: companyId ? { companyId } : undefined },
+    {
+      params: buildCompanyParams(companyId),
+    },
   );
 
-  return response.data;
+  return response.data as Tag;
 }
 
 export async function hardDeleteTag(id: string, companyId?: string): Promise<void> {
   await api.delete(`/tags/${id}`, {
-    params: companyId ? { companyId } : undefined,
+    params: buildCompanyParams(companyId),
   });
 }

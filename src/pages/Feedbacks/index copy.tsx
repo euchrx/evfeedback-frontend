@@ -38,7 +38,7 @@ const RATING_OPTIONS: RatingOption[] = [
   { value: 5, emoji: "🤩", label: "Excelente" },
 ];
 
-const DEFAULT_RESET_DELAY_MS = 5000;
+const RESET_DELAY_MS = 5000;
 const INACTIVITY_TIMEOUT_MS = 30000;
 const CONFIG_REFRESH_MS = 90000;
 const KEYBOARD_CLOSE_ANIMATION_MS = 260;
@@ -120,7 +120,7 @@ function getPhoneCursorFromDigits(digitsValue: string, digitsCursor: number) {
 
   let digitCount = 0;
 
-  for (let i = 0; i < masked.length; i += 1) {
+  for (let i = 0; i < masked.length; i++) {
     if (/\d/.test(masked[i])) {
       digitCount += 1;
 
@@ -137,10 +137,6 @@ function clampText(value: string, maxLength: number) {
   return value.slice(0, maxLength);
 }
 
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
-}
-
 export default function FeedbackKiosk() {
   const [step, setStep] = useState<Step>("rating");
   const [kioskErrorType, setKioskErrorType] = useState<KioskErrorType>(null);
@@ -148,14 +144,15 @@ export default function FeedbackKiosk() {
   const [rating, setRating] = useState<number | null>(null);
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [comment, setComment] = useState("");
-  const [email, setEmail] = useState("");
 
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactMessage, setContactMessage] = useState("");
   const [contactConsent, setContactConsent] = useState(false);
 
-  const [submittingAction, setSubmittingAction] = useState<"skip" | "send" | null>(null);
+  const [submittingAction, setSubmittingAction] = useState<
+    "skip" | "send" | null
+  >(null);
   const [tagOptions, setTagOptions] = useState<TagOption[]>([]);
   const [config, setConfig] = useState<PublicKioskConfig | null>(null);
   const [apiWarning, setApiWarning] = useState("");
@@ -163,7 +160,6 @@ export default function FeedbackKiosk() {
   const [contactNameError, setContactNameError] = useState("");
   const [contactPhoneError, setContactPhoneError] = useState("");
   const [commentError, setCommentError] = useState("");
-  const [emailError, setEmailError] = useState("");
 
   const [activeField, setActiveField] = useState<ActiveField>(null);
   const [keyboardUppercase, setKeyboardUppercase] = useState(false);
@@ -175,6 +171,8 @@ export default function FeedbackKiosk() {
   const [cursorPosition, setCursorPosition] = useState(0);
   const [activeVisualKey, setActiveVisualKey] = useState<string | null>(null);
   const [capsLock, setCapsLock] = useState(false);
+  const [email, setEmail] = useState("");
+  const [emailError, setEmailError] = useState("");
 
   const shiftClickTimerRef = useRef<number | null>(null);
   const lastShiftPressRef = useRef(0);
@@ -209,10 +207,6 @@ export default function FeedbackKiosk() {
     settings?.cardBackgroundColor?.trim() || "rgba(15,23,42,0.72)";
   const textColor = settings?.textColor?.trim() || "#ffffff";
   const buttonTextColor = settings?.buttonTextColor?.trim() || "#0f172a";
-  const resetDelayMs =
-    (settings?.kioskResetSeconds && settings.kioskResetSeconds > 0
-      ? settings.kioskResetSeconds
-      : DEFAULT_RESET_DELAY_MS / 1000) * 1000;
 
   const resolvedPrimaryColor = primaryColor || "#0ea5e9";
   const resolvedTextColor = textColor || "#ffffff";
@@ -289,10 +283,8 @@ export default function FeedbackKiosk() {
     clearLongPressTimer();
     clearKeyHighlightTimer();
     clearShiftClickTimer();
-
     longPressTriggeredRef.current = false;
     lastShiftPressRef.current = 0;
-
     setAccentMenu(null);
     setActiveVisualKey(null);
     setActiveField(null);
@@ -402,52 +394,6 @@ export default function FeedbackKiosk() {
     }, INACTIVITY_TIMEOUT_MS);
   }
 
-  function getActiveFieldValue(fieldOverride?: ActiveField) {
-    const field = fieldOverride ?? activeField;
-
-    if (!field) return "";
-    if (field === "email") return email;
-    if (field === "comment") return comment;
-    if (field === "contactName") return contactName;
-    if (field === "contactPhone") return contactPhone;
-    if (field === "contactMessage") return contactMessage;
-
-    return "";
-  }
-
-  function setActiveFieldValue(value: string, fieldOverride?: ActiveField) {
-    const field = fieldOverride ?? activeField;
-    if (!field) return;
-
-    if (field === "email") {
-      setEmail(clampText(value, 120));
-      if (emailError) setEmailError("");
-      return;
-    }
-
-    if (field === "comment") {
-      setComment(clampText(value, 300));
-      if (commentError) setCommentError("");
-      return;
-    }
-
-    if (field === "contactName") {
-      setContactName(clampText(value, 80));
-      if (contactNameError) setContactNameError("");
-      return;
-    }
-
-    if (field === "contactPhone") {
-      setContactPhone(formatPhoneValue(value));
-      if (contactPhoneError) setContactPhoneError("");
-      return;
-    }
-
-    if (field === "contactMessage") {
-      setContactMessage(clampText(value, 300));
-    }
-  }
-
   function openKeyboard(field: ActiveField) {
     setAccentMenu(null);
     clearLongPressTimer();
@@ -479,6 +425,7 @@ export default function FeedbackKiosk() {
 
     setKeyboardUppercase(currentValue.trim().length === 0);
   }
+
   function handleKeyboardKey(key: string) {
     setAccentMenu(null);
     clearLongPressTimer();
@@ -569,7 +516,10 @@ export default function FeedbackKiosk() {
         }
 
         lastShiftPressRef.current = now;
-        setCapsLock(false);
+        setCapsLock((currentCaps) => {
+          if (currentCaps) return currentCaps;
+          return false;
+        });
         setKeyboardUppercase((current) => !current);
 
         clearShiftClickTimer();
@@ -619,13 +569,11 @@ export default function FeedbackKiosk() {
         currentDigits.slice(digitsCursor);
 
       const sanitizedNextDigits = sanitizePhoneValue(nextDigits);
-      const digitsToAdd = rawKey.replace(/\D/g, "").length;
-
       setContactPhone(formatPhoneValue(sanitizedNextDigits));
       setCursorPosition(
         getPhoneCursorFromDigits(
           sanitizedNextDigits,
-          Math.min(digitsCursor + digitsToAdd, sanitizedNextDigits.length),
+          Math.min(digitsCursor + rawKey.replace(/\D/g, "").length, sanitizedNextDigits.length),
         ),
       );
 
@@ -642,7 +590,6 @@ export default function FeedbackKiosk() {
 
     setActiveFieldValue(nextValue);
     setCursorPosition(safeCursor + key.length);
-
     if (!capsLock) {
       setKeyboardUppercase(false);
     }
@@ -651,6 +598,53 @@ export default function FeedbackKiosk() {
   function getAccentOptions(key: string) {
     const lower = key.toLowerCase();
     return ACCENTED_VARIANTS[lower] ?? [];
+  }
+
+  function getActiveFieldValue(fieldOverride?: ActiveField) {
+    const field = fieldOverride ?? activeField;
+
+    if (!field) return "";
+
+    if (field === "email") return email;
+    if (field === "comment") return comment;
+    if (field === "contactName") return contactName;
+    if (field === "contactPhone") return contactPhone;
+    if (field === "contactMessage") return contactMessage;
+
+    return "";
+  }
+
+  function setActiveFieldValue(value: string, fieldOverride?: ActiveField) {
+    const field = fieldOverride ?? activeField;
+    if (!field) return;
+
+    if (field === "email") {
+      setEmail(clampText(value, 120));
+      if (emailError) setEmailError("");
+      return;
+    }
+
+    if (field === "comment") {
+      setComment(clampText(value, 300));
+      if (commentError) setCommentError("");
+      return;
+    }
+
+    if (field === "contactName") {
+      setContactName(clampText(value, 80));
+      if (contactNameError) setContactNameError("");
+      return;
+    }
+
+    if (field === "contactPhone") {
+      setContactPhone(formatPhoneValue(value));
+      if (contactPhoneError) setContactPhoneError("");
+      return;
+    }
+
+    if (field === "contactMessage") {
+      setContactMessage(clampText(value, 300));
+    }
   }
 
   function handleLetterPointerDown(key: string) {
@@ -721,17 +715,9 @@ export default function FeedbackKiosk() {
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
 
-    if (activeField !== "contactPhone" && !capsLock) {
+    if (activeField !== "contactPhone") {
       setKeyboardUppercase(false);
     }
-  }
-
-  function handleToggleTag(id: string) {
-    setTagIds((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id],
-    );
   }
 
   function handleSelectRating(value: number) {
@@ -753,35 +739,16 @@ export default function FeedbackKiosk() {
     setStep("tags");
   }
 
-  async function handleSubmit(skipComment = false, action: "skip" | "send" = "send") {
-    if (!rating || !kioskToken || submittingAction) return;
+  function handleToggleTag(id: string) {
+    setTagIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  }
 
-    try {
-      setSubmittingAction(action);
-      clearInactivityTimer();
-      clearDelayedResetTimer();
-      closeKeyboard(false);
-
-      await api.post("/kiosk/feedback", {
-        token: kioskToken,
-        rating,
-        comment: skipComment ? "" : comment.trim(),
-        email: email.trim() || undefined,
-        tagIds,
-        contactName: isNegativeRating ? contactName.trim() : "",
-        contactPhone: isNegativeRating ? sanitizePhoneValue(contactPhone) : "",
-        contactMessage: isNegativeRating ? contactMessage.trim() : "",
-        contactConsent: isNegativeRating ? contactConsent : false,
-      });
-
-      setStep("done");
-    } catch (error) {
-      console.error("Erro ao enviar feedback:", error);
-      setKioskErrorType("request_error");
-      setStep("error");
-    } finally {
-      setSubmittingAction(null);
-    }
+  function isValidEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
   }
 
   async function handleSubmitCommentStep() {
@@ -813,7 +780,7 @@ export default function FeedbackKiosk() {
     setSubmittingAction("send");
 
     try {
-      await handleSubmit(false, "send");
+      await handleSubmit();
     } finally {
       setSubmittingAction(null);
     }
@@ -921,56 +888,38 @@ export default function FeedbackKiosk() {
     }
   }
 
-  function getErrorTitle() {
-    switch (kioskErrorType) {
-      case "missing_token":
-        return "Kiosk não identificado";
-      case "invalid_token":
-        return "Kiosk inválido ou inativo";
-      default:
-        return "Não foi possível continuar";
+  async function handleSubmit(
+    skipComment = false,
+    action: "skip" | "send" = "send",
+  ) {
+    if (!rating || !kioskToken || submittingAction) return;
+
+    try {
+      setSubmittingAction(action);
+      clearInactivityTimer();
+      clearDelayedResetTimer();
+      closeKeyboard(false);
+
+      await api.post("/kiosk/feedback", {
+        token: kioskToken,
+        rating,
+        comment: skipComment ? "" : comment.trim(),
+        email: email.trim() || undefined,
+        tagIds,
+        contactName: isNegativeRating ? contactName.trim() : "",
+        contactPhone: isNegativeRating ? sanitizePhoneValue(contactPhone) : "",
+        contactMessage: isNegativeRating ? contactMessage.trim() : "",
+        contactConsent: isNegativeRating ? contactConsent : false,
+      });
+
+      setStep("done");
+    } catch (error) {
+      console.error("Erro ao enviar feedback:", error);
+      setKioskErrorType("request_error");
+      setStep("error");
+    } finally {
+      setSubmittingAction(null);
     }
-  }
-
-  function getErrorDescription() {
-    switch (kioskErrorType) {
-      case "missing_token":
-        return "Este acesso é exclusivo para links válidos de atendimento. Verifique o link ou solicite um novo acesso.";
-      case "invalid_token":
-        return "Não foi possível localizar um kiosk válido para este link. Verifique o token informado ou contate o responsável.";
-      default:
-        return "Verifique a configuração do kiosk ou a conexão com a API.";
-    }
-  }
-
-  function getErrorEmoji() {
-    switch (kioskErrorType) {
-      case "missing_token":
-      case "invalid_token":
-        return "🔒";
-      default:
-        return "⚠️";
-    }
-  }
-
-  function renderTextWithCursor(value: string, field: Exclude<ActiveField, null>) {
-    const isActive = activeField === field;
-    const safeCursor = Math.max(0, Math.min(cursorPosition, value.length));
-
-    const before = value.slice(0, safeCursor);
-    const after = value.slice(safeCursor);
-
-    if (!value && !isActive) {
-      return null;
-    }
-
-    return (
-      <span className="whitespace-pre-wrap break-words leading-relaxed">
-        {before}
-        {isActive ? <span className="kiosk-caret" /> : null}
-        {after}
-      </span>
-    );
   }
 
   useEffect(() => {
@@ -998,10 +947,10 @@ export default function FeedbackKiosk() {
 
     const timer = window.setTimeout(() => {
       hardResetFlow();
-    }, resetDelayMs);
+    }, RESET_DELAY_MS);
 
     return () => window.clearTimeout(timer);
-  }, [step, resetDelayMs]);
+  }, [step]);
 
   useEffect(() => {
     if (step !== "error") return;
@@ -1033,7 +982,9 @@ export default function FeedbackKiosk() {
     const pendingConfig = pendingConfigRef.current;
     const pendingTags = pendingTagsRef.current;
 
-    if (!pendingConfig || !pendingTags) return;
+    if (!pendingConfig || !pendingTags) {
+      return;
+    }
 
     configSnapshotRef.current = getConfigSnapshot(pendingConfig);
     tagsSnapshotRef.current = getTagsSnapshot(pendingTags);
@@ -1076,8 +1027,6 @@ export default function FeedbackKiosk() {
       clearDelayedResetTimer();
       clearKeyboardCloseTimer();
       clearLongPressTimer();
-      clearShiftClickTimer();
-      clearKeyHighlightTimer();
       longPressTriggeredRef.current = false;
     };
   }, []);
@@ -1174,11 +1123,21 @@ export default function FeedbackKiosk() {
       };
     })();
 
-    document.addEventListener("gesturestart", preventGesture, { passive: false });
-    document.addEventListener("gesturechange", preventGesture, { passive: false });
-    document.addEventListener("gestureend", preventGesture, { passive: false });
-    document.addEventListener("touchstart", preventMultiTouchZoom, { passive: false });
-    document.addEventListener("touchend", preventDoubleTapZoom, { passive: false });
+    document.addEventListener("gesturestart", preventGesture, {
+      passive: false,
+    });
+    document.addEventListener("gesturechange", preventGesture, {
+      passive: false,
+    });
+    document.addEventListener("gestureend", preventGesture, {
+      passive: false,
+    });
+    document.addEventListener("touchstart", preventMultiTouchZoom, {
+      passive: false,
+    });
+    document.addEventListener("touchend", preventDoubleTapZoom, {
+      passive: false,
+    });
 
     return () => {
       document.removeEventListener("gesturestart", preventGesture);
@@ -1194,6 +1153,464 @@ export default function FeedbackKiosk() {
       closeKeyboard(false);
     }
   }, [step]);
+
+  function getErrorTitle() {
+    switch (kioskErrorType) {
+      case "missing_token":
+        return "Kiosk não identificado";
+      case "invalid_token":
+        return "Kiosk inválido ou inativo";
+      default:
+        return "Não foi possível continuar";
+    }
+  }
+
+  function getErrorDescription() {
+    switch (kioskErrorType) {
+      case "missing_token":
+        return "Este acesso é exclusivo para links válidos de atendimento. Verifique o link ou solicite um novo acesso.";
+      case "invalid_token":
+        return "Não foi possível localizar um kiosk válido para este link. Verifique o token informado ou contate o responsável.";
+      default:
+        return "Verifique a configuração do kiosk ou a conexão com a API.";
+    }
+  }
+
+  function getErrorEmoji() {
+    switch (kioskErrorType) {
+      case "missing_token":
+      case "invalid_token":
+        return "🔒";
+      default:
+        return "⚠️";
+    }
+  }
+
+  function renderTextKeyboard() {
+    return (
+      <div className="w-full">
+        <div className="space-y-2">
+          <div className="flex justify-center gap-2">
+            {KEYBOARD_NUMBER_ROW.map((key) => {
+              const isActive = activeVisualKey === key;
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onPointerDown={handleKeyPress(key)}
+                  className="flex h-11 min-w-[2.4rem] items-center justify-center rounded-2xl border px-3 text-[16px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all active:scale-95 md:h-12 md:min-w-[3rem] md:text-[17px]"
+                  style={{
+                    borderColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.08)",
+                    backgroundColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.12)",
+                    color: isActive ? resolvedButtonTextColor : resolvedTextColor,
+                  }}
+                >
+                  {key}
+                </button>
+              );
+            })}
+          </div>
+
+          {KEYBOARD_ROWS.map((row, rowIndex) => (
+            <div
+              key={`row-${rowIndex}`}
+              className="flex justify-center gap-2"
+            >
+              {row.map((key) => {
+                const label = keyboardUppercase ? key.toUpperCase() : key;
+                const isActive = activeVisualKey === key;
+
+                return (
+                  <div
+                    key={key}
+                    className="relative"
+                    data-accent-trigger="true"
+                  >
+                    {accentMenu?.key === key ? (
+                      <div
+                        data-accent-popup="true"
+                        className="absolute -top-14 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-2xl border border-white/10 bg-slate-900/95 px-2 py-2 shadow-2xl"
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        {accentMenu.options.map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleAccentSelect(option);
+                            }}
+                            className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-xl border border-white/8 bg-white/10 px-2 text-base font-medium transition-transform active:scale-95"
+                            style={{ color: resolvedTextColor }}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <button
+                      type="button"
+                      onPointerDown={handleLetterPointerDown(key)}
+                      onPointerUp={handleLetterPointerUp(key)}
+                      onPointerLeave={handleLetterPointerLeave}
+                      className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
+                      style={{
+                        borderColor: isActive
+                          ? resolvedPrimaryColor
+                          : "rgba(255,255,255,0.08)",
+                        backgroundColor: isActive
+                          ? resolvedPrimaryColor
+                          : "rgba(255,255,255,0.12)",
+                        color: isActive
+                          ? resolvedButtonTextColor
+                          : resolvedTextColor,
+                      }}
+                    >
+                      {label}
+                    </button>
+                  </div>
+                );
+              })}
+
+              {rowIndex === 2 ? (
+                <>
+                  {[".", ","].map((key) => {
+                    const isActive = activeVisualKey === key;
+
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onPointerDown={handleKeyPress(key)}
+                        className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
+                        style={{
+                          borderColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.08)",
+                          backgroundColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.12)",
+                          color: isActive
+                            ? resolvedButtonTextColor
+                            : resolvedTextColor,
+                        }}
+                      >
+                        {key}
+                      </button>
+                    );
+                  })}
+
+                  {(() => {
+                    const isActive = activeVisualKey === "BACKSPACE";
+
+                    return (
+                      <button
+                        type="button"
+                        onPointerDown={handleKeyPress("BACKSPACE")}
+                        className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+                        style={{
+                          borderColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.08)",
+                          backgroundColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.12)",
+                          color: isActive ? resolvedButtonTextColor : resolvedTextColor,
+                        }}
+                      >
+                        <Delete className="h-5 w-5" />
+                      </button>
+                    );
+                  })()}
+                </>
+              ) : null}
+            </div>
+          ))}
+
+          <div className="grid grid-cols-[auto_1fr_auto_auto] gap-2">
+            <button
+              type="button"
+              onPointerDown={handleKeyPress("SHIFT")}
+              className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+              style={{
+                borderColor: keyboardUppercase || capsLock
+                  ? resolvedPrimaryColor
+                  : "rgba(255,255,255,0.08)",
+                backgroundColor: keyboardUppercase || capsLock
+                  ? resolvedPrimaryColor
+                  : "rgba(255,255,255,0.12)",
+                color: keyboardUppercase || capsLock
+                  ? resolvedButtonTextColor
+                  : resolvedTextColor,
+              }}
+            >
+              <ChevronUp className="h-5 w-5" />
+            </button>
+
+            {(() => {
+              const isSpaceActive = activeVisualKey === "SPACE";
+              const isLeftActive = activeVisualKey === "LEFT";
+              const isRightActive = activeVisualKey === "RIGHT";
+
+              return (
+                <>
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("SPACE")}
+                    className="flex h-12 items-center justify-center rounded-2xl border px-5 text-sm font-medium transition-transform active:scale-95 md:h-14"
+                    style={{
+                      borderColor: isSpaceActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isSpaceActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isSpaceActive ? resolvedButtonTextColor : resolvedTextColor,
+                    }}
+                  >
+                    espaço
+                  </button>
+
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("LEFT")}
+                    className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+                    style={{
+                      borderColor: isLeftActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isLeftActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isLeftActive ? resolvedButtonTextColor : resolvedTextColor,
+                    }}
+                  >
+                    ←
+                  </button>
+
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("RIGHT")}
+                    className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
+                    style={{
+                      borderColor: isRightActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isRightActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isRightActive ? resolvedButtonTextColor : resolvedTextColor,
+                    }}
+                  >
+                    →
+                  </button>
+                </>
+              );
+            })()}
+          </div>
+
+          <div className="flex justify-center gap-2">
+            {EXTRA_PUNCTUATION_KEYS.map((key) => {
+              const isActive = activeVisualKey === key;
+
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onPointerDown={handleKeyPress(key)}
+                  className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border px-3 text-sm font-medium transition-all active:scale-95 md:h-11 md:min-w-[68px]"
+                  style={{
+                    borderColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.08)",
+                    backgroundColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.12)",
+                    color: isActive ? resolvedButtonTextColor : resolvedTextColor,
+                  }}
+                >
+                  {key}
+                </button>
+              );
+            })}
+
+            {(() => {
+              const isActive = activeVisualKey === "CLEAR";
+
+              return (
+                <button
+                  type="button"
+                  onPointerDown={handleKeyPress("CLEAR")}
+                  className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl border px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
+                  style={{
+                    borderColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.08)",
+                    backgroundColor: isActive
+                      ? resolvedPrimaryColor
+                      : "rgba(255,255,255,0.12)",
+                    color: isActive ? resolvedButtonTextColor : resolvedTextColor,
+                  }}
+                >
+                  Limpar
+                </button>
+              );
+            })()}
+
+            <button
+              type="button"
+              onPointerDown={handleKeyPress("DONE")}
+              className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
+              style={{
+                backgroundColor: resolvedPrimaryColor,
+                color: resolvedButtonTextColor,
+              }}
+            >
+              Concluir
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderPhoneKeyboard() {
+    return (
+      <div className="mx-auto w-full max-w-md">
+        <div className="space-y-3">
+          {PHONE_KEYS.map((row, rowIndex) => (
+            <div
+              key={`phone-row-${rowIndex}`}
+              className="grid grid-cols-3 gap-3"
+            >
+              {row.map((key, keyIndex) =>
+                key ? (
+                  (() => {
+                    const isActive = activeVisualKey === key;
+
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onPointerDown={handleKeyPress(key)}
+                        className="flex h-14 items-center justify-center rounded-2xl border text-xl font-medium transition-transform active:scale-95 md:h-16"
+                        style={{
+                          borderColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.08)",
+                          backgroundColor: isActive
+                            ? resolvedPrimaryColor
+                            : "rgba(255,255,255,0.12)",
+                          color: isActive
+                            ? resolvedButtonTextColor
+                            : resolvedTextColor,
+                        }}
+                      >
+                        {key}
+                      </button>
+                    );
+                  })()
+                ) : (
+                  <div
+                    key={`empty-${rowIndex}-${keyIndex}`}
+                    className="h-14 md:h-16"
+                  />
+                ),
+              )}
+            </div>
+          ))}
+
+          <div className="grid grid-cols-3 gap-3">
+            {(() => {
+              const isClearActive = activeVisualKey === "CLEAR";
+              const isBackspaceActive = activeVisualKey === "BACKSPACE";
+
+              return (
+                <>
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("CLEAR")}
+                    className="flex h-14 items-center justify-center rounded-2xl border text-sm font-medium transition-transform active:scale-95 md:h-16"
+                    style={{
+                      borderColor: isClearActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isClearActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isClearActive
+                        ? resolvedButtonTextColor
+                        : resolvedTextColor,
+                    }}
+                  >
+                    Limpar
+                  </button>
+
+                  <button
+                    type="button"
+                    onPointerDown={handleKeyPress("BACKSPACE")}
+                    className="flex h-14 items-center justify-center rounded-2xl border transition-transform active:scale-95 md:h-16"
+                    style={{
+                      borderColor: isBackspaceActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.08)",
+                      backgroundColor: isBackspaceActive
+                        ? resolvedPrimaryColor
+                        : "rgba(255,255,255,0.12)",
+                      color: isBackspaceActive
+                        ? resolvedButtonTextColor
+                        : resolvedTextColor,
+                    }}
+                  >
+                    <Delete className="h-5 w-5" />
+                  </button>
+                </>
+              );
+            })()}
+
+            <button
+              type="button"
+              onPointerDown={handleKeyPress("DONE")}
+              className="flex h-14 items-center justify-center rounded-2xl transition-transform active:scale-95 md:h-16"
+              style={{
+                backgroundColor: resolvedPrimaryColor,
+                color: resolvedButtonTextColor,
+              }}
+            >
+              <CornerDownLeft className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderTextWithCursor(value: string, field: Exclude<ActiveField, null>) {
+    const isActive = activeField === field;
+    const safeCursor = Math.max(0, Math.min(cursorPosition, value.length));
+
+    const before = value.slice(0, safeCursor);
+    const after = value.slice(safeCursor);
+
+    if (!value && !isActive) {
+      return null;
+    }
+
+    return (
+      <span className="whitespace-pre-wrap break-words leading-relaxed">
+        {before}
+        {isActive ? <span className="kiosk-caret" /> : null}
+        {after}
+      </span>
+    );
+  }
 
   return (
     <main
@@ -1221,10 +1638,11 @@ export default function FeedbackKiosk() {
 
       <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-center overflow-hidden">
         <div
-          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${keyboardOpen || keyboardClosing
-            ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
-            : "max-h-full"
-            }`}
+          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${
+            keyboardOpen || keyboardClosing
+              ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
+              : "max-h-full"
+          }`}
           style={{ backgroundColor: cardBackgroundColor }}
         >
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
@@ -1250,6 +1668,7 @@ export default function FeedbackKiosk() {
             {step === "rating" && (
               <section className="text-center">
                 <h1 className="text-3xl font-bold md:text-5xl">{heroTitle}</h1>
+
                 <p className="mx-auto mt-4 max-w-2xl text-base opacity-90 md:text-xl">
                   {heroSubtitle}
                 </p>
@@ -1312,17 +1731,18 @@ export default function FeedbackKiosk() {
                           key={tag.id}
                           type="button"
                           onClick={() => handleToggleTag(tag.id)}
-                          className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${active
-                            ? ""
-                            : "border-white/10 bg-black/10 hover:bg-black/20"
-                            }`}
+                          className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
+                            active
+                              ? ""
+                              : "border-white/10 bg-black/10 hover:bg-black/20"
+                          }`}
                           style={
                             active
                               ? {
-                                borderColor: resolvedPrimaryColor,
-                                backgroundColor: resolvedPrimaryColor,
-                                color: resolvedButtonTextColor,
-                              }
+                                  borderColor: resolvedPrimaryColor,
+                                  backgroundColor: resolvedPrimaryColor,
+                                  color: resolvedButtonTextColor,
+                                }
                               : { color: resolvedTextColor }
                           }
                         >
@@ -1351,7 +1771,9 @@ export default function FeedbackKiosk() {
 
                   <button
                     type="button"
-                    onClick={() => setStep("comment")}
+                    onClick={() => {
+                      setStep("comment");
+                    }}
                     className="rounded-2xl px-8 py-4 text-lg font-semibold transition"
                     style={{
                       backgroundColor: resolvedPrimaryColor,
@@ -1367,7 +1789,7 @@ export default function FeedbackKiosk() {
             {step === "comment" && (
               <section className="text-center">
                 <p className="text-sm md:text-base opacity-80">
-                  Avaliação:
+                  Label da avaliação:
                   <span className="ml-2 font-semibold">
                     {selectedRating?.emoji} {selectedRating?.label}
                   </span>
@@ -1397,10 +1819,11 @@ export default function FeedbackKiosk() {
                           openKeyboard("email");
                         }
                       }}
-                      className={`min-h-[64px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${activeField === "email"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`min-h-[64px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${
+                        activeField === "email"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {email ? (
@@ -1434,10 +1857,11 @@ export default function FeedbackKiosk() {
                           openKeyboard("comment");
                         }
                       }}
-                      className={`min-h-[180px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${activeField === "comment"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`min-h-[180px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${
+                        activeField === "comment"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {comment ? (
@@ -1515,10 +1939,11 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactName")}
-                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactName"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactName"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactName ? (
@@ -1545,10 +1970,11 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactPhone")}
-                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactPhone"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactPhone"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactPhone ? (
@@ -1576,10 +2002,11 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactMessage")}
-                      className={`flex min-h-[120px] w-full items-start rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactMessage"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`flex min-h-[120px] w-full items-start rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactMessage"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactMessage ? (
@@ -1621,7 +2048,7 @@ export default function FeedbackKiosk() {
 
                   <button
                     type="button"
-                    onClick={() => void handleSubmit(true, "skip")}
+                    onClick={() => void handleSubmit(false, "skip")}
                     disabled={submittingAction !== null}
                     className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25 disabled:opacity-60"
                   >
@@ -1714,20 +2141,28 @@ export default function FeedbackKiosk() {
       </div>
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${keyboardOpen && !keyboardClosing
-          ? "translate-y-0 opacity-100 pointer-events-auto"
-          : "translate-y-full opacity-0 pointer-events-none"
-          }`}
+        className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${
+          keyboardOpen && !keyboardClosing
+            ? "translate-y-0 opacity-100 pointer-events-auto"
+            : "translate-y-full opacity-0 pointer-events-none"
+        }`}
       >
         <div className="mx-auto w-full max-w-6xl px-3 md:px-6">
           <div
             className="rounded-t-[28px] border border-white/10 border-b-0 p-4 shadow-2xl backdrop-blur-xl md:p-5"
             style={{ backgroundColor: "rgba(2, 6, 23, 0.97)" }}
           >
-            <div className="mb-3 flex items-center justify-end">
+            <div
+              className="mb-3 flex items-center justify-end"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               <button
                 type="button"
-                onClick={() => closeKeyboard(true)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  closeKeyboard(true);
+                }}
                 className="rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-medium transition-transform active:scale-95"
                 style={{ color: resolvedTextColor }}
               >
@@ -1735,399 +2170,13 @@ export default function FeedbackKiosk() {
               </button>
             </div>
 
-            {activeField === "contactPhone" ? (
-              <div className="mx-auto w-full max-w-md">
-                <div className="space-y-3">
-                  {PHONE_KEYS.map((row, rowIndex) => (
-                    <div key={`phone-row-${rowIndex}`} className="grid grid-cols-3 gap-3">
-                      {row.map((key, keyIndex) =>
-                        key ? (
-                          <button
-                            key={key}
-                            type="button"
-                            onPointerDown={handleKeyPress(key)}
-                            className="flex h-14 items-center justify-center rounded-2xl border text-xl font-medium transition-transform active:scale-95 md:h-16"
-                            style={{
-                              borderColor:
-                                activeVisualKey === key
-                                  ? resolvedPrimaryColor
-                                  : "rgba(255,255,255,0.08)",
-                              backgroundColor:
-                                activeVisualKey === key
-                                  ? resolvedPrimaryColor
-                                  : "rgba(255,255,255,0.12)",
-                              color:
-                                activeVisualKey === key
-                                  ? resolvedButtonTextColor
-                                  : resolvedTextColor,
-                            }}
-                          >
-                            {key}
-                          </button>
-                        ) : (
-                          <div key={`empty-${rowIndex}-${keyIndex}`} className="h-14 md:h-16" />
-                        ),
-                      )}
-                    </div>
-                  ))}
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      type="button"
-                      onPointerDown={handleKeyPress("CLEAR")}
-                      className="flex h-14 items-center justify-center rounded-2xl border text-sm font-medium transition-transform active:scale-95 md:h-16"
-                      style={{
-                        borderColor:
-                          activeVisualKey === "CLEAR"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.08)",
-                        backgroundColor:
-                          activeVisualKey === "CLEAR"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.12)",
-                        color:
-                          activeVisualKey === "CLEAR"
-                            ? resolvedButtonTextColor
-                            : resolvedTextColor,
-                      }}
-                    >
-                      Limpar
-                    </button>
-
-                    <button
-                      type="button"
-                      onPointerDown={handleKeyPress("BACKSPACE")}
-                      className="flex h-14 items-center justify-center rounded-2xl border transition-transform active:scale-95 md:h-16"
-                      style={{
-                        borderColor:
-                          activeVisualKey === "BACKSPACE"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.08)",
-                        backgroundColor:
-                          activeVisualKey === "BACKSPACE"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.12)",
-                        color:
-                          activeVisualKey === "BACKSPACE"
-                            ? resolvedButtonTextColor
-                            : resolvedTextColor,
-                      }}
-                    >
-                      <Delete className="h-5 w-5" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onPointerDown={handleKeyPress("DONE")}
-                      className="flex h-14 items-center justify-center rounded-2xl transition-transform active:scale-95 md:h-16"
-                      style={{
-                        backgroundColor: resolvedPrimaryColor,
-                        color: resolvedButtonTextColor,
-                      }}
-                    >
-                      <CornerDownLeft className="h-5 w-5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
+            {activeField === "contactPhone" ? renderPhoneKeyboard() : null}
             {activeField === "email" ||
-              activeField === "comment" ||
-              activeField === "contactName" ||
-              activeField === "contactMessage" ? (
-              <div className="w-full">
-                <div className="space-y-2">
-                  <div className="flex justify-center gap-2">
-                    {KEYBOARD_NUMBER_ROW.map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onPointerDown={handleKeyPress(key)}
-                        className="flex h-11 min-w-[2.4rem] items-center justify-center rounded-2xl border px-3 text-[16px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all active:scale-95 md:h-12 md:min-w-[3rem] md:text-[17px]"
-                        style={{
-                          borderColor:
-                            activeVisualKey === key
-                              ? resolvedPrimaryColor
-                              : "rgba(255,255,255,0.08)",
-                          backgroundColor:
-                            activeVisualKey === key
-                              ? resolvedPrimaryColor
-                              : "rgba(255,255,255,0.12)",
-                          color:
-                            activeVisualKey === key
-                              ? resolvedButtonTextColor
-                              : resolvedTextColor,
-                        }}
-                      >
-                        {key}
-                      </button>
-                    ))}
-                  </div>
-
-                  {KEYBOARD_ROWS.map((row, rowIndex) => (
-                    <div key={`row-${rowIndex}`} className="flex justify-center gap-2">
-                      {row.map((key) => {
-                        const label = keyboardUppercase ? key.toUpperCase() : key;
-
-                        return (
-                          <div key={key} className="relative" data-accent-trigger="true">
-                            {accentMenu?.key === key ? (
-                              <div
-                                data-accent-popup="true"
-                                className="absolute -top-14 left-1/2 z-20 flex -translate-x-1/2 gap-1 rounded-2xl border border-white/10 bg-slate-900/95 px-2 py-2 shadow-2xl"
-                              >
-                                {accentMenu.options.map((option) => (
-                                  <button
-                                    key={option}
-                                    type="button"
-                                    onPointerDown={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      handleAccentSelect(option);
-                                    }}
-                                    className="flex h-10 min-w-[2.5rem] items-center justify-center rounded-xl border border-white/8 bg-white/10 px-2 text-base font-medium transition-transform active:scale-95"
-                                    style={{ color: resolvedTextColor }}
-                                  >
-                                    {option}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : null}
-
-                            <button
-                              type="button"
-                              onPointerDown={handleLetterPointerDown(key)}
-                              onPointerUp={handleLetterPointerUp(key)}
-                              onPointerLeave={handleLetterPointerLeave}
-                              className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
-                              style={{
-                                borderColor:
-                                  activeVisualKey === key
-                                    ? resolvedPrimaryColor
-                                    : "rgba(255,255,255,0.08)",
-                                backgroundColor:
-                                  activeVisualKey === key
-                                    ? resolvedPrimaryColor
-                                    : "rgba(255,255,255,0.12)",
-                                color:
-                                  activeVisualKey === key
-                                    ? resolvedButtonTextColor
-                                    : resolvedTextColor,
-                              }}
-                            >
-                              {label}
-                            </button>
-                          </div>
-                        );
-                      })}
-
-                      {rowIndex === 2 ? (
-                        <>
-                          {[".", ","].map((key) => (
-                            <button
-                              key={key}
-                              type="button"
-                              onPointerDown={handleKeyPress(key)}
-                              className="flex h-12 min-w-[2.5rem] items-center justify-center rounded-2xl border px-3 text-[17px] font-medium shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all active:scale-95 md:h-14 md:min-w-[3.2rem] md:text-[18px]"
-                              style={{
-                                borderColor:
-                                  activeVisualKey === key
-                                    ? resolvedPrimaryColor
-                                    : "rgba(255,255,255,0.08)",
-                                backgroundColor:
-                                  activeVisualKey === key
-                                    ? resolvedPrimaryColor
-                                    : "rgba(255,255,255,0.12)",
-                                color:
-                                  activeVisualKey === key
-                                    ? resolvedButtonTextColor
-                                    : resolvedTextColor,
-                              }}
-                            >
-                              {key}
-                            </button>
-                          ))}
-
-                          <button
-                            type="button"
-                            onPointerDown={handleKeyPress("BACKSPACE")}
-                            className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
-                            style={{
-                              borderColor:
-                                activeVisualKey === "BACKSPACE"
-                                  ? resolvedPrimaryColor
-                                  : "rgba(255,255,255,0.08)",
-                              backgroundColor:
-                                activeVisualKey === "BACKSPACE"
-                                  ? resolvedPrimaryColor
-                                  : "rgba(255,255,255,0.12)",
-                              color:
-                                activeVisualKey === "BACKSPACE"
-                                  ? resolvedButtonTextColor
-                                  : resolvedTextColor,
-                            }}
-                          >
-                            <Delete className="h-5 w-5" />
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
-                  ))}
-
-                  <div className="grid grid-cols-[auto_1fr_auto_auto] gap-2">
-                    <button
-                      type="button"
-                      onPointerDown={handleKeyPress("SHIFT")}
-                      className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
-                      style={{
-                        borderColor:
-                          keyboardUppercase || capsLock
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.08)",
-                        backgroundColor:
-                          keyboardUppercase || capsLock
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.12)",
-                        color:
-                          keyboardUppercase || capsLock
-                            ? resolvedButtonTextColor
-                            : resolvedTextColor,
-                      }}
-                    >
-                      <ChevronUp className="h-5 w-5" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onPointerDown={handleKeyPress("SPACE")}
-                      className="flex h-12 items-center justify-center rounded-2xl border px-5 text-sm font-medium transition-transform active:scale-95 md:h-14"
-                      style={{
-                        borderColor:
-                          activeVisualKey === "SPACE"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.08)",
-                        backgroundColor:
-                          activeVisualKey === "SPACE"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.12)",
-                        color:
-                          activeVisualKey === "SPACE"
-                            ? resolvedButtonTextColor
-                            : resolvedTextColor,
-                      }}
-                    >
-                      espaço
-                    </button>
-
-                    <button
-                      type="button"
-                      onPointerDown={handleKeyPress("LEFT")}
-                      className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
-                      style={{
-                        borderColor:
-                          activeVisualKey === "LEFT"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.08)",
-                        backgroundColor:
-                          activeVisualKey === "LEFT"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.12)",
-                        color:
-                          activeVisualKey === "LEFT"
-                            ? resolvedButtonTextColor
-                            : resolvedTextColor,
-                      }}
-                    >
-                      ←
-                    </button>
-
-                    <button
-                      type="button"
-                      onPointerDown={handleKeyPress("RIGHT")}
-                      className="flex h-12 min-w-[64px] items-center justify-center rounded-2xl border px-4 text-lg transition-transform active:scale-95 md:h-14 md:min-w-[80px]"
-                      style={{
-                        borderColor:
-                          activeVisualKey === "RIGHT"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.08)",
-                        backgroundColor:
-                          activeVisualKey === "RIGHT"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.12)",
-                        color:
-                          activeVisualKey === "RIGHT"
-                            ? resolvedButtonTextColor
-                            : resolvedTextColor,
-                      }}
-                    >
-                      →
-                    </button>
-                  </div>
-
-                  <div className="flex justify-center gap-2">
-                    {EXTRA_PUNCTUATION_KEYS.map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onPointerDown={handleKeyPress(key)}
-                        className="flex h-10 min-w-[58px] items-center justify-center rounded-2xl border px-3 text-sm font-medium transition-all active:scale-95 md:h-11 md:min-w-[68px]"
-                        style={{
-                          borderColor:
-                            activeVisualKey === key
-                              ? resolvedPrimaryColor
-                              : "rgba(255,255,255,0.08)",
-                          backgroundColor:
-                            activeVisualKey === key
-                              ? resolvedPrimaryColor
-                              : "rgba(255,255,255,0.12)",
-                          color:
-                            activeVisualKey === key
-                              ? resolvedButtonTextColor
-                              : resolvedTextColor,
-                        }}
-                      >
-                        {key}
-                      </button>
-                    ))}
-
-                    <button
-                      type="button"
-                      onPointerDown={handleKeyPress("CLEAR")}
-                      className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl border px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
-                      style={{
-                        borderColor:
-                          activeVisualKey === "CLEAR"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.08)",
-                        backgroundColor:
-                          activeVisualKey === "CLEAR"
-                            ? resolvedPrimaryColor
-                            : "rgba(255,255,255,0.12)",
-                        color:
-                          activeVisualKey === "CLEAR"
-                            ? resolvedButtonTextColor
-                            : resolvedTextColor,
-                      }}
-                    >
-                      Limpar
-                    </button>
-
-                    <button
-                      type="button"
-                      onPointerDown={handleKeyPress("DONE")}
-                      className="flex h-10 min-w-[92px] items-center justify-center rounded-2xl px-4 text-sm font-medium transition-transform active:scale-95 md:h-11 md:min-w-[108px]"
-                      style={{
-                        backgroundColor: resolvedPrimaryColor,
-                        color: resolvedButtonTextColor,
-                      }}
-                    >
-                      Concluir
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
+            activeField === "comment" ||
+            activeField === "contactName" ||
+            activeField === "contactMessage"
+              ? renderTextKeyboard()
+              : null}
           </div>
         </div>
       </div>

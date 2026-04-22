@@ -12,59 +12,74 @@ import {
   type UserRole,
 } from "../../../services/users";
 import {
+  canAccessUsers,
   canHardDelete,
   getResolvedCompanyId,
   isSuperAdmin,
 } from "../../../utils/permissions";
+import { useToast } from "../../../components/ui/ToastProvider";
+import { useConfirmDialog } from "../../../components/ui/ConfirmDialogProvider";
+import { UserFormModal } from "./UserFormModal";
 
 const PAGE_SIZE = 10;
 
 type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
 
-type EditingState = {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  companyId: string;
-} | null;
+function getRoleLabel(role: UserRole) {
+  switch (role) {
+    case "SUPER_ADMIN":
+      return "SUPER_ADMIN";
+    case "COMPANY_ADMIN":
+      return "COMPANY_ADMIN";
+    case "MANAGER":
+      return "MANAGER";
+    default:
+      return role;
+  }
+}
+
+function formatRoleBadge(role: UserRole) {
+  switch (role) {
+    case "SUPER_ADMIN":
+      return "border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-200";
+    case "COMPANY_ADMIN":
+      return "border-cyan-400/20 bg-cyan-500/10 text-cyan-200";
+    case "MANAGER":
+      return "border-violet-400/20 bg-violet-500/10 text-violet-200";
+    default:
+      return "border-white/10 bg-white/5 text-slate-200";
+  }
+}
 
 export default function UsersPage() {
+  const toast = useToast();
+  const { confirm } = useConfirmDialog();
+
   const currentUser = getStoredUser();
   const superAdmin = isSuperAdmin(currentUser);
-
-  const canManageUsers = superAdmin;
-  const canDeletePermanently = canHardDelete(currentUser) && superAdmin;
+  const canView = canAccessUsers(currentUser);
+  const canDeletePermanently = canHardDelete(currentUser);
 
   const [users, setUsers] = useState<UserItem[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>("MANAGER");
-  const [companyId, setCompanyId] = useState(currentUser?.companyId ?? "");
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [roleFilter, setRoleFilter] = useState<"" | UserRole>("");
 
   const [page, setPage] = useState(1);
-  const [editing, setEditing] = useState<EditingState>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [error, setError] = useState("");
 
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
 
-  const availableRoles: UserRole[] = ["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"];
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
 
   async function load() {
     try {
-      setError("");
       setLoading(true);
 
       const resolvedCompanyId = getResolvedCompanyId(currentUser);
@@ -77,120 +92,114 @@ export default function UsersPage() {
       setUsers(Array.isArray(usersData) ? usersData : []);
       setCompanies(Array.isArray(companiesData) ? companiesData : []);
     } catch {
-      setError("Não foi possível carregar os usuários.");
+      toast.error("Não foi possível carregar os usuários.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleCreate() {
-    if (!name.trim() || !email.trim() || !password.trim()) {
-      setError("Preencha nome, e-mail e senha.");
+  async function handleCreate(payload: {
+    name: string;
+    email: string;
+    password?: string;
+    role: UserRole;
+    companyId?: string;
+  }) {
+    if (!payload.name.trim() || !payload.email.trim() || !payload.password?.trim()) {
+      toast.warning("Preencha nome, e-mail e senha.");
       return;
     }
 
-    const resolvedCompanyId =
-      role === "SUPER_ADMIN" ? undefined : companyId;
-
-    if (role !== "SUPER_ADMIN" && !resolvedCompanyId) {
-      setError("Selecione uma empresa.");
+    if (payload.role !== "SUPER_ADMIN" && !payload.companyId) {
+      toast.warning("Selecione uma empresa.");
       return;
     }
 
     try {
-      setSubmitting(true);
-      setError("");
+      setCreateLoading(true);
 
       await createUser({
-        name: name.trim(),
-        email: email.trim(),
-        password,
-        role,
-        companyId: resolvedCompanyId,
+        name: payload.name.trim(),
+        email: payload.email.trim(),
+        password: payload.password,
+        role: payload.role,
+        companyId: payload.role === "SUPER_ADMIN" ? undefined : payload.companyId,
         active: true,
       });
 
-      setName("");
-      setEmail("");
-      setPassword("");
-      setRole("MANAGER");
-      setCompanyId("");
-      setPage(1);
-      setSelectedIds([]);
+      setCreateOpen(false);
+      toast.success("Usuário criado com sucesso.");
       await load();
     } catch {
-      setError("Não foi possível criar o usuário.");
+      toast.error("Não foi possível criar o usuário.");
     } finally {
-      setSubmitting(false);
+      setCreateLoading(false);
     }
   }
 
+  async function handleUpdate(payload: {
+    name: string;
+    email: string;
+    password?: string;
+    role: UserRole;
+    companyId?: string;
+  }) {
+    if (!editingUser) return;
 
-  function handleStartEdit(user: UserItem) {
-    setEditing({
-      id: user.id,
-      name: user.name ?? "",
-      email: user.email ?? "",
-      role: user.role,
-      companyId: user.companyId ?? "",
-    });
-  }
-
-  function handleCancelEdit() {
-    setEditing(null);
-  }
-
-  async function handleSaveEdit(user: UserItem) {
-    if (!editing) return;
-
-    if (!editing.name.trim() || !editing.email.trim()) {
-      setError("Preencha nome e e-mail.");
+    if (!payload.name.trim() || !payload.email.trim()) {
+      toast.warning("Preencha nome e e-mail.");
       return;
     }
 
-    const targetCompanyId = editing.role === "SUPER_ADMIN" ? undefined : editing.companyId;
-
-    if (editing.role !== "SUPER_ADMIN" && !targetCompanyId) {
-      setError("Selecione uma empresa.");
+    if (payload.role !== "SUPER_ADMIN" && !payload.companyId) {
+      toast.warning("Selecione uma empresa.");
       return;
     }
 
     try {
-      setSavingEdit(true);
-      setError("");
+      setEditLoading(true);
 
-      await updateUser(user.id, {
-        name: editing.name.trim(),
-        email: editing.email.trim(),
-        role: editing.role,
-        companyId: targetCompanyId,
-      });
+      await updateUser(
+        editingUser.id,
+        {
+          name: payload.name.trim(),
+          email: payload.email.trim(),
+          role: payload.role,
+          companyId: payload.role === "SUPER_ADMIN" ? undefined : payload.companyId,
+        },
+        payload.role === "SUPER_ADMIN"
+          ? undefined
+          : payload.companyId ?? editingUser.companyId,
+      );
 
-      setEditing(null);
+      setEditingUser(null);
+      toast.success("Usuário atualizado com sucesso.");
       await load();
     } catch {
-      setError("Não foi possível atualizar o usuário.");
+      toast.error("Não foi possível atualizar o usuário.");
     } finally {
-      setSavingEdit(false);
+      setEditLoading(false);
     }
   }
 
   async function handleDeactivate(user: UserItem) {
-    const confirmed = window.confirm(
-      `Deseja desativar o usuário "${user.name}"?`,
-    );
+    const confirmed = await confirm({
+      title: "Desativar usuário",
+      description: `O usuário "${user.name}" ficará sem acesso até ser reativado novamente.`,
+      confirmText: "Desativar",
+      cancelText: "Cancelar",
+      variant: "warning",
+    });
+
     if (!confirmed) return;
 
     try {
       setProcessingId(user.id);
-      setError("");
-
       await deactivateUser(user.id, user.companyId);
-
+      toast.success("Usuário desativado com sucesso.");
       await load();
-      setSelectedIds((current) => current.filter((id) => id !== user.id));
     } catch {
-      setError("Não foi possível desativar o usuário.");
+      toast.error("Não foi possível desativar o usuário.");
     } finally {
       setProcessingId(null);
     }
@@ -199,81 +208,43 @@ export default function UsersPage() {
   async function handleActivate(user: UserItem) {
     try {
       setProcessingId(user.id);
-      setError("");
-
       await activateUser(user.id, user.companyId);
-
+      toast.success("Usuário ativado com sucesso.");
       await load();
     } catch {
-      setError("Não foi possível reativar o usuário.");
+      toast.error("Não foi possível ativar o usuário.");
     } finally {
       setProcessingId(null);
     }
   }
 
   async function handleHardDelete(user: UserItem) {
-    const confirmed = window.confirm(
-      `Excluir definitivamente o usuário "${user.name}"? Essa ação não poderá ser desfeita.`,
-    );
+    if (!canDeletePermanently) return;
+
+    if (currentUser?.id === user.id) {
+      toast.warning("Você não pode excluir o próprio usuário.");
+      return;
+    }
+
+    const confirmed = await confirm({
+      title: "Excluir usuário",
+      description: `O usuário "${user.name}" será removido definitivamente. Essa ação não poderá ser desfeita.`,
+      confirmText: "Excluir usuário",
+      cancelText: "Cancelar",
+      variant: "danger",
+    });
+
     if (!confirmed) return;
 
     try {
       setProcessingId(user.id);
-      setError("");
-
       await hardDeleteUser(user.id, user.companyId);
-
+      toast.success("Usuário excluído com sucesso.");
       await load();
-      setSelectedIds((current) => current.filter((id) => id !== user.id));
     } catch {
-      setError("Não foi possível excluir definitivamente o usuário.");
+      toast.error("Não foi possível excluir o usuário.");
     } finally {
       setProcessingId(null);
-    }
-  }
-
-  const selectedUsers = useMemo(
-    () =>
-      users.filter((user) => {
-        const canDelete = canDeletePermanently && currentUser?.id !== user.id;
-        return selectedIds.includes(user.id) && canDelete;
-      }),
-    [users, canDeletePermanently, currentUser?.id, selectedIds],
-  );
-
-  async function handleBulkDelete() {
-    if (selectedUsers.length === 0) return;
-
-    const confirmed = window.confirm(
-      `Excluir definitivamente ${selectedUsers.length} usuário(s) selecionado(s)? Essa ação não poderá ser desfeita.`,
-    );
-    if (!confirmed) return;
-
-    try {
-      setBulkDeleting(true);
-      setError("");
-
-      const results = await Promise.allSettled(
-        selectedUsers.map((user) => hardDeleteUser(user.id, user.companyId)),
-      );
-
-      const failedCount = results.filter((result) => result.status === "rejected").length;
-
-      await load();
-
-      if (failedCount > 0) {
-        const successCount = selectedUsers.length - failedCount;
-        setError(
-          successCount > 0
-            ? `${failedCount} de ${selectedUsers.length} usuário(s) selecionado(s) não puderam ser excluídos.`
-            : `Não foi possível excluir os ${selectedUsers.length} usuário(s) selecionado(s).`,
-        );
-      }
-    } catch {
-      setError("Não foi possível concluir a exclusão em massa dos usuários.");
-    } finally {
-      setBulkDeleting(false);
-      setSelectedIds([]);
     }
   }
 
@@ -312,55 +283,17 @@ export default function UsersPage() {
     return filteredUsers.slice(start, start + PAGE_SIZE);
   }, [filteredUsers, page]);
 
-  const currentPageIds = useMemo(
-    () => paginatedUsers.map((user) => user.id),
-    [paginatedUsers],
-  );
-
-  const allCurrentPageSelected =
-    currentPageIds.length > 0 &&
-    currentPageIds.every((id) => selectedIds.includes(id));
-
-  const someCurrentPageSelected =
-    currentPageIds.some((id) => selectedIds.includes(id)) &&
-    !allCurrentPageSelected;
-
-  function handleToggleOne(id: string) {
-    setSelectedIds((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id],
-    );
-  }
-
-  function handleTogglePage(ids: string[]) {
-    const allSelected = ids.every((id) => selectedIds.includes(id));
-
-    setSelectedIds((current) => {
-      if (allSelected) {
-        return current.filter((id) => !ids.includes(id));
-      }
-
-      const merged = new Set([...current, ...ids]);
-      return Array.from(merged);
-    });
-  }
-
   useEffect(() => {
-    if (canManageUsers) {
+    if (canView) {
       void load();
     } else {
       setLoading(false);
     }
-  }, [canManageUsers]);
+  }, [canView]);
 
   useEffect(() => {
     setPage(1);
   }, [search, statusFilter, roleFilter]);
-
-  useEffect(() => {
-    setSelectedIds([]);
-  }, [search, statusFilter, roleFilter, page]);
 
   useEffect(() => {
     if (page > totalPages) {
@@ -368,452 +301,317 @@ export default function UsersPage() {
     }
   }, [page, totalPages]);
 
-  if (!canManageUsers) {
+  if (!canView) {
     return (
-      <section className="space-y-4">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Acesso negado
-        </h1>
-        <p className="text-slate-600">
-          Apenas SUPER_ADMIN pode acessar a página de usuários.
+      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+        <h2 className="text-xl font-semibold text-white">Acesso negado</h2>
+        <p className="mt-2 text-sm leading-6 text-rose-100/80">
+          Você não tem permissão para acessar a página de usuários.
         </p>
       </section>
     );
   }
 
   return (
-    <section className="space-y-8">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Usuários
-        </h1>
-        <p className="text-slate-600">Gerencie os usuários da plataforma.</p>
-      </header>
+    <>
+      <section className="space-y-6">
+        <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                gestão de usuários
+              </div>
 
-      {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
-        </div>
-      ) : null}
+              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
+                Acessos e permissões
+              </h2>
 
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h2 className="text-xl font-semibold text-slate-900">Novo usuário</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                Gerencie usuários, vínculos com empresas e níveis de acesso do ambiente administrativo.
+              </p>
+            </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nome"
-            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-          />
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar por nome, e-mail ou empresa"
+                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+              />
 
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="E-mail"
-            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-          />
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+              >
+                <option value="ALL">Todos os status</option>
+                <option value="ACTIVE">Ativos</option>
+                <option value="INACTIVE">Inativos</option>
+              </select>
 
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Senha"
-            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-          />
+              <select
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value as "" | UserRole)}
+                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+              >
+                <option value="">Todas as roles</option>
+                <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                <option value="COMPANY_ADMIN">COMPANY_ADMIN</option>
+                <option value="MANAGER">MANAGER</option>
+              </select>
 
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value as UserRole)}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-          >
-            {availableRoles.map((itemRole) => (
-              <option key={itemRole} value={itemRole}>
-                {itemRole}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={companyId}
-            onChange={(e) => setCompanyId(e.target.value)}
-            disabled={role === "SUPER_ADMIN"}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500 disabled:bg-slate-100 disabled:text-slate-500"
-          >
-            <>
-              <option value="">
-                {role === "SUPER_ADMIN"
-                  ? "Empresa ignorada para SUPER_ADMIN"
-                  : "Selecione a empresa"}
-              </option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </>
-          </select>
-        </div>
-
-        <div className="mt-5">
-          <button
-            type="button"
-            onClick={handleCreate}
-            disabled={submitting}
-            className="rounded-xl bg-sky-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:opacity-60"
-          >
-            {submitting ? "Criando..." : "Criar usuário"}
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">
-              Usuários cadastrados
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              {loading ? "Carregando..." : `${filteredUsers.length} item(ns)`}
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nome, e-mail ou empresa"
-              className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500"
-            />
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-            >
-              <option value="ALL">Todos os status</option>
-              <option value="ACTIVE">Ativos</option>
-              <option value="INACTIVE">Inativos</option>
-            </select>
-
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value as "" | UserRole)}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-sky-500"
-            >
-              <option value="">Todas as roles</option>
-              <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-              <option value="COMPANY_ADMIN">COMPANY_ADMIN</option>
-              <option value="MANAGER">MANAGER</option>
-            </select>
-
-            <button
-              type="button"
-              onClick={handleClearFilters}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-            >
-              Limpar filtros
-            </button>
-          </div>
-        </div>
-
-        {selectedIds.length > 0 ? (
-          <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <span className="text-sm font-medium text-slate-700">
-              {selectedIds.length} selecionado(s)
-            </span>
-
-            <div className="flex flex-wrap gap-2">
-              {selectedUsers.length > 0 ? (
+              <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => void handleBulkDelete()}
-                  disabled={bulkDeleting}
-                  className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                  onClick={handleClearFilters}
+                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
                 >
-                  {bulkDeleting ? "Excluindo..." : "Excluir selecionados"}
+                  Limpar
                 </button>
-              ) : null}
 
-              <button
-                type="button"
-                onClick={() => setSelectedIds([])}
-                disabled={bulkDeleting}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
-              >
-                Limpar seleção
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  className="inline-flex h-12 items-center justify-center rounded-2xl bg-cyan-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                >
+                  Novo
+                </button>
+              </div>
             </div>
           </div>
-        ) : null}
+        </div>
 
-        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+        <div className="rounded-[28px] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <div className="flex flex-col gap-3 border-b border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-white">Usuários cadastrados</h3>
+              <p className="mt-1 text-sm text-slate-400">
+                {loading
+                  ? "Carregando dados..."
+                  : `${filteredUsers.length} usuário(s) encontrado(s)`}
+              </p>
+            </div>
+          </div>
+
           {loading ? (
-            <div className="px-6 py-10 text-center text-slate-500">
+            <div className="p-10 text-center text-sm text-slate-400">
               Carregando usuários...
             </div>
           ) : filteredUsers.length === 0 ? (
-            <div className="px-6 py-10 text-center text-slate-500">
-              Nenhum usuário encontrado.
+            <div className="p-10 text-center">
+              <div className="mx-auto max-w-md">
+                <h4 className="text-lg font-semibold text-white">
+                  Nenhum usuário encontrado
+                </h4>
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Ajuste os filtros ou cadastre um novo usuário para organizar os acessos do sistema.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(true)}
+                  className="mt-5 inline-flex h-11 items-center justify-center rounded-2xl bg-cyan-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                >
+                  Cadastrar usuário
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left">
-                      <input
-                        ref={(el) => {
-                          if (el) {
-                            el.indeterminate = someCurrentPageSelected;
-                          }
-                        }}
-                        type="checkbox"
-                        checked={allCurrentPageSelected}
-                        onChange={() => handleTogglePage(currentPageIds)}
-                        className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                      />
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Nome
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      E-mail
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Role
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Empresa
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
+            <>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-white/10">
+                  <thead className="bg-white/[0.03]">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Nome
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        E-mail
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Role
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Empresa
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Ações
+                      </th>
+                    </tr>
+                  </thead>
 
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {paginatedUsers.map((user) => {
-                    const isEditing = editing?.id === user.id;
-                    const isProcessing = processingId === user.id;
-                    const canDelete =
-                      canDeletePermanently && currentUser?.id !== user.id;
+                  <tbody className="divide-y divide-white/10">
+                    {paginatedUsers.map((user) => {
+                      const isProcessing = processingId === user.id;
+                      const canDelete = canDeletePermanently && currentUser?.id !== user.id;
 
-                    return (
-                      <tr key={user.id} className="hover:bg-slate-50/70">
-                        <td className="px-4 py-4">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(user.id)}
-                            onChange={() => handleToggleOne(user.id)}
-                            className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
-                          />
-                        </td>
+                      return (
+                        <tr
+                          key={user.id}
+                          className="transition hover:bg-white/[0.03]"
+                        >
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="text-sm font-semibold text-white">
+                                {user.name}
+                              </p>
+                            </div>
+                          </td>
 
-                        <td className="px-4 py-4 text-sm font-medium text-slate-900">
-                          {isEditing ? (
-                            <input
-                              value={editing?.name ?? ""}
-                              onChange={(e) =>
-                                setEditing((prev) =>
-                                  prev ? { ...prev, name: e.target.value } : prev,
-                                )
-                              }
-                              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-sky-500"
-                            />
-                          ) : (
-                            user.name
-                          )}
-                        </td>
+                          <td className="px-6 py-4 text-sm text-slate-400">
+                            {user.email}
+                          </td>
 
-                        <td className="px-4 py-4 text-sm text-slate-600">
-                          {isEditing ? (
-                            <input
-                              value={editing?.email ?? ""}
-                              onChange={(e) =>
-                                setEditing((prev) =>
-                                  prev ? { ...prev, email: e.target.value } : prev,
-                                )
-                              }
-                              className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-sky-500"
-                            />
-                          ) : (
-                            user.email
-                          )}
-                        </td>
-
-                        <td className="px-4 py-4 text-sm text-slate-600">
-                          {isEditing ? (
-                            <select
-                              value={editing?.role ?? "MANAGER"}
-                              onChange={(e) =>
-                                setEditing((prev) =>
-                                  prev
-                                    ? { ...prev, role: e.target.value as UserRole, companyId: e.target.value === "SUPER_ADMIN" ? "" : prev.companyId }
-                                    : prev,
-                                )
-                              }
-                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-sky-500"
+                          <td className="px-6 py-4">
+                            <span
+                              className={[
+                                "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                                formatRoleBadge(user.role),
+                              ].join(" ")}
                             >
-                              {availableRoles.map((item) => (
-                                <option key={item} value={item}>
-                                  {item}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                              {user.role}
+                              {getRoleLabel(user.role)}
                             </span>
-                          )}
-                        </td>
+                          </td>
 
-                        <td className="px-4 py-4 text-sm text-slate-600">
-                          {isEditing ? (
-                            editing?.role === "SUPER_ADMIN" ? (
-                              "-"
-                            ) : (
-                              <select
-                                value={editing?.companyId ?? ""}
-                                onChange={(e) =>
-                                  setEditing((prev) =>
-                                    prev ? { ...prev, companyId: e.target.value } : prev,
-                                  )
-                                }
-                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:border-sky-500"
+                          <td className="px-6 py-4 text-sm text-slate-400">
+                            {user.company?.name ?? "-"}
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span
+                              className={[
+                                "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+                                user.active
+                                  ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
+                                  : "border-amber-400/20 bg-amber-500/10 text-amber-200",
+                              ].join(" ")}
+                            >
+                              {user.active ? "Ativo" : "Inativo"}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditingUser(user)}
+                                disabled={isProcessing}
+                                className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
                               >
-                                <option value="">Selecione a empresa</option>
-                                {companies.map((company) => (
-                                  <option key={company.id} value={company.id}>
-                                    {company.name}
-                                  </option>
-                                ))}
-                              </select>
-                            )
-                          ) : (
-                            user.company?.name ?? "-"
-                          )}
-                        </td>
+                                Editar
+                              </button>
 
-                        <td className="px-4 py-4 text-sm">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                              user.active
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-amber-100 text-amber-700"
-                            }`}
-                          >
-                            {user.active ? "Ativo" : "Inativo"}
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-4">
-                          <div className="flex justify-end gap-2">
-                            {isEditing ? (
-                              <>
+                              {user.active ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleSaveEdit(user)}
-                                  disabled={savingEdit}
-                                  className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
+                                  onClick={() => void handleDeactivate(user)}
+                                  disabled={isProcessing}
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                  {savingEdit ? "Salvando..." : "Salvar"}
+                                  Desativar
                                 </button>
-
+                              ) : (
                                 <button
                                   type="button"
-                                  onClick={handleCancelEdit}
-                                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                                  onClick={() => void handleActivate(user)}
+                                  disabled={isProcessing}
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                  Cancelar
+                                  Reativar
                                 </button>
-                              </>
-                            ) : (
-                              <>
+                              )}
+
+                              {canDelete ? (
                                 <button
                                   type="button"
-                                  onClick={() => handleStartEdit(user)}
-                                  className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-200"
+                                  onClick={() => void handleHardDelete(user)}
+                                  disabled={isProcessing}
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                  Editar
+                                  Excluir
                                 </button>
+                              ) : null}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                                {user.active ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeactivate(user)}
-                                    disabled={isProcessing}
-                                    className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800 transition hover:bg-amber-200 disabled:opacity-60"
-                                  >
-                                    Desativar
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleActivate(user)}
-                                    disabled={isProcessing}
-                                    className="rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-200 disabled:opacity-60"
-                                  >
-                                    Reativar
-                                  </button>
-                                )}
+              <div className="flex flex-col gap-3 border-t border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-400">
+                  Página {page} de {totalPages}
+                </p>
 
-                                {canDelete ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleHardDelete(user)}
-                                    disabled={isProcessing || bulkDeleting}
-                                    className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
-                                  >
-                                    Excluir
-                                  </button>
-                                ) : null}
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={page === 1}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((current) => Math.min(totalPages, current + 1))
+                    }
+                    disabled={page === totalPages}
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Próxima
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
-
-        {!loading && filteredUsers.length > 0 ? (
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-500">
-              Página {page} de {totalPages}
-            </p>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                disabled={page === 1}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200 disabled:opacity-50"
-              >
-                Anterior
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setPage((current) => Math.min(totalPages, current + 1))
-                }
-                disabled={page === totalPages}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-200 disabled:opacity-50"
-              >
-                Próxima
-              </button>
-            </div>
-          </div>
-        ) : null}
       </section>
-    </section>
+
+      <UserFormModal
+        open={createOpen}
+        mode="create"
+        companies={companies}
+        loading={createLoading}
+        allowSuperAdminRole={superAdmin}
+        onClose={() => {
+          if (!createLoading) {
+            setCreateOpen(false);
+          }
+        }}
+        onSubmit={handleCreate}
+      />
+
+      <UserFormModal
+        open={!!editingUser}
+        mode="edit"
+        companies={companies}
+        loading={editLoading}
+        allowSuperAdminRole={superAdmin}
+        initialData={
+          editingUser
+            ? {
+                name: editingUser.name,
+                email: editingUser.email,
+                role: editingUser.role,
+                companyId: editingUser.companyId ?? "",
+              }
+            : undefined
+        }
+        onClose={() => {
+          if (!editLoading) {
+            setEditingUser(null);
+          }
+        }}
+        onSubmit={handleUpdate}
+      />
+    </>
   );
 }
