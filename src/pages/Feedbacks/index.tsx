@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Delete, CornerDownLeft, ChevronUp } from "lucide-react";
+import isEmail from "validator/lib/isEmail";
 import { api } from "../../services/api";
 import {
   getPublicKioskConfig,
@@ -138,7 +139,7 @@ function clampText(value: string, maxLength: number) {
 }
 
 function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  return isEmail(value.trim());
 }
 
 export default function FeedbackKiosk() {
