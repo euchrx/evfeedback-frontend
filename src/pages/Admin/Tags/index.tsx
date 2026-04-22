@@ -400,8 +400,8 @@ export default function TagsPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="min-w-[1050px] divide-y divide-white/10">
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-max divide-y divide-white/10">
                   <thead className="bg-white/[0.03]">
                     <tr>
                       <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -573,10 +573,10 @@ export default function TagsPage() {
         initialData={
           editingTag
             ? {
-                name: editingTag.name,
-                color: editingTag.color ?? "#0ea5e9",
-                companyId: editingTag.companyId ?? "",
-              }
+              name: editingTag.name,
+              color: editingTag.color ?? "#0ea5e9",
+              companyId: editingTag.companyId ?? "",
+            }
             : undefined
         }
         onClose={() => {
