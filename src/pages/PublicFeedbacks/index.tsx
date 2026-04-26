@@ -95,6 +95,28 @@ function getTokenFromUrl() {
   }
 }
 
+function getInitialFiltersFromUrl(): SharedFeedbackFilters {
+  try {
+    const params = new URLSearchParams(window.location.search);
+
+    return {
+      branchId: params.get("branchId") ?? "",
+      kioskId: params.get("kioskId") ?? "",
+      rating: params.get("rating") ?? "",
+      startDate: params.get("startDate") ?? "",
+      endDate: params.get("endDate") ?? "",
+    };
+  } catch {
+    return {
+      branchId: "",
+      kioskId: "",
+      rating: "",
+      startDate: "",
+      endDate: "",
+    };
+  }
+}
+
 function hasContactInfo(feedback: FeedbackItem) {
   return Boolean(
     feedback.contactName?.trim() ||
@@ -347,13 +369,9 @@ export default function PublicFeedbacksPage() {
     null,
   );
 
-  const [filters, setFilters] = useState<SharedFeedbackFilters>({
-    branchId: "",
-    kioskId: "",
-    rating: "",
-    startDate: "",
-    endDate: "",
-  });
+  const[filters, setFilters] = useState<SharedFeedbackFilters>(() =>
+    getInitialFiltersFromUrl(),
+  );
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
