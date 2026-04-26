@@ -220,9 +220,21 @@ export default function FeedbackKiosk() {
   const resolvedButtonTextColor = buttonTextColor || "#0f172a";
 
   const isNegativeRating = rating === 1 || rating === 2;
-  const selectedRating = RATING_OPTIONS.find((item) => item.value === rating);
+  const selectedRating = useMemo(
+    () => RATING_OPTIONS.find((item) => item.value === rating),
+    [rating],
+  );
   const canApplyLiveRefresh = step === "rating" || step === "done";
   const keyboardOpen = activeField !== null;
+
+  const activeFieldValue = useMemo(() => {
+    if (activeField === "email") return email;
+    if (activeField === "comment") return comment;
+    if (activeField === "contactName") return contactName;
+    if (activeField === "contactPhone") return contactPhone;
+    if (activeField === "contactMessage") return contactMessage;
+    return "";
+  }, [activeField, email, comment, contactName, contactPhone, contactMessage]);
 
   function clearShiftClickTimer() {
     if (shiftClickTimerRef.current) {
@@ -267,7 +279,7 @@ export default function FeedbackKiosk() {
   }
 
   function flashKey(key: string) {
-    setActiveVisualKey(key);
+    setActiveVisualKey((current) => (current === key ? current : key));
     clearKeyHighlightTimer();
 
     keyHighlightTimerRef.current = window.setTimeout(() => {
@@ -283,46 +295,16 @@ export default function FeedbackKiosk() {
     }
   }
 
-  function hardResetFlow() {
+  function clearAllRuntimeTimers() {
     clearInactivityTimer();
     clearDelayedResetTimer();
     clearKeyboardCloseTimer();
     clearLongPressTimer();
     clearKeyHighlightTimer();
     clearShiftClickTimer();
+  }
 
-    longPressTriggeredRef.current = false;
-    lastShiftPressRef.current = 0;
-
-    setAccentMenu(null);
-    setActiveVisualKey(null);
-    setActiveField(null);
-    setKeyboardUppercase(false);
-    setKeyboardClosing(false);
-    setCursorPosition(0);
-    setCapsLock(false);
-
-    if (!kioskToken) {
-      setStep("error");
-      setKioskErrorType("missing_token");
-      setRating(null);
-      setTagIds([]);
-      setComment("");
-      setCommentError("");
-      setEmail("");
-      setEmailError("");
-      setContactName("");
-      setContactPhone("");
-      setContactNameError("");
-      setContactPhoneError("");
-      setContactMessage("");
-      setContactConsent(false);
-      setSubmittingAction(null);
-      return;
-    }
-
-    setStep("rating");
-    setKioskErrorType(null);
+  function resetFormState() {
     setRating(null);
     setTagIds([]);
     setComment("");
@@ -336,6 +318,34 @@ export default function FeedbackKiosk() {
     setContactMessage("");
     setContactConsent(false);
     setSubmittingAction(null);
+  }
+
+  function resetKeyboardState() {
+    longPressTriggeredRef.current = false;
+    lastShiftPressRef.current = 0;
+
+    setAccentMenu(null);
+    setActiveVisualKey(null);
+    setActiveField(null);
+    setKeyboardUppercase(false);
+    setKeyboardClosing(false);
+    setCursorPosition(0);
+    setCapsLock(false);
+  }
+
+  function hardResetFlow() {
+    clearAllRuntimeTimers();
+    resetKeyboardState();
+    resetFormState();
+
+    if (!kioskToken) {
+      setStep("error");
+      setKioskErrorType("missing_token");
+      return;
+    }
+
+    setStep("rating");
+    setKioskErrorType(null);
   }
 
   function closeKeyboard(animated = true) {
@@ -407,6 +417,11 @@ export default function FeedbackKiosk() {
     const field = fieldOverride ?? activeField;
 
     if (!field) return "";
+
+    if (!fieldOverride) {
+      return activeFieldValue;
+    }
+
     if (field === "email") return email;
     if (field === "comment") return comment;
     if (field === "contactName") return contactName;
@@ -421,31 +436,36 @@ export default function FeedbackKiosk() {
     if (!field) return;
 
     if (field === "email") {
-      setEmail(clampText(value, 120));
+      const next = clampText(value, 120);
+      setEmail((current) => (current === next ? current : next));
       if (emailError) setEmailError("");
       return;
     }
 
     if (field === "comment") {
-      setComment(clampText(value, 300));
+      const next = clampText(value, 300);
+      setComment((current) => (current === next ? current : next));
       if (commentError) setCommentError("");
       return;
     }
 
     if (field === "contactName") {
-      setContactName(clampText(value, 80));
+      const next = clampText(value, 80);
+      setContactName((current) => (current === next ? current : next));
       if (contactNameError) setContactNameError("");
       return;
     }
 
     if (field === "contactPhone") {
-      setContactPhone(formatPhoneValue(value));
+      const next = formatPhoneValue(value);
+      setContactPhone((current) => (current === next ? current : next));
       if (contactPhoneError) setContactPhoneError("");
       return;
     }
 
     if (field === "contactMessage") {
-      setContactMessage(clampText(value, 300));
+      const next = clampText(value, 300);
+      setContactMessage((current) => (current === next ? current : next));
     }
   }
 
@@ -456,7 +476,7 @@ export default function FeedbackKiosk() {
     clearDelayedResetTimer();
     blurNativeActiveElement();
     setKeyboardClosing(false);
-    setActiveField(field);
+    setActiveField((current) => (current === field ? current : field));
 
     const currentValue =
       field === "email"
@@ -471,16 +491,21 @@ export default function FeedbackKiosk() {
                 ? contactMessage
                 : "";
 
-    setCursorPosition(currentValue.length);
+    setCursorPosition((current) =>
+      current === currentValue.length ? current : currentValue.length,
+    );
 
     if (field === "contactPhone") {
       setKeyboardUppercase(false);
       return;
     }
 
-    setKeyboardUppercase(currentValue.trim().length === 0);
+    const shouldStartUppercase = currentValue.trim().length === 0;
+    setKeyboardUppercase((current) =>
+      current === shouldStartUppercase ? current : shouldStartUppercase,
+    );
   }
-  function handleKeyboardKey(key: string) {
+    function handleKeyboardKey(key: string) {
     setAccentMenu(null);
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
@@ -505,10 +530,20 @@ export default function FeedbackKiosk() {
             currentDigits.slice(digitsCursor);
 
           const sanitizedNextDigits = sanitizePhoneValue(nextDigits);
-          setContactPhone(formatPhoneValue(sanitizedNextDigits));
-          setCursorPosition(
-            getPhoneCursorFromDigits(sanitizedNextDigits, digitsCursor - 1),
+          const nextFormatted = formatPhoneValue(sanitizedNextDigits);
+
+          setContactPhone((current) =>
+            current === nextFormatted ? current : nextFormatted,
           );
+
+          setCursorPosition((current) => {
+            const next = getPhoneCursorFromDigits(
+              sanitizedNextDigits,
+              digitsCursor - 1,
+            );
+
+            return current === next ? current : next;
+          });
 
           if (contactPhoneError) setContactPhoneError("");
           return;
@@ -521,31 +556,40 @@ export default function FeedbackKiosk() {
           currentValue.slice(safeCursor);
 
         setActiveFieldValue(next);
-        setCursorPosition(safeCursor - 1);
+        setCursorPosition((current) =>
+          current === safeCursor - 1 ? current : safeCursor - 1,
+        );
 
         if (!capsLock) {
           setKeyboardUppercase(false);
         }
+
         return;
       }
 
-      case "CLEAR":
+      case "CLEAR": {
         setActiveFieldValue("");
-        setCursorPosition(0);
+        setCursorPosition((current) => (current === 0 ? current : 0));
+
         if (activeField !== "contactPhone") {
           setKeyboardUppercase(true);
         }
-        return;
 
-      case "SPACE":
+        return;
+      }
+
+      case "SPACE": {
         if (activeField !== "contactPhone") {
           insertCharacter(" ");
         }
-        return;
 
-      case "DONE":
+        return;
+      }
+
+      case "DONE": {
         closeKeyboard(true);
         return;
+      }
 
       case "SHIFT": {
         if (activeField === "contactPhone") return;
@@ -582,19 +626,23 @@ export default function FeedbackKiosk() {
         return;
       }
 
-      case "LEFT":
+      case "LEFT": {
         setCursorPosition((current) => Math.max(0, current - 1));
         return;
+      }
 
-      case "RIGHT":
+      case "RIGHT": {
         setCursorPosition((current) =>
           Math.min(getActiveFieldValue().length, current + 1),
         );
-        return;
 
-      default:
+        return;
+      }
+
+      default: {
         insertCharacter(key);
         return;
+      }
     }
   }
 
@@ -614,21 +662,31 @@ export default function FeedbackKiosk() {
     if (activeField === "contactPhone") {
       const currentDigits = sanitizePhoneValue(currentValue);
       const digitsCursor = getPhoneDigitsBeforeCursor(currentValue, safeCursor);
+      const digitsToInsert = rawKey.replace(/\D/g, "");
+
+      if (!digitsToInsert) return;
+
       const nextDigits =
         currentDigits.slice(0, digitsCursor) +
-        rawKey.replace(/\D/g, "") +
+        digitsToInsert +
         currentDigits.slice(digitsCursor);
 
       const sanitizedNextDigits = sanitizePhoneValue(nextDigits);
-      const digitsToAdd = rawKey.replace(/\D/g, "").length;
+      const digitsToAdd = digitsToInsert.length;
+      const nextFormatted = formatPhoneValue(sanitizedNextDigits);
 
-      setContactPhone(formatPhoneValue(sanitizedNextDigits));
-      setCursorPosition(
-        getPhoneCursorFromDigits(
+      setContactPhone((current) =>
+        current === nextFormatted ? current : nextFormatted,
+      );
+
+      setCursorPosition((current) => {
+        const next = getPhoneCursorFromDigits(
           sanitizedNextDigits,
           Math.min(digitsCursor + digitsToAdd, sanitizedNextDigits.length),
-        ),
-      );
+        );
+
+        return current === next ? current : next;
+      });
 
       if (contactPhoneError) setContactPhoneError("");
       return;
@@ -642,7 +700,10 @@ export default function FeedbackKiosk() {
       currentValue.slice(safeCursor);
 
     setActiveFieldValue(nextValue);
-    setCursorPosition(safeCursor + key.length);
+
+    setCursorPosition((current) =>
+      current === safeCursor + key.length ? current : safeCursor + key.length,
+    );
 
     if (!capsLock) {
       setKeyboardUppercase(false);
@@ -674,6 +735,7 @@ export default function FeedbackKiosk() {
 
       longPressTimerRef.current = window.setTimeout(() => {
         longPressTriggeredRef.current = true;
+
         setAccentMenu({
           key,
           options: keyboardUppercase
@@ -717,7 +779,13 @@ export default function FeedbackKiosk() {
       currentValue.slice(safeCursor);
 
     setActiveFieldValue(nextValue);
-    setCursorPosition(safeCursor + accentedChar.length);
+
+    setCursorPosition((current) =>
+      current === safeCursor + accentedChar.length
+        ? current
+        : safeCursor + accentedChar.length,
+    );
+
     setAccentMenu(null);
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
@@ -748,9 +816,13 @@ export default function FeedbackKiosk() {
     setContactPhoneError("");
     setContactMessage("");
     setContactConsent(false);
+    setAccentMenu(null);
+    setActiveVisualKey(null);
     setActiveField(null);
     setKeyboardUppercase(false);
     setKeyboardClosing(false);
+    setCursorPosition(0);
+    setCapsLock(false);
     setStep("tags");
   }
 
@@ -811,6 +883,7 @@ export default function FeedbackKiosk() {
         setStep("contact");
         openKeyboard("contactPhone");
       }
+
       return;
     }
 
@@ -908,6 +981,7 @@ export default function FeedbackKiosk() {
       } else if (!trimmedPhone) {
         openKeyboard("contactPhone");
       }
+
       return;
     }
 
@@ -978,8 +1052,7 @@ export default function FeedbackKiosk() {
       );
     }
   }
-
-  function getErrorTitle() {
+    function getErrorTitle() {
     switch (kioskErrorType) {
       case "missing_token":
         return "Kiosk não identificado";
@@ -1040,7 +1113,6 @@ export default function FeedbackKiosk() {
   }, [
     step,
     rating,
-    tagIds,
     email,
     comment,
     contactName,
@@ -1116,26 +1188,33 @@ export default function FeedbackKiosk() {
     return () => {
       window.clearInterval(timer);
     };
-  }, [kioskToken]);
+  }, [kioskToken, canApplyLiveRefresh]);
 
   useEffect(() => {
     if (tagOptions.length === 0) {
-      setTagIds([]);
+      setTagIds((current) => (current.length === 0 ? current : []));
       return;
     }
 
     const availableIds = new Set(tagOptions.map((tag) => tag.id));
-    setTagIds((current) => current.filter((id) => availableIds.has(id)));
+
+    setTagIds((current) => {
+      const next = current.filter((id) => availableIds.has(id));
+
+      if (
+        next.length === current.length &&
+        next.every((item, index) => item === current[index])
+      ) {
+        return current;
+      }
+
+      return next;
+    });
   }, [tagOptions]);
 
   useEffect(() => {
     return () => {
-      clearInactivityTimer();
-      clearDelayedResetTimer();
-      clearKeyboardCloseTimer();
-      clearLongPressTimer();
-      clearShiftClickTimer();
-      clearKeyHighlightTimer();
+      clearAllRuntimeTimers();
       longPressTriggeredRef.current = false;
     };
   }, []);
@@ -1225,9 +1304,11 @@ export default function FeedbackKiosk() {
 
       return (event: TouchEvent) => {
         const now = Date.now();
+
         if (now - lastTouchEnd <= 300) {
           event.preventDefault();
         }
+
         lastTouchEnd = now;
       };
     })();
@@ -1235,8 +1316,12 @@ export default function FeedbackKiosk() {
     document.addEventListener("gesturestart", preventGesture, { passive: false });
     document.addEventListener("gesturechange", preventGesture, { passive: false });
     document.addEventListener("gestureend", preventGesture, { passive: false });
-    document.addEventListener("touchstart", preventMultiTouchZoom, { passive: false });
-    document.addEventListener("touchend", preventDoubleTapZoom, { passive: false });
+    document.addEventListener("touchstart", preventMultiTouchZoom, {
+      passive: false,
+    });
+    document.addEventListener("touchend", preventDoubleTapZoom, {
+      passive: false,
+    });
 
     return () => {
       document.removeEventListener("gesturestart", preventGesture);
@@ -1279,10 +1364,11 @@ export default function FeedbackKiosk() {
 
       <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-center overflow-hidden">
         <div
-          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${keyboardOpen || keyboardClosing
-            ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
-            : "max-h-full"
-            }`}
+          className={`flex w-full flex-col overflow-hidden rounded-[32px] border border-white/10 p-5 shadow-2xl backdrop-blur md:p-8 transition-[max-height] duration-300 ${
+            keyboardOpen || keyboardClosing
+              ? "max-h-[calc(100vh-20rem)] md:max-h-[calc(100vh-24rem)]"
+              : "max-h-full"
+          }`}
           style={{ backgroundColor: cardBackgroundColor }}
         >
           <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">
@@ -1370,17 +1456,18 @@ export default function FeedbackKiosk() {
                           key={tag.id}
                           type="button"
                           onClick={() => handleToggleTag(tag.id)}
-                          className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${active
-                            ? ""
-                            : "border-white/10 bg-black/10 hover:bg-black/20"
-                            }`}
+                          className={`rounded-2xl border px-4 py-5 text-base font-medium transition active:scale-95 md:px-6 md:py-6 md:text-lg ${
+                            active
+                              ? ""
+                              : "border-white/10 bg-black/10 hover:bg-black/20"
+                          }`}
                           style={
                             active
                               ? {
-                                borderColor: resolvedPrimaryColor,
-                                backgroundColor: resolvedPrimaryColor,
-                                color: resolvedButtonTextColor,
-                              }
+                                  borderColor: resolvedPrimaryColor,
+                                  backgroundColor: resolvedPrimaryColor,
+                                  color: resolvedButtonTextColor,
+                                }
                               : { color: resolvedTextColor }
                           }
                         >
@@ -1421,8 +1508,7 @@ export default function FeedbackKiosk() {
                 </div>
               </section>
             )}
-
-            {step === "comment" && (
+                        {step === "comment" && (
               <section className="text-center">
                 <p className="text-sm md:text-base opacity-80">
                   Avaliação:
@@ -1455,10 +1541,11 @@ export default function FeedbackKiosk() {
                           openKeyboard("email");
                         }
                       }}
-                      className={`min-h-[64px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${activeField === "email"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`min-h-[64px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${
+                        activeField === "email"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {email ? (
@@ -1468,7 +1555,9 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque aqui para digitar...</span>
+                        <span className="opacity-45">
+                          Toque aqui para digitar...
+                        </span>
                       )}
                     </div>
 
@@ -1492,10 +1581,11 @@ export default function FeedbackKiosk() {
                           openKeyboard("comment");
                         }
                       }}
-                      className={`min-h-[180px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${activeField === "comment"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`min-h-[180px] w-full rounded-3xl border bg-black/10 px-5 py-4 text-left text-base outline-none md:text-lg ${
+                        activeField === "comment"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {comment ? (
@@ -1505,12 +1595,16 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque aqui para digitar...</span>
+                        <span className="opacity-45">
+                          Toque aqui para digitar...
+                        </span>
                       )}
                     </div>
 
                     {commentError ? (
-                      <p className="mt-3 text-sm text-rose-300">{commentError}</p>
+                      <p className="mt-3 text-sm text-rose-300">
+                        {commentError}
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -1573,10 +1667,11 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactName")}
-                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactName"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactName"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactName ? (
@@ -1586,7 +1681,9 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque aqui para digitar...</span>
+                        <span className="opacity-45">
+                          Toque aqui para digitar...
+                        </span>
                       )}
                     </button>
                     {contactNameError ? (
@@ -1603,10 +1700,11 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactPhone")}
-                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactPhone"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`w-full rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactPhone"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactPhone ? (
@@ -1616,7 +1714,9 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque aqui para digitar...</span>
+                        <span className="opacity-45">
+                          Toque aqui para digitar...
+                        </span>
                       )}
                     </button>
                     {contactPhoneError ? (
@@ -1634,10 +1734,11 @@ export default function FeedbackKiosk() {
                     <button
                       type="button"
                       onClick={() => openKeyboard("contactMessage")}
-                      className={`flex min-h-[120px] w-full items-start rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${activeField === "contactMessage"
-                        ? "border-white/30"
-                        : "border-white/10"
-                        }`}
+                      className={`flex min-h-[120px] w-full items-start rounded-2xl border bg-black/10 px-5 py-4 text-left text-base md:text-lg ${
+                        activeField === "contactMessage"
+                          ? "border-white/30"
+                          : "border-white/10"
+                      }`}
                       style={{ color: resolvedTextColor }}
                     >
                       {contactMessage ? (
@@ -1647,7 +1748,9 @@ export default function FeedbackKiosk() {
                           <span className="kiosk-caret" />
                         </span>
                       ) : (
-                        <span className="opacity-45">Toque aqui para digitar...</span>
+                        <span className="opacity-45">
+                          Toque aqui para digitar...
+                        </span>
                       )}
                     </button>
                   </div>
@@ -1683,7 +1786,9 @@ export default function FeedbackKiosk() {
                     disabled={submittingAction !== null}
                     className="rounded-2xl bg-black/15 px-8 py-4 text-lg font-semibold transition hover:bg-black/25 disabled:opacity-60"
                   >
-                    {submittingAction === "skip" ? "Enviando..." : "Pular e enviar"}
+                    {submittingAction === "skip"
+                      ? "Enviando..."
+                      : "Pular e enviar"}
                   </button>
 
                   <button
@@ -1772,10 +1877,11 @@ export default function FeedbackKiosk() {
       </div>
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${keyboardOpen && !keyboardClosing
-          ? "translate-y-0 opacity-100 pointer-events-auto"
-          : "translate-y-full opacity-0 pointer-events-none"
-          }`}
+        className={`fixed inset-x-0 bottom-0 z-50 transition-all duration-300 ease-out ${
+          keyboardOpen && !keyboardClosing
+            ? "translate-y-0 opacity-100 pointer-events-auto"
+            : "translate-y-full opacity-0 pointer-events-none"
+        }`}
       >
         <div className="mx-auto w-full max-w-6xl px-3 md:px-6">
           <div
@@ -1797,7 +1903,10 @@ export default function FeedbackKiosk() {
               <div className="mx-auto w-full max-w-md">
                 <div className="space-y-3">
                   {PHONE_KEYS.map((row, rowIndex) => (
-                    <div key={`phone-row-${rowIndex}`} className="grid grid-cols-3 gap-3">
+                    <div
+                      key={`phone-row-${rowIndex}`}
+                      className="grid grid-cols-3 gap-3"
+                    >
                       {row.map((key, keyIndex) =>
                         key ? (
                           <button
@@ -1823,7 +1932,10 @@ export default function FeedbackKiosk() {
                             {key}
                           </button>
                         ) : (
-                          <div key={`empty-${rowIndex}-${keyIndex}`} className="h-14 md:h-16" />
+                          <div
+                            key={`empty-${rowIndex}-${keyIndex}`}
+                            className="h-14 md:h-16"
+                          />
                         ),
                       )}
                     </div>
@@ -1891,9 +2003,9 @@ export default function FeedbackKiosk() {
             ) : null}
 
             {activeField === "email" ||
-              activeField === "comment" ||
-              activeField === "contactName" ||
-              activeField === "contactMessage" ? (
+            activeField === "comment" ||
+            activeField === "contactName" ||
+            activeField === "contactMessage" ? (
               <div className="w-full">
                 <div className="space-y-2">
                   <div className="flex justify-center gap-2">
@@ -1924,11 +2036,16 @@ export default function FeedbackKiosk() {
                   </div>
 
                   {KEYBOARD_ROWS.map((row, rowIndex) => (
-                    <div key={`row-${rowIndex}`} className="flex justify-center gap-2">
+                    <div
+                      key={`row-${rowIndex}`}
+                      className="flex justify-center gap-2"
+                    >
                       {row.map((key) => {
-                        const label = keyboardUppercase ? key.toUpperCase() : key;
+                        const label = keyboardUppercase
+                          ? key.toUpperCase()
+                          : key;
 
-                        return (
+                                                  return (
                           <div key={key} className="relative" data-accent-trigger="true">
                             {accentMenu?.key === key ? (
                               <div

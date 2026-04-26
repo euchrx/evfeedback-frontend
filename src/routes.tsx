@@ -1,65 +1,76 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import LoginPage from "./pages/Login";
-import CompaniesPage from "./pages/Admin/Companies";
-import UsersPage from "./pages/Admin/Users";
-import BranchesPage from "./pages/Admin/Branches";
-import KiosksPage from "./pages/Admin/Kiosks";
-import TagsPage from "./pages/Admin/Tags";
-import FeedbacksPage from "./pages/Admin/Feedbacks";
-import SettingsPage from "./pages/Admin/Settings";
-import DashboardPage from "./pages/Admin/Dashboard";
+
 import { PrivateRoute } from "./routes/PrivateRoute";
 import { RoleRoute } from "./routes/RoleRoute";
 import { AdminLayout } from "./components/admin/AdminLayout";
-import FeedbackKiosk from "./pages/Feedbacks";
-import PublicFeedbacksPage from "./pages/PublicFeedbacks";
+
+const LoginPage = lazy(() => import("./pages/Login"));
+const CompaniesPage = lazy(() => import("./pages/Admin/Companies"));
+const UsersPage = lazy(() => import("./pages/Admin/Users"));
+const BranchesPage = lazy(() => import("./pages/Admin/Branches"));
+const KiosksPage = lazy(() => import("./pages/Admin/Kiosks"));
+const TagsPage = lazy(() => import("./pages/Admin/Tags"));
+const FeedbacksPage = lazy(() => import("./pages/Admin/Feedbacks"));
+const SettingsPage = lazy(() => import("./pages/Admin/Settings"));
+const DashboardPage = lazy(() => import("./pages/Admin/Dashboard"));
+const FeedbackKiosk = lazy(() => import("./pages/Feedbacks"));
+const PublicFeedbacksPage = lazy(() => import("./pages/PublicFeedbacks"));
+
+function PageFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-300">
+      Carregando...
+    </div>
+  );
+}
 
 export function AppRoutes() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="/login" element={<LoginPage />} />
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<LoginPage />} />
 
-        <Route element={<PrivateRoute />}>
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Navigate to="dashboard" replace />} />
+          <Route element={<PrivateRoute />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/dashboard" replace />} />
 
-            <Route
-              element={
-                <RoleRoute
-                  allowedRoles={["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"]}
-                />
-              }
-            >
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="feedbacks" element={<FeedbacksPage />} />
-              <Route path="kiosks" element={<KiosksPage />} />
-              <Route path="tags" element={<TagsPage />} />
+              <Route
+                element={
+                  <RoleRoute
+                    allowedRoles={["SUPER_ADMIN", "COMPANY_ADMIN", "MANAGER"]}
+                  />
+                }
+              >
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="feedbacks" element={<FeedbacksPage />} />
+              </Route>
+
+              <Route
+                element={
+                  <RoleRoute allowedRoles={["SUPER_ADMIN", "COMPANY_ADMIN"]} />
+                }
+              >
+                <Route path="tags" element={<TagsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
+
+              <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
+                <Route path="companies" element={<CompaniesPage />} />
+                <Route path="users" element={<UsersPage />} />
+                <Route path="branches" element={<BranchesPage />} />
+                <Route path="kiosks" element={<KiosksPage />} />
+              </Route>
             </Route>
-
-            <Route
-              element={
-                <RoleRoute allowedRoles={["SUPER_ADMIN", "COMPANY_ADMIN"]} />
-              }
-            >
-              <Route path="users" element={<UsersPage />} />
-              <Route path="branches" element={<BranchesPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-            </Route>
-
-            <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
-              <Route path="companies" element={<CompaniesPage />} />
-            </Route>
-
-            <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
           </Route>
-        </Route>
 
-        <Route path="/feedback" element={<FeedbackKiosk />} />
-        <Route path="/shared/feedbacks" element={<PublicFeedbacksPage />} />
-        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
-      </Routes>
+          <Route path="/feedback" element={<FeedbackKiosk />} />
+          <Route path="/shared/feedbacks" element={<PublicFeedbacksPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
