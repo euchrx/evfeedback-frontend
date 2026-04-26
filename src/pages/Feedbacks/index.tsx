@@ -1522,7 +1522,7 @@ export default function FeedbackKiosk() {
                 </h2>
 
                 <p className="mt-4 text-lg opacity-90">
-                  Deixe seu comentário abaixo. O e-mail é opcional.
+                  Sua opinião ajuda a melhorar o atendimento desta unidade
                 </p>
 
                 <div className="mx-auto mt-8 max-w-3xl space-y-5">
