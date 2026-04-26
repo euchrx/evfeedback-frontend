@@ -100,6 +100,24 @@ export async function getAppApkInfo(companyId?: string): Promise<AppApkInfo> {
   return response.data as AppApkInfo;
 }
 
+export async function uploadLogo(file: File, companyId?: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await api.post("/settings/logo", formData, {
+    params: {
+      companyId,
+    },
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data as {
+    logoUrl: string;
+  };
+}
+
 export async function uploadAppApk(
   file: File,
   companyId?: string,

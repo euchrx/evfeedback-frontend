@@ -8,6 +8,7 @@ import {
   type AppApkInfo,
   uploadAppApk,
   updateMySettings,
+  uploadLogo,
 } from "../../../services/settings";
 import {
   canManageOperationalModules,
@@ -144,6 +145,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
   const [uploadingApk, setUploadingApk] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const resolvedPrimaryColor = primaryColor.trim() || "#0ea5e9";
   const resolvedBackgroundColor = backgroundColor.trim() || "#020617";
@@ -159,19 +161,19 @@ export default function SettingsPage() {
 
   const previewBackgroundStyle = backgroundImageUrl.trim()
     ? {
-        backgroundColor: resolvedBackgroundColor,
-        backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.78)), url(${backgroundImageUrl.trim()})`,
-        backgroundPosition: "center",
-        backgroundSize: "cover",
-      }
+      backgroundColor: resolvedBackgroundColor,
+      backgroundImage: `linear-gradient(rgba(2, 6, 23, 0.55), rgba(2, 6, 23, 0.78)), url(${backgroundImageUrl.trim()})`,
+      backgroundPosition: "center",
+      backgroundSize: "cover",
+    }
     : {
-        backgroundColor: resolvedBackgroundColor,
-      };
+      backgroundColor: resolvedBackgroundColor,
+    };
 
   const appApkQrCodeUrl = appApkInfo?.downloadUrl
     ? `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(
-        appApkInfo.downloadUrl,
-      )}`
+      appApkInfo.downloadUrl,
+    )}`
     : "";
 
   function resetSettingsForm() {
@@ -190,6 +192,26 @@ export default function SettingsPage() {
     setNotificationEmails("");
     setDailyNotificationEnabled(true);
     setMonthlyNotificationEnabled(true);
+  }
+
+  async function handleUploadLogo(file: File | null) {
+    if (!file) return;
+
+    try {
+      setUploadingLogo(true);
+
+      const result = await uploadLogo(file, selectedCompanyId);
+
+      setLogoUrl(result.logoUrl);
+      toast.success("Logo enviada com sucesso.");
+    } catch (err: unknown) {
+      toast.error(
+        "Não foi possível enviar a logo.",
+        getErrorMessage(err, "Tente novamente em instantes."),
+      );
+    } finally {
+      setUploadingLogo(false);
+    }
   }
 
   async function load() {
@@ -426,13 +448,32 @@ export default function SettingsPage() {
                 />
               </Field>
 
-              <Field label="URL da logo">
-                <input
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="https://..."
-                  className={inputClassName}
-                />
+              <Field label="Logo da empresa">
+                <label className="flex h-12 cursor-pointer items-center justify-between rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-slate-300 transition hover:border-cyan-400/40">
+                  <span>{uploadingLogo ? "Enviando..." : "Selecionar imagem"}</span>
+
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    disabled={uploadingLogo}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      void handleUploadLogo(file);
+                      e.currentTarget.value = "";
+                    }}
+                    className="hidden"
+                  />
+                </label>
+
+                {logoUrl ? (
+                  <div className="mt-3 rounded-2xl border border-white/10 bg-slate-900/50 p-3">
+                    <img
+                      src={logoUrl}
+                      alt="Logo enviada"
+                      className="h-16 w-auto object-contain"
+                    />
+                  </div>
+                ) : null}
               </Field>
 
               <Field label="Mensagem de agradecimento">
