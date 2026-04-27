@@ -38,11 +38,11 @@ export function canAccessBranches(user: AuthUser | null | undefined) {
 }
 
 export function canAccessKiosks(user: AuthUser | null | undefined) {
-  return isSuperAdmin(user) || isCompanyAdmin(user) || isManager(user);
+  return isSuperAdmin(user) || isCompanyAdmin(user);
 }
 
 export function canAccessTags(user: AuthUser | null | undefined) {
-  return isSuperAdmin(user) || isCompanyAdmin(user) || isManager(user);
+  return isSuperAdmin(user) || isCompanyAdmin(user);
 }
 
 export function canAccessFeedbacks(user: AuthUser | null | undefined) {

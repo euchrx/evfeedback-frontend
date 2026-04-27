@@ -49,6 +49,9 @@ function getRatingLabel(rating: number) {
   }
 }
 
+const panelClass =
+  "rounded-[28px] border border-white/10 bg-slate-900/80 shadow-lg shadow-black/10";
+
 export default function DashboardPage() {
   const toast = useToast();
 
@@ -60,7 +63,6 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [branches, setBranches] = useState<BranchDashboardItem[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-
   const [isLoading, setIsLoading] = useState(true);
 
   const [filters, setFilters] = useState<DashboardFilters>({
@@ -177,7 +179,10 @@ export default function DashboardPage() {
       return undefined;
     }
 
-    const sorted = validBranches.sort((a, b) => a.averageRating - b.averageRating);
+    const sorted = validBranches.sort(
+      (a, b) => a.averageRating - b.averageRating,
+    );
+
     const candidate = sorted[0];
 
     if (candidate.id === bestBranch?.id) {
@@ -193,7 +198,7 @@ export default function DashboardPage() {
 
   if (!canView) {
     return (
-      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-lg shadow-black/10">
         <h2 className="text-xl font-semibold text-white">Acesso negado</h2>
         <p className="mt-2 text-sm leading-6 text-rose-100/80">
           Você não tem permissão para acessar o dashboard.
@@ -204,7 +209,7 @@ export default function DashboardPage() {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+      <div className={`${panelClass} p-6`}>
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
@@ -216,8 +221,8 @@ export default function DashboardPage() {
             </h2>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-              Acompanhe volume, média, distribuição e desempenho por filial em um
-              único painel executivo.
+              Acompanhe volume, média, distribuição e desempenho por filial em
+              um único painel executivo.
             </p>
           </div>
 
@@ -231,7 +236,7 @@ export default function DashboardPage() {
                     companyId: e.target.value,
                   }))
                 }
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition-colors focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
               >
                 <option value="">Selecione uma empresa</option>
                 {companies.map((company) => (
@@ -261,7 +266,7 @@ export default function DashboardPage() {
                   dateFrom: e.target.value,
                 }))
               }
-              className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition [color-scheme:dark] focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+              className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition-colors [color-scheme:dark] focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
             />
 
             <input
@@ -273,14 +278,14 @@ export default function DashboardPage() {
                   dateTo: e.target.value,
                 }))
               }
-              className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition [color-scheme:dark] focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+              className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition-colors [color-scheme:dark] focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
             />
 
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={handleApplyPeriod}
-                className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl bg-cyan-400 px-4 text-sm font-semibold text-slate-950 transition-colors hover:bg-cyan-300"
               >
                 Aplicar
               </button>
@@ -288,7 +293,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={handleClearPeriod}
-                className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
+                className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition-colors hover:border-white/20 hover:bg-white/10"
               >
                 Limpar
               </button>
@@ -298,13 +303,15 @@ export default function DashboardPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-[28px] border border-white/10 bg-white/5 px-6 py-12 text-center text-sm text-slate-400 shadow-2xl shadow-black/20 backdrop-blur-xl">
+        <div
+          className={`${panelClass} px-6 py-12 text-center text-sm text-slate-400`}
+        >
           Carregando indicadores...
         </div>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <article className={`${panelClass} p-6`}>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Total de feedbacks
               </p>
@@ -316,7 +323,7 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <article className={`${panelClass} p-6`}>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Média geral
               </p>
@@ -328,7 +335,7 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <article className={`${panelClass} p-6`}>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Filiais com feedback
               </p>
@@ -340,7 +347,7 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <article className={`${panelClass} p-6`}>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Tags mais marcadas
               </p>
@@ -354,7 +361,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <article className={`${panelClass} p-6`}>
               <div className="mb-5 space-y-1">
                 <h2 className="text-xl font-semibold text-white">
                   Distribuição por nota
@@ -377,9 +384,9 @@ export default function DashboardPage() {
                         <span className="text-slate-400">{item.count}</span>
                       </div>
 
-                      <div className="h-3 rounded-full bg-slate-900/80">
+                      <div className="h-3 rounded-full bg-slate-950/80">
                         <div
-                          className="h-3 rounded-full bg-cyan-400 transition-all"
+                          className="h-3 rounded-full bg-cyan-400 transition-[width] duration-150"
                           style={{ width }}
                         />
                       </div>
@@ -389,7 +396,7 @@ export default function DashboardPage() {
               </div>
             </article>
 
-            <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <article className={`${panelClass} p-6`}>
               <div className="mb-5 space-y-1">
                 <h2 className="text-xl font-semibold text-white">
                   Principais motivos
@@ -404,7 +411,7 @@ export default function DashboardPage() {
                   {summary.topTags.map((tag, index) => (
                     <div
                       key={`${tag.name}-${index}`}
-                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/60 px-4 py-3"
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3"
                     >
                       <span className="font-medium text-slate-200">
                         {tag.name}
@@ -422,8 +429,9 @@ export default function DashboardPage() {
               )}
             </article>
           </div>
+
           <div className="grid gap-6 xl:grid-cols-2">
-            <article className="rounded-[28px] border border-emerald-400/15 bg-emerald-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <article className="rounded-[28px] border border-emerald-400/15 bg-emerald-500/10 p-6 shadow-lg shadow-black/10">
               <div className="mb-4 space-y-1">
                 <h2 className="text-xl font-semibold text-white">
                   Melhor filial
@@ -452,7 +460,7 @@ export default function DashboardPage() {
               )}
             </article>
 
-            <article className="rounded-[28px] border border-rose-400/15 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <article className="rounded-[28px] border border-rose-400/15 bg-rose-500/10 p-6 shadow-lg shadow-black/10">
               <div className="mb-4 space-y-1">
                 <h2 className="text-xl font-semibold text-white">
                   Pior filial
@@ -482,7 +490,7 @@ export default function DashboardPage() {
             </article>
           </div>
 
-          <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <article className={`${panelClass} p-6`}>
             <div className="mb-5 space-y-1">
               <h2 className="text-xl font-semibold text-white">
                 Últimos feedbacks
@@ -501,18 +509,19 @@ export default function DashboardPage() {
                 {summary.recentFeedbacks.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-2xl border border-white/10 bg-slate-900/60 p-4"
+                    className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${item.rating <= 2
-                                ? "bg-rose-500/10 text-rose-200 border border-rose-400/20"
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                              item.rating <= 2
+                                ? "border-rose-400/20 bg-rose-500/10 text-rose-200"
                                 : item.rating === 3
-                                  ? "bg-amber-500/10 text-amber-200 border border-amber-400/20"
-                                  : "bg-emerald-500/10 text-emerald-200 border border-emerald-400/20"
-                              }`}
+                                  ? "border-amber-400/20 bg-amber-500/10 text-amber-200"
+                                  : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
+                            }`}
                           >
                             {getRatingLabel(item.rating)}
                           </span>
@@ -523,17 +532,23 @@ export default function DashboardPage() {
                         </div>
 
                         <p className="text-sm text-slate-300">
-                          <span className="font-medium text-white">Filial:</span>{" "}
+                          <span className="font-medium text-white">
+                            Filial:
+                          </span>{" "}
                           {item.branchName ?? "-"}
                         </p>
 
                         <p className="text-sm text-slate-300">
-                          <span className="font-medium text-white">Kiosk:</span>{" "}
+                          <span className="font-medium text-white">
+                            Kiosk:
+                          </span>{" "}
                           {item.kioskName ?? "-"}
                         </p>
 
                         <p className="text-sm text-slate-300">
-                          <span className="font-medium text-white">Comentário:</span>{" "}
+                          <span className="font-medium text-white">
+                            Comentário:
+                          </span>{" "}
                           {item.comment?.trim() || "Sem comentário."}
                         </p>
 
@@ -557,7 +572,7 @@ export default function DashboardPage() {
             )}
           </article>
 
-          <article className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+          <article className={`${panelClass} p-6`}>
             <div className="mb-5 space-y-1">
               <h2 className="text-xl font-semibold text-white">
                 Desempenho por filial
@@ -576,7 +591,7 @@ export default function DashboardPage() {
                 {branches.map((branch) => (
                   <div
                     key={branch.id}
-                    className="rounded-2xl border border-white/10 bg-slate-900/60 p-4"
+                    className="rounded-2xl border border-white/10 bg-slate-950/40 p-4"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <h3 className="text-base font-semibold text-white">
@@ -584,7 +599,9 @@ export default function DashboardPage() {
                       </h3>
                       <div className="flex flex-wrap gap-3 text-sm text-slate-300">
                         <span>Feedbacks: {branch.totalFeedbacks}</span>
-                        <span>Média: {formatAverage(branch.averageRating)}</span>
+                        <span>
+                          Média: {formatAverage(branch.averageRating)}
+                        </span>
                       </div>
                     </div>
                   </div>

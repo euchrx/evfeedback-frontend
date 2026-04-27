@@ -92,7 +92,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-full w-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-white/5 text-white shadow-2xl shadow-black/20 backdrop-blur-xl">
+    <aside className="flex h-full w-full flex-col overflow-hidden rounded-[28px] border border-white/10 bg-slate-900/80 text-white shadow-lg shadow-black/10">
       <div className="border-b border-white/10 p-5 sm:p-6">
         <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/15 text-lg font-semibold text-cyan-300 ring-1 ring-cyan-300/20">
           EV
