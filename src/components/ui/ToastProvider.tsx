@@ -1,4 +1,4 @@
-import {
+﻿import {
   createContext,
   useCallback,
   useContext,
@@ -50,42 +50,42 @@ function getVariantStyles(variant: ToastVariant) {
     case "success":
       return {
         container:
-          "border-emerald-400/20 bg-emerald-500/10 text-emerald-50",
+          "border-emerald-200 bg-emerald-50 text-emerald-800",
         badge:
-          "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-300/20",
+          "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-300/20",
         accent: "bg-emerald-300",
         close:
-          "text-emerald-100/80 hover:bg-emerald-400/10 hover:text-emerald-50",
+          "text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800",
       };
 
     case "error":
       return {
-        container: "border-rose-400/20 bg-rose-500/10 text-rose-50",
-        badge: "bg-rose-400/15 text-rose-200 ring-1 ring-rose-300/20",
+        container: "border-rose-200 bg-rose-50 text-rose-800",
+        badge: "bg-rose-100 text-rose-700 ring-1 ring-rose-300/20",
         accent: "bg-rose-300",
         close:
-          "text-rose-100/80 hover:bg-rose-400/10 hover:text-rose-50",
+          "text-rose-700 hover:bg-rose-100 hover:text-rose-800",
       };
 
     case "warning":
       return {
         container:
-          "border-amber-400/20 bg-amber-500/10 text-amber-50",
+          "border-amber-200 bg-amber-50 text-amber-800",
         badge:
-          "bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/20",
+          "bg-amber-100 text-amber-700 ring-1 ring-amber-300/20",
         accent: "bg-amber-300",
         close:
-          "text-amber-100/80 hover:bg-amber-400/10 hover:text-amber-50",
+          "text-amber-700 hover:bg-amber-100 hover:text-amber-800",
       };
 
     case "info":
     default:
       return {
-        container: "border-cyan-400/20 bg-cyan-500/10 text-cyan-50",
-        badge: "bg-cyan-400/15 text-cyan-200 ring-1 ring-cyan-300/20",
+        container: "border-cyan-200 bg-cyan-50 text-cyan-800",
+        badge: "bg-cyan-100 text-cyan-700 ring-1 ring-cyan-300/20",
         accent: "bg-cyan-300",
         close:
-          "text-cyan-100/80 hover:bg-cyan-400/10 hover:text-cyan-50",
+          "text-cyan-700 hover:bg-cyan-100 hover:text-cyan-800",
       };
   }
 }
@@ -106,7 +106,7 @@ function ToastViewport({
           <div
             key={toast.id}
             className={[
-              "pointer-events-auto relative overflow-hidden rounded-[24px] border shadow-2xl shadow-black/25 backdrop-blur-xl",
+              "pointer-events-auto relative overflow-hidden rounded-[24px] border shadow-[0_18px_45px_-18px_rgba(15,23,42,0.32)]",
               styles.container,
             ].join(" ")}
           >
@@ -124,12 +124,12 @@ function ToastViewport({
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-white">
+                  <p className="text-sm font-semibold text-slate-900">
                     {toast.title}
                   </p>
 
                   {toast.description ? (
-                    <p className="mt-1 text-sm leading-6 text-white/75">
+                    <p className="mt-1 text-sm leading-6 text-slate-700">
                       {toast.description}
                     </p>
                   ) : null}

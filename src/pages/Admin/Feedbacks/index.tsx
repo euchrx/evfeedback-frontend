@@ -1,3 +1,5 @@
+﻿import { useAdminScopeBranchId, useAdminScopeCompanyId } from "../../../hooks/useAdminScope";
+import { NO_BRANCH_SCOPE } from "../../../services/adminScope";
 import { useEffect, useMemo, useState } from "react";
 import { Eye } from "lucide-react";
 import {
@@ -41,17 +43,17 @@ function getRatingLabel(rating: number) {
 function getRatingBadgeClass(rating: number) {
   switch (rating) {
     case 1:
-      return "border-rose-400/20 bg-rose-500/10 text-rose-200";
+      return "border-rose-200 bg-rose-50 text-rose-700";
     case 2:
       return "border-orange-400/20 bg-orange-500/10 text-orange-200";
     case 3:
-      return "border-amber-400/20 bg-amber-500/10 text-amber-200";
+      return "border-amber-200 bg-amber-50 text-amber-700";
     case 4:
       return "border-sky-400/20 bg-sky-500/10 text-sky-200";
     case 5:
-      return "border-emerald-400/20 bg-emerald-500/10 text-emerald-200";
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
     default:
-      return "border-white/10 bg-white/5 text-slate-200";
+      return "border-slate-200 bg-white text-slate-700";
   }
 }
 
@@ -84,11 +86,13 @@ export default function FeedbacksPage() {
   const canManage = canManageOperationalModules(currentUser);
   const superAdmin = isSuperAdmin(currentUser);
   const resolvedCompanyId = getResolvedCompanyId(currentUser);
+  const scopeBranchId = useAdminScopeBranchId();
+  const scopeCompanyId = useAdminScopeCompanyId();
 
   const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [, setCompanies] = useState<Company[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -97,8 +101,8 @@ export default function FeedbacksPage() {
   );
 
   const [filters, setFilters] = useState<FeedbackFilters>({
-    companyId: superAdmin ? "" : resolvedCompanyId ?? "",
-    branchId: "",
+    companyId: superAdmin ? scopeCompanyId : resolvedCompanyId ?? "",
+    branchId: scopeBranchId,
     kioskId: "",
     rating: "",
     startDate: "",
@@ -110,8 +114,8 @@ export default function FeedbacksPage() {
   const [page, setPage] = useState(1);
 
   const selectedCompanyId = useMemo(() => {
-    return superAdmin ? filters.companyId || undefined : resolvedCompanyId;
-  }, [superAdmin, filters.companyId, resolvedCompanyId]);
+    return superAdmin ? scopeCompanyId || undefined : resolvedCompanyId;
+  }, [superAdmin, scopeCompanyId, resolvedCompanyId]);
 
   useEffect(() => {
     if (!canView) {
@@ -124,8 +128,14 @@ export default function FeedbacksPage() {
 
   useEffect(() => {
     if (!canView) return;
-    void loadFeedbacks(filters);
-  }, [canView]);
+    const scopedFilters = {
+      ...filters,
+      branchId: scopeBranchId,
+      kioskId: scopeBranchId ? "" : filters.kioskId,
+    };
+    setFilters(scopedFilters);
+    void loadFeedbacks(scopedFilters);
+  }, [canView, scopeBranchId]);
 
   async function loadDependencies() {
     try {
@@ -163,11 +173,16 @@ export default function FeedbacksPage() {
     try {
       setLoading(true);
 
+      if (superAdmin && scopeBranchId === NO_BRANCH_SCOPE) {
+        setFeedbacks([]);
+        return;
+      }
+
       const finalFilters = customFilters ?? filters;
 
       const sanitizedFilters: FeedbackFilters = {
         companyId: superAdmin
-          ? finalFilters.companyId || undefined
+          ? scopeCompanyId || undefined
           : resolvedCompanyId,
         branchId: finalFilters.branchId || undefined,
         kioskId: finalFilters.kioskId || undefined,
@@ -196,7 +211,7 @@ export default function FeedbacksPage() {
       [field]: value,
       ...(field === "companyId"
         ? {
-          branchId: "",
+          branchId: scopeBranchId,
           kioskId: "",
         }
         : {}),
@@ -208,23 +223,6 @@ export default function FeedbacksPage() {
     void loadFeedbacks(filters);
   }
 
-  function handleClearFilters() {
-    const cleared: FeedbackFilters = {
-      companyId: superAdmin ? "" : resolvedCompanyId ?? "",
-      branchId: "",
-      kioskId: "",
-      rating: "",
-      startDate: "",
-      endDate: "",
-      active: "",
-    };
-
-    setFilters(cleared);
-    setSearch("");
-    setPage(1);
-    void loadDependencies();
-    void loadFeedbacks(cleared);
-  }
 
   async function handleDelete(feedback: FeedbackItem) {
     if (!canManage) return;
@@ -307,9 +305,9 @@ export default function FeedbacksPage() {
 
   if (!canView) {
     return (
-      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-        <h2 className="text-xl font-semibold text-white">Acesso negado</h2>
-        <p className="mt-2 text-sm leading-6 text-rose-100/80">
+      <section className="rounded-3xl border border-rose-100 bg-white p-6 shadow-[0_18px_50px_-20px_rgba(244,63,94,0.28)]">
+        <h2 className="text-xl font-semibold text-slate-900">Acesso negado</h2>
+        <p className="mt-2 text-sm leading-6 text-rose-700">
           Você não tem permissão para acessar a página de feedbacks.
         </p>
       </section>
@@ -319,43 +317,14 @@ export default function FeedbacksPage() {
   return (
     <>
       <section className="space-y-6">
-        <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
-                gestão de feedbacks
-              </div>
-
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
-                Avaliações recebidas
-              </h2>
-
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                Acompanhe as avaliações enviadas pelos clientes, filtre por unidade
-                operacional e visualize os detalhes de cada registro.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {superAdmin ? (
-                <select
-                  value={filters.companyId ?? ""}
-                  onChange={(e) => handleChangeFilter("companyId", e.target.value)}
-                  className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
-                >
-                  <option value="">Todas as empresas</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
+        <div>
+          <div className="w-full">
+<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 
               <select
                 value={filters.rating ?? ""}
                 onChange={(e) => handleChangeFilter("rating", e.target.value)}
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               >
                 <option value="">Todas as notas</option>
                 <option value="1">1 - Péssimo</option>
@@ -368,7 +337,7 @@ export default function FeedbacksPage() {
               <select
                 value={filters.branchId ?? ""}
                 onChange={(e) => handleChangeFilter("branchId", e.target.value)}
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               >
                 <option value="">Todas as filiais</option>
                 {branches.map((branch) => (
@@ -381,7 +350,7 @@ export default function FeedbacksPage() {
               <select
                 value={filters.kioskId ?? ""}
                 onChange={(e) => handleChangeFilter("kioskId", e.target.value)}
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               >
                 <option value="">Todos os kiosks</option>
                 {kiosks.map((kiosk) => (
@@ -394,7 +363,7 @@ export default function FeedbacksPage() {
               <select
                 value={filters.active ?? ""}
                 onChange={(e) => handleChangeFilter("active", e.target.value)}
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               >
                 <option value="">Todos os status</option>
                 <option value="true">Ativos</option>
@@ -405,24 +374,24 @@ export default function FeedbacksPage() {
                 type="date"
                 value={filters.startDate ?? ""}
                 onChange={(e) => handleChangeFilter("startDate", e.target.value)}
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition [color-scheme:dark] focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition  focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               />
 
               <input
                 type="date"
                 value={filters.endDate ?? ""}
                 onChange={(e) => handleChangeFilter("endDate", e.target.value)}
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition [color-scheme:dark] focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition  focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               />
 
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por comentário, e-mail, filial, kiosk, contato ou tag"
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none placeholder:text-slate-500 transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10 sm:col-span-2 xl:col-span-2"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none placeholder:text-slate-400 transition focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10 sm:col-span-2 xl:col-span-2"
               />
 
-              <div className="flex gap-3 sm:col-span-2 xl:col-span-2">
+              <div className="w-full flex gap-3 sm:col-span-2 xl:col-span-2">
                 <button
                   type="button"
                   onClick={handleApplyFilters}
@@ -430,26 +399,18 @@ export default function FeedbacksPage() {
                 >
                   Aplicar filtros
                 </button>
-
-                <button
-                  type="button"
-                  onClick={handleClearFilters}
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
-                >
-                  Limpar
-                </button>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl">
-          <div className="flex flex-col gap-3 border-b border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-white">
-                Feedbacks cadastrados
+              <h3 className="text-xl font-semibold text-slate-900">
+                Feedbacks
               </h3>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-slate-600">
                 {loading
                   ? "Carregando dados..."
                   : `${filteredFeedbacks.length} feedback(s) encontrado(s)`}
@@ -458,16 +419,16 @@ export default function FeedbacksPage() {
           </div>
 
           {loading ? (
-            <div className="p-10 text-center text-sm text-slate-400">
+            <div className="p-10 text-center text-sm text-slate-600">
               Carregando feedbacks...
             </div>
           ) : filteredFeedbacks.length === 0 ? (
             <div className="p-10 text-center">
               <div className="mx-auto max-w-md">
-                <h4 className="text-lg font-semibold text-white">
+                <h4 className="text-lg font-semibold text-slate-900">
                   Nenhum feedback encontrado
                 </h4>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Ajuste os filtros para ampliar o resultado da consulta.
                 </p>
               </div>
@@ -476,7 +437,7 @@ export default function FeedbacksPage() {
             <>
               <div className="overflow-x-auto">
                 <table className="min-w-[1450px] divide-y divide-white/10">
-                  <thead className="bg-white/[0.03]">
+                  <thead>
                     <tr>
                       <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         Data
@@ -518,9 +479,9 @@ export default function FeedbacksPage() {
                       return (
                         <tr
                           key={feedback.id}
-                          className="transition hover:bg-white/[0.03]"
+                          className="transition hover:bg-slate-50"
                         >
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
                             {formatDate(feedback.createdAt)}
                           </td>
 
@@ -536,32 +497,32 @@ export default function FeedbacksPage() {
                           </td>
 
                           {superAdmin ? (
-                            <td className="px-6 py-4 align-top text-sm text-slate-400">
+                            <td className="px-6 py-4 align-top text-sm text-slate-600">
                               {feedback.company?.name ?? "-"}
                             </td>
                           ) : null}
 
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
                             {feedback.branch?.name ?? "-"}
                           </td>
 
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
                             {feedback.kiosk?.name ?? "-"}
                           </td>
 
-                          <td className="max-w-[300px] px-6 py-4 align-top text-sm text-slate-300">
+                          <td className="max-w-[300px] px-6 py-4 align-top text-sm text-slate-600">
                             <span className="line-clamp-3">
                               {feedback.comment?.trim() || "Sem comentário."}
                             </span>
                           </td>
 
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
                             {tags.length > 0 ? (
-                              <div className="flex max-w-[280px] flex-wrap gap-2">
+                              <div className="w-full flex max-w-[280px] flex-wrap gap-2">
                                 {tags.map((item) => (
                                   <span
                                     key={item.id}
-                                    className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-slate-200"
+                                    className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
                                   >
                                     {item.tag?.name ?? "Tag"}
                                   </span>
@@ -577,8 +538,8 @@ export default function FeedbacksPage() {
                               className={[
                                 "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
                                 hasContactInfo(feedback)
-                                  ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-                                  : "border-white/10 bg-white/5 text-slate-400",
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border-slate-200 bg-white text-slate-600",
                               ].join(" ")}
                             >
                               {hasContactInfo(feedback)
@@ -588,11 +549,11 @@ export default function FeedbacksPage() {
                           </td>
 
                           <td className="px-6 py-4 align-top">
-                            <div className="flex justify-end gap-2">
+                            <div className="w-full flex justify-end gap-2">
                               <button
                                 type="button"
                                 onClick={() => setSelectedFeedback(feedback)}
-                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white transition hover:border-white/20 hover:bg-white/10"
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
                                 title="Ver detalhes"
                               >
                                 <Eye size={18} />
@@ -603,7 +564,7 @@ export default function FeedbacksPage() {
                                   type="button"
                                   onClick={() => void handleDelete(feedback)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   {isProcessing ? "Excluindo..." : "Excluir"}
                                 </button>
@@ -617,17 +578,17 @@ export default function FeedbacksPage() {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 border-t border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-400">
+              <div className="w-full flex flex-col gap-3 border-t border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-600">
                   Página {page} de {totalPages}
                 </p>
 
-                <div className="flex gap-2">
+                <div className="w-full flex gap-2">
                   <button
                     type="button"
                     onClick={() => setPage((current) => Math.max(1, current - 1))}
                     disabled={page === 1}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Anterior
                   </button>
@@ -638,7 +599,7 @@ export default function FeedbacksPage() {
                       setPage((current) => Math.min(totalPages, current + 1))
                     }
                     disabled={page === totalPages}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Próxima
                   </button>
@@ -649,20 +610,20 @@ export default function FeedbacksPage() {
         </div>
       </section>
       {selectedFeedback ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-white/10 bg-slate-950/95 p-6 shadow-2xl shadow-black/40">
-            <div className="flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50/70 p-4 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-3xl border border-white/80 bg-white p-6 shadow-[0_24px_70px_-22px_rgba(15,23,42,0.30)]">
+            <div className="w-full flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">
                   <Eye size={14} />
                   Detalhes do feedback
                 </div>
 
-                <h2 className="mt-4 text-3xl font-bold tracking-tight text-white">
+                <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
                   Registro detalhado
                 </h2>
 
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                   Visualização completa do feedback para leitura operacional e
                   acompanhamento da experiência registrada pelo cliente.
                 </p>
@@ -671,14 +632,14 @@ export default function FeedbacksPage() {
               <button
                 type="button"
                 onClick={() => setSelectedFeedback(null)}
-                className="inline-flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
               >
                 Fechar
               </button>
             </div>
 
             <div className="mt-6 grid gap-5 lg:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                   Dados gerais
                 </h3>
@@ -688,7 +649,7 @@ export default function FeedbacksPage() {
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                       Data
                     </p>
-                    <p className="mt-2 text-sm font-medium text-white">
+                    <p className="mt-2 text-sm font-medium text-slate-900">
                       {formatDate(selectedFeedback.createdAt)}
                     </p>
                   </div>
@@ -715,7 +676,7 @@ export default function FeedbacksPage() {
                       <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                         Empresa
                       </p>
-                      <p className="mt-2 text-sm font-medium text-white">
+                      <p className="mt-2 text-sm font-medium text-slate-900">
                         {selectedFeedback.company?.name ?? "-"}
                       </p>
                     </div>
@@ -725,7 +686,7 @@ export default function FeedbacksPage() {
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                       Filial
                     </p>
-                    <p className="mt-2 text-sm font-medium text-white">
+                    <p className="mt-2 text-sm font-medium text-slate-900">
                       {selectedFeedback.branch?.name ?? "-"}
                     </p>
                   </div>
@@ -734,7 +695,7 @@ export default function FeedbacksPage() {
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                       Kiosk
                     </p>
-                    <p className="mt-2 text-sm font-medium text-white">
+                    <p className="mt-2 text-sm font-medium text-slate-900">
                       {selectedFeedback.kiosk?.name ?? "-"}
                     </p>
                   </div>
@@ -743,14 +704,14 @@ export default function FeedbacksPage() {
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                       Registro
                     </p>
-                    <p className="mt-2 text-sm font-medium text-white">
+                    <p className="mt-2 text-sm font-medium text-slate-900">
                       Feedback recebido
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                   Informações de contato
                 </h3>
@@ -761,7 +722,7 @@ export default function FeedbacksPage() {
                       <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                         E-mail
                       </p>
-                      <p className="mt-2 text-sm font-medium text-white">
+                      <p className="mt-2 text-sm font-medium text-slate-900">
                         {selectedFeedback.email?.trim() || "-"}
                       </p>
                     </div>
@@ -770,7 +731,7 @@ export default function FeedbacksPage() {
                       <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                         Nome
                       </p>
-                      <p className="mt-2 text-sm font-medium text-white">
+                      <p className="mt-2 text-sm font-medium text-slate-900">
                         {selectedFeedback.contactName?.trim() || "-"}
                       </p>
                     </div>
@@ -779,7 +740,7 @@ export default function FeedbacksPage() {
                       <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                         Telefone
                       </p>
-                      <p className="mt-2 text-sm font-medium text-white">
+                      <p className="mt-2 text-sm font-medium text-slate-900">
                         {selectedFeedback.contactPhone?.trim() || "-"}
                       </p>
                     </div>
@@ -788,7 +749,7 @@ export default function FeedbacksPage() {
                       <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                         Consentimento
                       </p>
-                      <p className="mt-2 text-sm font-medium text-white">
+                      <p className="mt-2 text-sm font-medium text-slate-900">
                         {selectedFeedback.contactConsent ? "Sim" : "Não"}
                       </p>
                     </div>
@@ -797,29 +758,29 @@ export default function FeedbacksPage() {
                       <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                         Mensagem de contato
                       </p>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
                         {selectedFeedback.contactMessage?.trim() || "-"}
                       </p>
                     </div>
                   </div>
                 ) : (
-                  <p className="mt-5 text-sm leading-6 text-slate-400">
+                  <p className="mt-5 text-sm leading-6 text-slate-600">
                     Nenhuma informação de contato foi registrada neste feedback.
                   </p>
                 )}
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5 lg:col-span-2">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 lg:col-span-2">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                   Comentário
                 </h3>
 
-                <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-200">
+                <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-slate-700">
                   {selectedFeedback.comment?.trim() || "Sem comentário."}
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5 lg:col-span-2">
+              <div className="rounded-3xl border border-slate-200 bg-white p-5 lg:col-span-2">
                 <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
                   Tags
                 </h3>
@@ -829,14 +790,14 @@ export default function FeedbacksPage() {
                     {selectedFeedback.tags!.map((item) => (
                       <span
                         key={item.id}
-                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200"
+                        className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
                       >
                         {item.tag?.name ?? "Tag"}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-5 text-sm text-slate-400">
+                  <p className="mt-5 text-sm text-slate-600">
                     Nenhuma tag marcada.
                   </p>
                 )}

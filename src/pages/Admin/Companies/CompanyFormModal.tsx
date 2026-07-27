@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { FormDialog } from "../../../components/ui/FormDialog";
 
 type CompanyFormModalProps = {
@@ -52,7 +52,7 @@ export function CompanyFormModal({
       <div className="space-y-2">
         <label
           htmlFor="company-name"
-          className="block text-sm font-medium text-slate-200"
+          className="block text-sm font-medium text-slate-700"
         >
           Nome da empresa
         </label>
@@ -62,7 +62,7 @@ export function CompanyFormModal({
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="Ex.: Rede Centro Sul"
-          className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+          className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
         />
       </div>
     </FormDialog>

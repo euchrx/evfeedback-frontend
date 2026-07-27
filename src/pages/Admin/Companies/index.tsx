@@ -1,3 +1,6 @@
+﻿import { Plus } from "lucide-react";
+import { useAdminScopeBranchId, useAdminScopeCompanyId } from "../../../hooks/useAdminScope";
+import { NO_BRANCH_SCOPE } from "../../../services/adminScope";
 import { useEffect, useMemo, useState } from "react";
 import {
   activateCompany,
@@ -33,6 +36,8 @@ export default function CompaniesPage() {
   const { confirm } = useConfirmDialog();
 
   const currentUser = getStoredUser();
+  const scopeBranchId = useAdminScopeBranchId();
+  const scopeCompanyId = useAdminScopeCompanyId();
   const canView = canAccessCompanies(currentUser);
   const canDeletePermanently = canHardDelete(currentUser);
 
@@ -170,18 +175,15 @@ export default function CompaniesPage() {
     }
   }
 
-  function handleClearFilters() {
-    setSearch("");
-    setPage(1);
-  }
 
   const filteredCompanies = useMemo(() => {
+    if (scopeBranchId === NO_BRANCH_SCOPE) return [];
     const normalizedSearch = search.trim().toLowerCase();
 
     return companies.filter((company) =>
-      company.name.toLowerCase().includes(normalizedSearch),
+      company.id === scopeCompanyId && company.name.toLowerCase().includes(normalizedSearch),
     );
-  }, [companies, search]);
+  }, [companies, search, scopeBranchId, scopeCompanyId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCompanies.length / PAGE_SIZE));
 
@@ -210,9 +212,9 @@ export default function CompaniesPage() {
 
   if (!canView) {
     return (
-      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-        <h2 className="text-xl font-semibold text-white">Acesso negado</h2>
-        <p className="mt-2 text-sm leading-6 text-rose-100/80">
+      <section className="rounded-3xl border border-rose-100 bg-white p-6 shadow-[0_18px_50px_-20px_rgba(244,63,94,0.28)]">
+        <h2 className="text-xl font-semibold text-slate-900">Acesso negado</h2>
+        <p className="mt-2 text-sm leading-6 text-rose-700">
           Apenas usuários com permissão de administração global podem acessar a página de empresas.
         </p>
       </section>
@@ -222,72 +224,50 @@ export default function CompaniesPage() {
   return (
     <>
       <section className="space-y-6">
-        <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
-                gestão de empresas
-              </div>
-
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
-                Estrutura organizacional
-              </h2>
-
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                Cadastre e mantenha as empresas da plataforma com um fluxo consistente e pronto para operação.
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
+        <div>
+          <div className="w-full">
+<div className="flex flex-col gap-3 sm:flex-row">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar empresa por nome"
-                className="h-12 min-w-[260px] rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-10 min-w-[260px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-500"
               />
-
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                className="inline-flex h-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
-              >
-                Limpar filtros
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCreateOpen(true)}
-                className="inline-flex h-12 items-center justify-center rounded-2xl bg-cyan-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-              >
-                Nova empresa
-              </button>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl">
-          <div className="flex flex-col gap-3 border-b border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-white">Empresas cadastradas</h3>
-              <p className="mt-1 text-sm text-slate-400">
+              <h3 className="text-xl font-semibold text-slate-900">Empresas</h3>
+              <p className="mt-1 text-sm text-slate-600">
                 {loading
                   ? "Carregando dados..."
                   : `${filteredCompanies.length} empresa(s) encontrada(s)`}
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+              Adicionar
+            </button>
           </div>
 
           {loading ? (
-            <div className="p-10 text-center text-sm text-slate-400">
+            <div className="p-10 text-center text-sm text-slate-600">
               Carregando empresas...
             </div>
           ) : filteredCompanies.length === 0 ? (
             <div className="p-10 text-center">
               <div className="mx-auto max-w-md">
-                <h4 className="text-lg font-semibold text-white">
+                <h4 className="text-lg font-semibold text-slate-900">
                   Nenhuma empresa encontrada
                 </h4>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Ajuste os filtros ou cadastre uma nova empresa para começar a estruturar a operação.
                 </p>
 
@@ -304,7 +284,7 @@ export default function CompaniesPage() {
             <>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-white/10">
-                  <thead className="bg-white/[0.03]">
+                  <thead>
                     <tr>
                       <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         Nome
@@ -331,21 +311,21 @@ export default function CompaniesPage() {
                       return (
                         <tr
                           key={company.id}
-                          className="transition hover:bg-white/[0.03]"
+                          className="transition hover:bg-slate-50"
                         >
                           <td className="px-6 py-4">
                             <div>
-                              <p className="text-sm font-semibold text-white">
+                              <p className="text-sm font-semibold text-slate-900">
                                 {company.name}
                               </p>
                             </div>
                           </td>
 
-                          <td className="px-6 py-4 text-sm text-slate-400">
+                          <td className="px-6 py-4 text-sm text-slate-600">
                             {formatDate(company.createdAt)}
                           </td>
 
-                          <td className="px-6 py-4 text-sm text-slate-400">
+                          <td className="px-6 py-4 text-sm text-slate-600">
                             {formatDate(company.updatedAt)}
                           </td>
 
@@ -354,8 +334,8 @@ export default function CompaniesPage() {
                               className={[
                                 "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
                                 company.active
-                                  ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-                                  : "border border-amber-400/20 bg-amber-500/10 text-amber-200",
+                                  ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                                  : "border border-amber-200 bg-amber-50 text-amber-700",
                               ].join(" ")}
                             >
                               {company.active ? "Ativa" : "Inativa"}
@@ -363,12 +343,12 @@ export default function CompaniesPage() {
                           </td>
 
                           <td className="px-6 py-4">
-                            <div className="flex flex-wrap justify-end gap-2">
+                            <div className="w-full flex flex-wrap justify-end gap-2">
                               <button
                                 type="button"
                                 onClick={() => setEditingCompany(company)}
                                 disabled={isProcessing}
-                                className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 Editar
                               </button>
@@ -378,7 +358,7 @@ export default function CompaniesPage() {
                                   type="button"
                                   onClick={() => void handleDeactivate(company)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Desativar
                                 </button>
@@ -387,7 +367,7 @@ export default function CompaniesPage() {
                                   type="button"
                                   onClick={() => void handleActivate(company)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Ativar
                                 </button>
@@ -398,7 +378,7 @@ export default function CompaniesPage() {
                                   type="button"
                                   onClick={() => void handleHardDelete(company)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Excluir
                                 </button>
@@ -412,17 +392,17 @@ export default function CompaniesPage() {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 border-t border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-400">
+              <div className="w-full flex flex-col gap-3 border-t border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-600">
                   Página {page} de {totalPages}
                 </p>
 
-                <div className="flex gap-2">
+                <div className="w-full flex gap-2">
                   <button
                     type="button"
                     onClick={() => setPage((current) => Math.max(1, current - 1))}
                     disabled={page === 1}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Anterior
                   </button>
@@ -433,7 +413,7 @@ export default function CompaniesPage() {
                       setPage((current) => Math.min(totalPages, current + 1))
                     }
                     disabled={page === totalPages}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Próxima
                   </button>

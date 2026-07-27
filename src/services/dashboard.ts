@@ -1,7 +1,8 @@
-import { api } from "./api";
+﻿import { api } from "./api";
 
 export type DashboardFilters = {
   companyId?: string;
+  branchId?: string;
   dateFrom?: string;
   dateTo?: string;
 };

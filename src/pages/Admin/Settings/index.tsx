@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
+import { useAdminScopeCompanyId } from "../../../hooks/useAdminScope";
 import { getStoredUser } from "../../../services/auth";
 import { getCompanies, type Company } from "../../../services/companies";
 import {
@@ -65,11 +66,11 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+    <section className="py-8 first:pt-0">
       <div className="mb-5 space-y-1">
-        <h2 className="text-xl font-semibold text-white">{title}</h2>
+        <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
         {description ? (
-          <p className="text-sm leading-6 text-slate-400">{description}</p>
+          <p className="text-sm leading-6 text-slate-600">{description}</p>
         ) : null}
       </div>
       {children}
@@ -86,17 +87,17 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-slate-200">{label}</label>
+      <label className="block text-sm font-medium text-slate-700">{label}</label>
       {children}
     </div>
   );
 }
 
 const inputClassName =
-  "h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10";
+  "h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10";
 
 const textareaClassName =
-  "min-h-[120px] w-full resize-none rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10";
+  "min-h-[120px] w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10";
 
 export default function SettingsPage() {
   const toast = useToast();
@@ -107,19 +108,17 @@ export default function SettingsPage() {
   const canManage = canManageOperationalModules(currentUser);
   const superAdmin = isSuperAdmin(currentUser);
   const resolvedCompanyId = getResolvedCompanyId(currentUser);
+  const scopeCompanyId = useAdminScopeCompanyId();
 
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [companyId, setCompanyId] = useState(
-    superAdmin ? "" : resolvedCompanyId ?? "",
-  );
+  const [, setCompanies] = useState<Company[]>([]);
 
   const selectedCompanyId = useMemo(() => {
     if (superAdmin) {
-      return companyId || undefined;
+      return scopeCompanyId || undefined;
     }
 
     return resolvedCompanyId;
-  }, [superAdmin, companyId, resolvedCompanyId]);
+  }, [superAdmin, scopeCompanyId, resolvedCompanyId]);
 
   const [companyName, setCompanyName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
@@ -134,7 +133,7 @@ export default function SettingsPage() {
     "rgba(15,23,42,0.72)",
   );
   const [textColor, setTextColor] = useState("#ffffff");
-  const [buttonTextColor, setButtonTextColor] = useState("#0f172a");
+  const [buttonTextColor, setButtonTextColor] = useState("#ffffff");
   const [notificationEmails, setNotificationEmails] = useState("");
   const [dailyNotificationEnabled, setDailyNotificationEnabled] = useState(true);
   const [monthlyNotificationEnabled, setMonthlyNotificationEnabled] =
@@ -380,9 +379,9 @@ export default function SettingsPage() {
 
   if (!canView) {
     return (
-      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-        <h2 className="text-xl font-semibold text-white">Acesso negado</h2>
-        <p className="mt-2 text-sm leading-6 text-rose-100/80">
+      <section className="rounded-3xl border border-rose-100 bg-white p-6 shadow-[0_18px_50px_-20px_rgba(244,63,94,0.28)]">
+        <h2 className="text-xl font-semibold text-slate-900">Acesso negado</h2>
+        <p className="mt-2 text-sm leading-6 text-rose-700">
           Você não tem permissão para acessar a página de configurações.
         </p>
       </section>
@@ -391,45 +390,23 @@ export default function SettingsPage() {
 
   return (
     <section className="space-y-6">
-      <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
+      <div>
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
-              configurações
-            </div>
 
-            <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
-              Identidade, comunicação e distribuição
+            <h2 className="text-xl font-semibold tracking-tight text-slate-900">
+              Configurações
             </h2>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
               Personalize o kiosk, configure notificações por e-mail e distribua o aplicativo Android.
             </p>
           </div>
-
-          {superAdmin ? (
-            <div className="w-full max-w-sm">
-              <Field label="Empresa">
-                <select
-                  value={companyId}
-                  onChange={(event) => setCompanyId(event.target.value)}
-                  className={inputClassName}
-                >
-                  <option value="">Selecione a empresa</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            </div>
-          ) : null}
         </div>
       </div>
 
       {loading ? (
-        <div className="rounded-[28px] border border-white/10 bg-white/5 px-4 py-12 text-center text-sm text-slate-400 shadow-2xl shadow-black/20 backdrop-blur-xl">
+        <div className="px-4 py-12 text-center text-sm text-slate-600">
           Carregando configurações...
         </div>
       ) : (
@@ -449,7 +426,7 @@ export default function SettingsPage() {
               </Field>
 
               <Field label="Logo da empresa">
-                <label className="flex h-12 cursor-pointer items-center justify-between rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-slate-300 transition hover:border-cyan-400/40">
+                <label className="flex h-12 cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-600 transition hover:border-cyan-400/40">
                   <span>{uploadingLogo ? "Enviando..." : "Selecionar imagem"}</span>
 
                   <input
@@ -466,7 +443,7 @@ export default function SettingsPage() {
                 </label>
 
                 {logoUrl ? (
-                  <div className="mt-3 rounded-2xl border border-white/10 bg-slate-900/50 p-3">
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white0 p-3">
                     <img
                       src={logoUrl}
                       alt="Logo enviada"
@@ -514,26 +491,26 @@ export default function SettingsPage() {
               </Field>
 
               <Field label="Cor principal">
-                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3">
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
                   <input
                     type="color"
                     value={primaryColor}
                     onChange={(e) => setPrimaryColor(e.target.value)}
-                    className="h-8 w-10 cursor-pointer rounded border border-white/10 bg-transparent p-0"
+                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
                   />
-                  <span className="text-sm text-slate-300">{primaryColor}</span>
+                  <span className="text-sm text-slate-600">{primaryColor}</span>
                 </div>
               </Field>
 
               <Field label="Cor de fundo">
-                <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3">
+                <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
                   <input
                     type="color"
                     value={backgroundColor}
                     onChange={(e) => setBackgroundColor(e.target.value)}
-                    className="h-8 w-10 cursor-pointer rounded border border-white/10 bg-transparent p-0"
+                    className="h-8 w-10 cursor-pointer rounded border border-slate-200 bg-transparent p-0"
                   />
-                  <span className="text-sm text-slate-300">{backgroundColor}</span>
+                  <span className="text-sm text-slate-600">{backgroundColor}</span>
                 </div>
               </Field>
 
@@ -568,7 +545,7 @@ export default function SettingsPage() {
                 <input
                   value={buttonTextColor}
                   onChange={(e) => setButtonTextColor(e.target.value)}
-                  placeholder="#0f172a"
+                  placeholder="#ffffff"
                   className={inputClassName}
                 />
               </Field>
@@ -579,7 +556,7 @@ export default function SettingsPage() {
             title="Preview do kiosk"
             description="Visualize em tempo real como a experiência aparecerá no dispositivo."
           >
-            <div className="overflow-hidden rounded-[32px] border border-white/10 shadow-inner">
+            <div className="overflow-hidden rounded-[32px] border border-slate-200 shadow-inner">
               <div
                 className="relative min-h-[720px] overflow-hidden px-4 py-6 md:px-8 md:py-10"
                 style={{
@@ -589,7 +566,7 @@ export default function SettingsPage() {
               >
                 <div className="mx-auto flex min-h-[calc(720px-3rem)] w-full max-w-5xl items-center justify-center">
                   <div
-                    className="w-full rounded-[32px] border border-white/10 p-6 shadow-2xl backdrop-blur md:p-10"
+                    className="w-full rounded-[32px] border border-slate-200 p-6 shadow-2xl backdrop-blur md:p-10"
                     style={{
                       backgroundColor: resolvedCardBackgroundColor,
                     }}
@@ -697,7 +674,7 @@ export default function SettingsPage() {
                 />
               </Field>
 
-              <label className="inline-flex items-center gap-3 text-sm text-slate-300">
+              <label className="inline-flex items-center gap-3 text-sm text-slate-600">
                 <input
                   type="checkbox"
                   checked={dailyNotificationEnabled}
@@ -706,7 +683,7 @@ export default function SettingsPage() {
                 Enviar resumo diário com os feedbacks do dia anterior
               </label>
 
-              <label className="inline-flex items-center gap-3 text-sm text-slate-300">
+              <label className="inline-flex items-center gap-3 text-sm text-slate-600">
                 <input
                   type="checkbox"
                   checked={monthlyNotificationEnabled}
@@ -721,7 +698,7 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => void handleSendTestEmail()}
                     disabled={sendingTestEmail}
-                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-5 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-11 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {sendingTestEmail ? "Enviando..." : "Enviar e-mail de teste"}
                   </button>
@@ -730,15 +707,16 @@ export default function SettingsPage() {
             </div>
           </SectionCard>
 
-          <SectionCard
-            title="Aplicativo Android"
+          {superAdmin ? (
+            <SectionCard
+              title="Aplicativo Android"
             description="Envie o APK e use o QR code para instalar diretamente no tablet."
           >
             <div className="grid gap-6 xl:grid-cols-[1.1fr_320px]">
               <div className="space-y-4">
                 {canManage ? (
-                  <label className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-dashed border-white/10 bg-slate-900/40 px-4 py-4 text-sm text-slate-400 transition hover:border-cyan-400/40 hover:bg-slate-900/70">
-                    <span className="font-medium text-white">
+                  <label className="flex cursor-pointer flex-col gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-600 transition hover:border-cyan-400/40 hover:bg-white">
+                    <span className="font-medium text-slate-900">
                       {uploadingApk ? "Enviando APK..." : "Selecionar APK"}
                     </span>
                     <span>Escolha um arquivo `.apk` para substituir a versão atual.</span>
@@ -756,11 +734,11 @@ export default function SettingsPage() {
                   </label>
                 ) : null}
 
-                <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   {appApkInfo ? (
-                    <div className="space-y-3 text-sm text-slate-300">
+                    <div className="space-y-3 text-sm text-slate-600">
                       <div>
-                        <p className="font-semibold text-white">APK atual</p>
+                        <p className="font-semibold text-slate-900">APK atual</p>
                         <p className="mt-1 break-all">{appApkInfo.originalName}</p>
                       </div>
 
@@ -792,7 +770,7 @@ export default function SettingsPage() {
                           href={appApkInfo.downloadUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-1 block break-all text-cyan-300 hover:text-cyan-200"
+                          className="mt-1 block break-all text-cyan-700 hover:text-cyan-700"
                         >
                           {appApkInfo.downloadUrl}
                         </a>
@@ -811,7 +789,7 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           onClick={() => void handleCopyApkLink()}
-                          className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
+                          className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
                         >
                           Copiar link
                         </button>
@@ -825,15 +803,15 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 {appApkInfo?.downloadUrl ? (
                   <div className="space-y-3 text-center">
                     <img
                       src={appApkQrCodeUrl}
                       alt="QR code para download do APK"
-                      className="mx-auto h-72 w-72 rounded-2xl border border-white/10 bg-white p-3"
+                      className="mx-auto h-72 w-72 rounded-2xl border border-slate-200 bg-white p-3"
                     />
-                    <p className="text-sm text-slate-400">
+                    <p className="text-sm text-slate-600">
                       Escaneie com o tablet para abrir o download do APK.
                     </p>
                   </div>
@@ -844,7 +822,8 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
-          </SectionCard>
+            </SectionCard>
+          ) : null}
 
           {canManage ? (
             <div className="flex justify-end">

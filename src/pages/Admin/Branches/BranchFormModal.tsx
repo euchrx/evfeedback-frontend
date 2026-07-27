@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { FormDialog } from "../../../components/ui/FormDialog";
 import type { Company } from "../../../services/companies";
 
@@ -25,7 +25,6 @@ type BranchFormModalProps = {
 export function BranchFormModal({
   open,
   mode,
-  companies,
   loading = false,
   isSuperAdmin,
   initialData,
@@ -76,7 +75,7 @@ export function BranchFormModal({
         <div className="space-y-2">
           <label
             htmlFor="branch-name"
-            className="block text-sm font-medium text-slate-200"
+            className="block text-sm font-medium text-slate-700"
           >
             Nome da filial
           </label>
@@ -85,14 +84,14 @@ export function BranchFormModal({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Ex.: Unidade Centro"
-            className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
           />
         </div>
 
         <div className="space-y-2">
           <label
             htmlFor="branch-code"
-            className="block text-sm font-medium text-slate-200"
+            className="block text-sm font-medium text-slate-700"
           >
             Código
           </label>
@@ -101,42 +100,8 @@ export function BranchFormModal({
             value={code}
             onChange={(event) => setCode(event.target.value)}
             placeholder="Ex.: CTR-01"
-            className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
           />
-        </div>
-
-        <div className="space-y-2">
-          <label
-            htmlFor="branch-company"
-            className="block text-sm font-medium text-slate-200"
-          >
-            Empresa
-          </label>
-
-          {isSuperAdmin ? (
-            <select
-              id="branch-company"
-              value={companyId}
-              onChange={(event) => setCompanyId(event.target.value)}
-              className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
-            >
-              <option value="">Selecione a empresa</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              value={
-                companies.find((company) => company.id === defaultCompanyId)?.name ||
-                "Empresa atual"
-              }
-              disabled
-              className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/40 px-4 text-sm text-slate-400 outline-none disabled:cursor-not-allowed"
-            />
-          )}
         </div>
       </div>
     </FormDialog>

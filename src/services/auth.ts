@@ -1,5 +1,5 @@
 import { api } from "./api";
-import { hasAuthToken, readAuthToken, removeAuthToken, saveAuthToken } from "./authToken";
+import { hasAuthToken, isAuthTokenPersistent, readAuthToken, removeAuthToken, saveAuthToken } from "./authToken";
 import type { AuthUser } from "../utils/permissions";
 
 export type LoginPayload = {
@@ -18,30 +18,35 @@ function canUseStorage() {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
-export function saveStoredUser(user: AuthUser) {
+export function saveStoredUser(user: AuthUser, persistent = false) {
   if (!canUseStorage()) return;
 
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  const targetStorage = persistent ? localStorage : sessionStorage;
+  const otherStorage = persistent ? sessionStorage : localStorage;
+
+  otherStorage.removeItem(USER_KEY);
+  targetStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
 export function removeStoredUser() {
   if (!canUseStorage()) return;
 
   localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(USER_KEY);
 }
 
-export async function login(payload: LoginPayload): Promise<LoginResponse> {
+export async function login(payload: LoginPayload, rememberAccess = false): Promise<LoginResponse> {
   const response = await api.post("/auth/login", payload);
   const data = response.data as LoginResponse;
 
   if (data?.access_token) {
-    saveAuthToken(data.access_token);
+    saveAuthToken(data.access_token, rememberAccess);
   } else {
     removeAuthToken();
   }
 
   if (data?.user) {
-    saveStoredUser(data.user);
+    saveStoredUser(data.user, rememberAccess);
   } else {
     removeStoredUser();
   }
@@ -54,7 +59,7 @@ export async function fetchMe(): Promise<AuthUser> {
   const user = response.data as AuthUser;
 
   if (user) {
-    saveStoredUser(user);
+    saveStoredUser(user, isAuthTokenPersistent());
   }
 
   return user;
@@ -67,7 +72,7 @@ export function getAuthToken() {
 export function getStoredUser(): AuthUser | null {
   if (!canUseStorage()) return null;
 
-  const raw = localStorage.getItem(USER_KEY);
+  const raw = localStorage.getItem(USER_KEY) ?? sessionStorage.getItem(USER_KEY);
   if (!raw) return null;
 
   try {

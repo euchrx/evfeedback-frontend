@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { FormDialog } from "../../../components/ui/FormDialog";
 import type { Company } from "../../../services/companies";
 import type { UserRole } from "../../../services/users";
@@ -9,6 +9,7 @@ type UserFormModalProps = {
   companies: Company[];
   loading?: boolean;
   allowSuperAdminRole?: boolean;
+  defaultCompanyId?: string;
   initialData?: {
     name: string;
     email: string;
@@ -43,9 +44,9 @@ function getRoleLabel(role: UserRole) {
 export function UserFormModal({
   open,
   mode,
-  companies,
   loading = false,
   allowSuperAdminRole = true,
+  defaultCompanyId,
   initialData,
   onClose,
   onSubmit,
@@ -69,14 +70,14 @@ export function UserFormModal({
     const nextRole =
       initialData?.role && availableRoles.includes(initialData.role)
         ? initialData.role
-        : availableRoles[0] ?? "MANAGER";
+        : availableRoles.includes("MANAGER") ? "MANAGER" : availableRoles[0] ?? "MANAGER";
 
     setName(initialData?.name ?? "");
     setEmail(initialData?.email ?? "");
     setPassword("");
     setRole(nextRole);
-    setCompanyId(initialData?.companyId ?? "");
-  }, [open, initialData, availableRoles]);
+    setCompanyId(initialData?.companyId ?? defaultCompanyId ?? "");
+  }, [open, initialData, availableRoles, defaultCompanyId]);
 
   useEffect(() => {
     if (role === "SUPER_ADMIN") {
@@ -120,7 +121,7 @@ export function UserFormModal({
         <div className="space-y-2">
           <label
             htmlFor="user-name"
-            className="block text-sm font-medium text-slate-200"
+            className="block text-sm font-medium text-slate-700"
           >
             Nome
           </label>
@@ -129,14 +130,14 @@ export function UserFormModal({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Ex.: João da Silva"
-            className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
           />
         </div>
 
         <div className="space-y-2">
           <label
             htmlFor="user-email"
-            className="block text-sm font-medium text-slate-200"
+            className="block text-sm font-medium text-slate-700"
           >
             E-mail
           </label>
@@ -146,7 +147,7 @@ export function UserFormModal({
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="usuario@empresa.com"
-            className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
           />
         </div>
 
@@ -154,7 +155,7 @@ export function UserFormModal({
           <div className="space-y-2">
             <label
               htmlFor="user-password"
-              className="block text-sm font-medium text-slate-200"
+              className="block text-sm font-medium text-slate-700"
             >
               Senha
             </label>
@@ -164,7 +165,7 @@ export function UserFormModal({
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Defina uma senha"
-              className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
             />
           </div>
         ) : null}
@@ -173,7 +174,7 @@ export function UserFormModal({
           <div className="space-y-2">
             <label
               htmlFor="user-role"
-              className="block text-sm font-medium text-slate-200"
+              className="block text-sm font-medium text-slate-700"
             >
               Role
             </label>
@@ -181,38 +182,11 @@ export function UserFormModal({
               id="user-role"
               value={role}
               onChange={(event) => setRole(event.target.value as UserRole)}
-              className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
             >
               {availableRoles.map((itemRole) => (
                 <option key={itemRole} value={itemRole}>
                   {getRoleLabel(itemRole)}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <label
-              htmlFor="user-company"
-              className="block text-sm font-medium text-slate-200"
-            >
-              Empresa
-            </label>
-            <select
-              id="user-company"
-              value={companyId}
-              onChange={(event) => setCompanyId(event.target.value)}
-              disabled={role === "SUPER_ADMIN"}
-              className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition disabled:cursor-not-allowed disabled:opacity-50 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
-            >
-              <option value="">
-                {role === "SUPER_ADMIN"
-                  ? "Empresa não se aplica"
-                  : "Selecione a empresa"}
-              </option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
                 </option>
               ))}
             </select>

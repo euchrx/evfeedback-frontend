@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { FormDialog } from "../../../components/ui/FormDialog";
 import type { Company } from "../../../services/companies";
 import type { Branch } from "../../../services/branches";
@@ -11,6 +11,7 @@ type KioskFormModalProps = {
   loading?: boolean;
   isSuperAdmin: boolean;
   defaultCompanyId?: string;
+  defaultBranchId?: string;
   initialData?: {
     name: string;
     branchId: string;
@@ -29,11 +30,11 @@ type KioskFormModalProps = {
 export function KioskFormModal({
   open,
   mode,
-  companies,
   branches,
   loading = false,
   isSuperAdmin,
   defaultCompanyId,
+  defaultBranchId,
   initialData,
   onClose,
   onSubmit,
@@ -42,6 +43,8 @@ export function KioskFormModal({
 
   const [name, setName] = useState("");
   const [branchId, setBranchId] = useState("");
+  const [branchQuery, setBranchQuery] = useState("");
+  const [showBranchSuggestions, setShowBranchSuggestions] = useState(false);
   const [locationDescription, setLocationDescription] = useState("");
   const [companyId, setCompanyId] = useState("");
 
@@ -49,10 +52,13 @@ export function KioskFormModal({
     if (!open) return;
 
     setName(initialData?.name ?? "");
-    setBranchId(initialData?.branchId ?? "");
+    const nextBranchId = initialData?.branchId ?? defaultBranchId ?? "";
+    const selectedBranch = branches.find((branch) => branch.id === nextBranchId);
+    setBranchId(nextBranchId);
+    setBranchQuery(selectedBranch?.name ?? "");
     setLocationDescription(initialData?.locationDescription ?? "");
     setCompanyId(initialData?.companyId ?? defaultCompanyId ?? "");
-  }, [open, initialData, defaultCompanyId]);
+  }, [open, initialData, defaultCompanyId, defaultBranchId, branches]);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -63,6 +69,7 @@ export function KioskFormModal({
 
     if (branchId && !branchStillExists) {
       setBranchId("");
+      setBranchQuery("");
     }
   }, [branchId, branches, companyId, isSuperAdmin]);
 
@@ -77,6 +84,31 @@ export function KioskFormModal({
 
     return branches.filter((branch) => branch.companyId === companyId);
   }, [branches, companyId, isSuperAdmin]);
+
+  function handleBranchQueryChange(value: string) {
+    setBranchQuery(value);
+    setShowBranchSuggestions(true);
+    const normalizedValue = value.trim().toLocaleLowerCase("pt-BR");
+    const matchedBranch = filteredBranches.find(
+      (branch) => branch.name.trim().toLocaleLowerCase("pt-BR") === normalizedValue,
+    );
+    setBranchId(matchedBranch?.id ?? "");
+  }
+
+  const branchSuggestions = useMemo(() => {
+    const query = branchQuery.trim().toLocaleLowerCase("pt-BR");
+    if (!query) return filteredBranches;
+
+    return filteredBranches.filter((branch) =>
+      branch.name.toLocaleLowerCase("pt-BR").includes(query),
+    );
+  }, [branchQuery, filteredBranches]);
+
+  function selectBranch(branch: Branch) {
+    setBranchId(branch.id);
+    setBranchQuery(branch.name);
+    setShowBranchSuggestions(false);
+  }
 
   const isInvalid =
     !name.trim() ||
@@ -111,7 +143,7 @@ export function KioskFormModal({
         <div className="space-y-2">
           <label
             htmlFor="kiosk-name"
-            className="block text-sm font-medium text-slate-200"
+            className="block text-sm font-medium text-slate-700"
           >
             Nome do kiosk
           </label>
@@ -120,14 +152,14 @@ export function KioskFormModal({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="Ex.: Tablet Atendimento 01"
-            className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
           />
         </div>
 
         <div className="space-y-2">
           <label
             htmlFor="kiosk-location"
-            className="block text-sm font-medium text-slate-200"
+            className="block text-sm font-medium text-slate-700"
           >
             Localização
           </label>
@@ -136,65 +168,49 @@ export function KioskFormModal({
             value={locationDescription}
             onChange={(event) => setLocationDescription(event.target.value)}
             placeholder="Ex.: Balcão principal"
-            className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
           />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="space-y-2">
-            <label
-              htmlFor="kiosk-company"
-              className="block text-sm font-medium text-slate-200"
-            >
-              Empresa
-            </label>
 
-            {isSuperAdmin ? (
-              <select
-                id="kiosk-company"
-                value={companyId}
-                onChange={(event) => setCompanyId(event.target.value)}
-                className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
-              >
-                <option value="">Selecione a empresa</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                value={
-                  companies.find((company) => company.id === defaultCompanyId)?.name ||
-                  "Empresa atual"
-                }
-                disabled
-                className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/40 px-4 text-sm text-slate-400 outline-none disabled:cursor-not-allowed"
-              />
-            )}
-          </div>
-
-          <div className="space-y-2">
+          <div className="relative space-y-2">
             <label
               htmlFor="kiosk-branch"
-              className="block text-sm font-medium text-slate-200"
+              className="block text-sm font-medium text-slate-700"
             >
               Filial
             </label>
-            <select
+            <input
               id="kiosk-branch"
-              value={branchId}
-              onChange={(event) => setBranchId(event.target.value)}
-              className="h-12 w-full rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
-            >
-              <option value="">Selecione a filial</option>
-              {filteredBranches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+              type="text"
+              autoComplete="off"
+              value={branchQuery}
+              onChange={(event) => handleBranchQueryChange(event.target.value)}
+              onFocus={() => setShowBranchSuggestions(true)}
+              onBlur={() => window.setTimeout(() => setShowBranchSuggestions(false), 150)}
+              placeholder="Digite para buscar uma filial"
+              className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
+            />
+            {showBranchSuggestions ? (
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-[0_16px_40px_-16px_rgba(15,23,42,0.35)]">
+                {branchSuggestions.length ? (
+                  branchSuggestions.map((branch) => (
+                    <button
+                      key={branch.id}
+                      type="button"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => selectBranch(branch)}
+                      className={`w-full rounded-lg px-3 py-2.5 text-left text-sm transition hover:bg-slate-50 ${branch.id === branchId ? "bg-cyan-50 font-medium text-cyan-800" : "text-slate-700"}`}
+                    >
+                      {branch.name}
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-3 py-3 text-sm text-slate-500">Nenhuma filial encontrada.</p>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

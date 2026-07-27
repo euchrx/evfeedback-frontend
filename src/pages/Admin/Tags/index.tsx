@@ -1,3 +1,7 @@
+﻿import { Plus } from "lucide-react";
+import { useAdminScopeBranchId, useAdminScopeCompanyId } from "../../../hooks/useAdminScope";
+import { NO_BRANCH_SCOPE } from "../../../services/adminScope";
+import { getAdminScopeCompanyId } from "../../../services/adminScope";
 import { useEffect, useMemo, useState } from "react";
 import {
   activateTag,
@@ -27,8 +31,8 @@ const PAGE_SIZE = 10;
 
 function getStatusBadgeClass(active: boolean) {
   return active
-    ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-    : "border-amber-400/20 bg-amber-500/10 text-amber-200";
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : "border-amber-200 bg-amber-50 text-amber-700";
 }
 
 export default function TagsPage() {
@@ -36,6 +40,8 @@ export default function TagsPage() {
   const { confirm } = useConfirmDialog();
 
   const currentUser = getStoredUser();
+  const scopeBranchId = useAdminScopeBranchId();
+  const scopeCompanyId = useAdminScopeCompanyId();
   const canView = canViewOperationalModules(currentUser);
   const canManage = canManageOperationalModules(currentUser);
   const canDeletePermanently = canHardDelete(currentUser);
@@ -59,8 +65,8 @@ export default function TagsPage() {
   const [editLoading, setEditLoading] = useState(false);
 
   const selectedCompanyId = useMemo(() => {
-    return superAdmin ? undefined : resolvedCompanyId;
-  }, [superAdmin, resolvedCompanyId]);
+    return superAdmin ? scopeCompanyId || undefined : resolvedCompanyId;
+  }, [superAdmin, scopeCompanyId, resolvedCompanyId]);
 
   async function load() {
     try {
@@ -101,10 +107,10 @@ export default function TagsPage() {
       return;
     }
 
-    const targetCompanyId = superAdmin ? payload.companyId : resolvedCompanyId ?? "";
+    const targetCompanyId = superAdmin ? scopeCompanyId : resolvedCompanyId ?? "";
 
     if (!targetCompanyId) {
-      toast.warning("Selecione a empresa da tag.");
+      toast.warning("Selecione uma rede no escopo.");
       return;
     }
 
@@ -142,7 +148,7 @@ export default function TagsPage() {
     }
 
     const targetCompanyId = superAdmin
-      ? payload.companyId ?? editingTag.companyId
+      ? scopeCompanyId ?? editingTag.companyId
       : resolvedCompanyId;
 
     try {
@@ -239,13 +245,9 @@ export default function TagsPage() {
     }
   }
 
-  function handleClearFilters() {
-    setSearch("");
-    setStatusFilter("ALL");
-    setPage(1);
-  }
 
   const filteredTags = useMemo(() => {
+    if (superAdmin && scopeBranchId === NO_BRANCH_SCOPE) return [];
     const normalizedSearch = search.trim().toLowerCase();
 
     return tags.filter((tag) => {
@@ -262,7 +264,7 @@ export default function TagsPage() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [tags, search, statusFilter]);
+  }, [tags, search, statusFilter, scopeBranchId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredTags.length / PAGE_SIZE));
 
@@ -292,9 +294,9 @@ export default function TagsPage() {
 
   if (!canView) {
     return (
-      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-        <h2 className="text-xl font-semibold text-white">Acesso negado</h2>
-        <p className="mt-2 text-sm leading-6 text-rose-100/80">
+      <section className="rounded-3xl border border-rose-100 bg-white p-6 shadow-[0_18px_50px_-20px_rgba(244,63,94,0.28)]">
+        <h2 className="text-xl font-semibold text-slate-900">Acesso negado</h2>
+        <p className="mt-2 text-sm leading-6 text-rose-700">
           Você não tem permissão para acessar a página de tags.
         </p>
       </section>
@@ -304,86 +306,65 @@ export default function TagsPage() {
   return (
     <>
       <section className="space-y-6">
-        <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
-                gestão de tags
-              </div>
-
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
-                Classificações e motivos
-              </h2>
-
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                Organize as tags utilizadas nos feedbacks e mantenha a classificação padronizada por empresa.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div>
+          <div className="w-full">
+<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar por nome, cor ou empresa"
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               />
 
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               >
                 <option value="ALL">Todos os status</option>
                 <option value="ACTIVE">Ativas</option>
                 <option value="INACTIVE">Inativas</option>
               </select>
 
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleClearFilters}
-                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
-                >
-                  Limpar
-                </button>
-
-                {canManage ? (
-                  <button
-                    type="button"
-                    onClick={() => setCreateOpen(true)}
-                    className="inline-flex h-12 items-center justify-center rounded-2xl bg-cyan-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                  >
-                    Nova
-                  </button>
-                ) : null}
+              <div className="w-full flex gap-3">
               </div>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl">
-          <div className="flex flex-col gap-3 border-b border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-white">Tags cadastradas</h3>
-              <p className="mt-1 text-sm text-slate-400">
+              <h3 className="text-xl font-semibold text-slate-900">Tags</h3>
+              <p className="mt-1 text-sm text-slate-600">
                 {loading
                   ? "Carregando dados..."
                   : `${filteredTags.length} tag(s) encontrada(s)`}
               </p>
             </div>
+            {canManage ? (
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+              Adicionar
+            </button>            ) : null}
+
           </div>
 
           {loading ? (
-            <div className="p-10 text-center text-sm text-slate-400">
+            <div className="p-10 text-center text-sm text-slate-600">
               Carregando tags...
             </div>
           ) : filteredTags.length === 0 ? (
             <div className="p-10 text-center">
               <div className="mx-auto max-w-md">
-                <h4 className="text-lg font-semibold text-white">
+                <h4 className="text-lg font-semibold text-slate-900">
                   Nenhuma tag encontrada
                 </h4>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Ajuste os filtros ou cadastre uma nova tag para começar a classificar os feedbacks.
                 </p>
 
@@ -402,7 +383,7 @@ export default function TagsPage() {
             <>
               <div className="w-full overflow-x-auto">
                 <table className="w-full min-w-max divide-y divide-white/10">
-                  <thead className="bg-white/[0.03]">
+                  <thead>
                     <tr>
                       <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         Nome
@@ -429,25 +410,25 @@ export default function TagsPage() {
                       return (
                         <tr
                           key={tag.id}
-                          className="transition hover:bg-white/[0.03]"
+                          className="transition hover:bg-slate-50"
                         >
                           <td className="px-6 py-4 align-top">
-                            <p className="text-sm font-semibold text-white">
+                            <p className="text-sm font-semibold text-slate-900">
                               {tag.name}
                             </p>
                           </td>
 
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
-                            <div className="flex items-center gap-3">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
+                            <div className="w-full flex items-center gap-3">
                               <span
-                                className="inline-block h-4 w-4 rounded-full border border-white/10"
+                                className="inline-block h-4 w-4 rounded-full border border-slate-200"
                                 style={{ backgroundColor: tag.color ?? "#e2e8f0" }}
                               />
                               <span>{tag.color ?? "-"}</span>
                             </div>
                           </td>
 
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
                             {superAdmin ? tag.company?.name ?? tag.companyId ?? "-" : "-"}
                           </td>
 
@@ -463,13 +444,13 @@ export default function TagsPage() {
                           </td>
 
                           <td className="px-6 py-4 align-top">
-                            <div className="flex flex-wrap justify-end gap-2">
+                            <div className="w-full flex flex-wrap justify-end gap-2">
                               {canManage ? (
                                 <button
                                   type="button"
                                   onClick={() => setEditingTag(tag)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Editar
                                 </button>
@@ -480,7 +461,7 @@ export default function TagsPage() {
                                   type="button"
                                   onClick={() => void handleDeactivate(tag)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Desativar
                                 </button>
@@ -491,7 +472,7 @@ export default function TagsPage() {
                                   type="button"
                                   onClick={() => void handleActivate(tag)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Ativar
                                 </button>
@@ -502,7 +483,7 @@ export default function TagsPage() {
                                   type="button"
                                   onClick={() => void handleHardDelete(tag)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Excluir
                                 </button>
@@ -516,17 +497,17 @@ export default function TagsPage() {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 border-t border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-400">
+              <div className="w-full flex flex-col gap-3 border-t border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-600">
                   Página {page} de {totalPages}
                 </p>
 
-                <div className="flex gap-2">
+                <div className="w-full flex gap-2">
                   <button
                     type="button"
                     onClick={() => setPage((current) => Math.max(1, current - 1))}
                     disabled={page === 1}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Anterior
                   </button>
@@ -537,7 +518,7 @@ export default function TagsPage() {
                       setPage((current) => Math.min(totalPages, current + 1))
                     }
                     disabled={page === totalPages}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Próxima
                   </button>
@@ -553,7 +534,7 @@ export default function TagsPage() {
         mode="create"
         companies={companies}
         isSuperAdmin={superAdmin}
-        defaultCompanyId={resolvedCompanyId ?? currentUser?.companyId ?? ""}
+        defaultCompanyId={superAdmin ? getAdminScopeCompanyId() : resolvedCompanyId ?? currentUser?.companyId ?? ""}
         loading={createLoading}
         onClose={() => {
           if (!createLoading) {
@@ -568,7 +549,7 @@ export default function TagsPage() {
         mode="edit"
         companies={companies}
         isSuperAdmin={superAdmin}
-        defaultCompanyId={resolvedCompanyId ?? currentUser?.companyId ?? ""}
+        defaultCompanyId={superAdmin ? getAdminScopeCompanyId() : resolvedCompanyId ?? currentUser?.companyId ?? ""}
         loading={editLoading}
         initialData={
           editingTag

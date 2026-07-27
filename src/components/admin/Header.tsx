@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from "react-router-dom";
+﻿import { useLocation, useNavigate } from "react-router-dom";
 import { getStoredUser, logout } from "../../services/auth";
 
 function formatRoleLabel(role?: string) {
@@ -106,12 +106,12 @@ export function Header() {
                 <p className="mt-1 truncate text-sm text-slate-400">
                   {user?.email ?? "-"}
                 </p>
-                <p className="mt-2 inline-flex rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-xs font-medium text-cyan-200">
+                <p className="mt-2 inline-flex rounded-full border border-cyan-200 bg-cyan-400/10 px-2.5 py-1 text-xs font-medium text-cyan-700">
                   {formatRoleLabel(user?.role)}
                 </p>
               </div>
 
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-400/15 text-sm font-semibold text-cyan-300 ring-1 ring-cyan-300/20">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-sm font-semibold text-cyan-700 ring-1 ring-cyan-300/20">
                 {(user?.name?.trim()?.charAt(0) || "U").toUpperCase()}
               </div>
             </div>

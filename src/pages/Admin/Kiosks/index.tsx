@@ -1,3 +1,6 @@
+﻿import { Plus } from "lucide-react";
+import { useAdminScopeBranchId, useAdminScopeCompanyId } from "../../../hooks/useAdminScope";
+import { getAdminScopeBranchId, getAdminScopeCompanyId } from "../../../services/adminScope";
 import { useEffect, useMemo, useState } from "react";
 import { getStoredUser } from "../../../services/auth";
 import { getCompanies, type Company } from "../../../services/companies";
@@ -29,8 +32,8 @@ const PAGE_SIZE = 10;
 
 function getStatusBadgeClass(active: boolean) {
   return active
-    ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
-    : "border-amber-400/20 bg-amber-500/10 text-amber-200";
+    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+    : "border-amber-200 bg-amber-50 text-amber-700";
 }
 
 function buildFeedbackLink(token: string) {
@@ -47,6 +50,8 @@ export default function KiosksPage() {
   const canDeletePermanently = canHardDelete(currentUser);
   const superAdmin = isSuperAdmin(currentUser);
   const resolvedCompanyId = getResolvedCompanyId(currentUser);
+  const scopeBranchId = useAdminScopeBranchId();
+  const scopeCompanyId = useAdminScopeCompanyId();
 
   const [kiosks, setKiosks] = useState<Kiosk[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -56,8 +61,8 @@ export default function KiosksPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [page, setPage] = useState(1);
 
-  const [listCompanyId, setListCompanyId] = useState(
-    superAdmin ? "" : resolvedCompanyId ?? "",
+  const [listCompanyId] = useState(
+    superAdmin ? scopeCompanyId : resolvedCompanyId ?? "",
   );
 
   const [selectedQrLink, setSelectedQrLink] = useState<string | null>(null);
@@ -73,11 +78,11 @@ export default function KiosksPage() {
 
   const selectedCompanyId = useMemo(() => {
     if (superAdmin) {
-      return listCompanyId || undefined;
+      return scopeCompanyId || undefined;
     }
 
     return resolvedCompanyId;
-  }, [superAdmin, listCompanyId, resolvedCompanyId]);
+  }, [superAdmin, scopeCompanyId, resolvedCompanyId]);
 
   async function load() {
     try {
@@ -123,11 +128,11 @@ export default function KiosksPage() {
     }
 
     const targetCompanyId = superAdmin
-      ? payload.companyId
+      ? scopeCompanyId
       : resolvedCompanyId ?? currentUser?.companyId ?? "";
 
     if (!targetCompanyId) {
-      toast.warning("Selecione uma empresa.");
+      toast.warning("Selecione uma rede no escopo.");
       return;
     }
 
@@ -171,11 +176,11 @@ export default function KiosksPage() {
     }
 
     const targetCompanyId = superAdmin
-      ? payload.companyId
+      ? scopeCompanyId
       : resolvedCompanyId ?? editingKiosk.companyId;
 
     if (superAdmin && !targetCompanyId) {
-      toast.warning("Selecione uma empresa.");
+      toast.warning("Selecione uma rede no escopo.");
       return;
     }
 
@@ -315,21 +320,12 @@ export default function KiosksPage() {
     setSelectedQrLink(buildFeedbackLink(token));
   }
 
-  function handleClearFilters() {
-    setSearch("");
-    setStatusFilter("ALL");
-
-    if (superAdmin) {
-      setListCompanyId("");
-    }
-
-    setPage(1);
-  }
 
   const filteredKiosks = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     return kiosks.filter((kiosk) => {
+      const matchesScope = !scopeBranchId || kiosk.branchId === scopeBranchId;
       const matchesSearch =
         !normalizedSearch ||
         kiosk.name.toLowerCase().includes(normalizedSearch) ||
@@ -342,9 +338,9 @@ export default function KiosksPage() {
         (statusFilter === "ACTIVE" && kiosk.active) ||
         (statusFilter === "INACTIVE" && !kiosk.active);
 
-      return matchesSearch && matchesStatus;
+      return matchesScope && matchesSearch && matchesStatus;
     });
-  }, [kiosks, search, statusFilter]);
+  }, [kiosks, search, statusFilter, scopeBranchId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredKiosks.length / PAGE_SIZE));
 
@@ -373,9 +369,9 @@ export default function KiosksPage() {
 
   if (!canView) {
     return (
-      <section className="rounded-[28px] border border-rose-400/20 bg-rose-500/10 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-        <h2 className="text-xl font-semibold text-white">Acesso negado</h2>
-        <p className="mt-2 text-sm leading-6 text-rose-100/80">
+      <section className="rounded-3xl border border-rose-100 bg-white p-6 shadow-[0_18px_50px_-20px_rgba(244,63,94,0.28)]">
+        <h2 className="text-xl font-semibold text-slate-900">Acesso negado</h2>
+        <p className="mt-2 text-sm leading-6 text-rose-700">
           Você não tem permissão para acessar a página de kiosks.
         </p>
       </section>
@@ -385,103 +381,65 @@ export default function KiosksPage() {
   return (
     <>
       <section className="space-y-6">
-        <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
-                gestão de kiosks
-              </div>
-
-              <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
-                Dispositivos e operação
-              </h2>
-
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                Cadastre dispositivos, gerencie tokens de acesso e acompanhe o status operacional dos kiosks.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div>
+          <div className="w-full">
+<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Buscar por nome, local, filial ou empresa"
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               />
 
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-                className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-cyan-400/60 focus:bg-white focus:ring-4 focus:ring-cyan-500/10"
               >
                 <option value="ALL">Todos os status</option>
                 <option value="ACTIVE">Ativos</option>
                 <option value="INACTIVE">Inativos</option>
               </select>
 
-              {superAdmin ? (
-                <select
-                  value={listCompanyId}
-                  onChange={(event) => setListCompanyId(event.target.value)}
-                  className="h-12 rounded-2xl border border-white/10 bg-slate-900/70 px-4 text-sm text-white outline-none transition focus:border-cyan-400/60 focus:bg-slate-900 focus:ring-4 focus:ring-cyan-500/10"
-                >
-                  <option value="">Todas as empresas</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div />
-              )}
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleClearFilters}
-                  className="inline-flex h-12 flex-1 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
-                >
-                  Limpar
-                </button>
-
-                {canManage ? (
-                  <button
-                    type="button"
-                    onClick={() => setCreateOpen(true)}
-                    className="inline-flex h-12 items-center justify-center rounded-2xl bg-cyan-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                  >
-                    Novo
-                  </button>
-                ) : null}
+              <div className="w-full flex gap-3">
               </div>
             </div>
           </div>
         </div>
 
-        <div className="rounded-[28px] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl">
-          <div className="flex flex-col gap-3 border-b border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-white">Kiosks cadastrados</h3>
-              <p className="mt-1 text-sm text-slate-400">
+              <h3 className="text-xl font-semibold text-slate-900">Kiosks</h3>
+              <p className="mt-1 text-sm text-slate-600">
                 {loading
                   ? "Carregando dados..."
                   : `${filteredKiosks.length} kiosk(s) encontrado(s)`}
               </p>
             </div>
+            {canManage ? (
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-700"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+              Adicionar
+            </button>            ) : null}
+
           </div>
 
           {loading ? (
-            <div className="p-10 text-center text-sm text-slate-400">
+            <div className="p-10 text-center text-sm text-slate-600">
               Carregando kiosks...
             </div>
           ) : filteredKiosks.length === 0 ? (
             <div className="p-10 text-center">
               <div className="mx-auto max-w-md">
-                <h4 className="text-lg font-semibold text-white">
+                <h4 className="text-lg font-semibold text-slate-900">
                   Nenhum kiosk encontrado
                 </h4>
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Ajuste os filtros ou cadastre um novo kiosk para iniciar a coleta de feedback.
                 </p>
 
@@ -500,7 +458,7 @@ export default function KiosksPage() {
             <>
               <div className="overflow-x-auto">
                 <table className="min-w-[1250px] divide-y divide-white/10">
-                  <thead className="bg-white/[0.03]">
+                  <thead>
                     <tr>
                       <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         Nome
@@ -533,38 +491,38 @@ export default function KiosksPage() {
                       return (
                         <tr
                           key={kiosk.id}
-                          className="transition hover:bg-white/[0.03]"
+                          className="transition hover:bg-slate-50"
                         >
                           <td className="px-6 py-4 align-top">
-                            <p className="text-sm font-semibold text-white">
+                            <p className="text-sm font-semibold text-slate-900">
                               {kiosk.name}
                             </p>
                           </td>
 
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
                             {kiosk.locationDescription ?? "-"}
                           </td>
 
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
                             {kiosk.branch?.name ?? "-"}
                           </td>
 
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
                             {superAdmin ? kiosk.company?.name ?? "-" : "-"}
                           </td>
 
-                          <td className="px-6 py-4 align-top text-sm text-slate-400">
+                          <td className="px-6 py-4 align-top text-sm text-slate-600">
                             <div className="space-y-3">
-                              <div className="rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 font-mono text-xs text-slate-300">
+                              <div className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 font-mono text-xs text-slate-600">
                                 {kiosk.token ?? "-"}
                               </div>
 
                               {kiosk.token ? (
-                                <div className="flex flex-wrap gap-2">
+                                <div className="w-full flex flex-wrap gap-2">
                                   <button
                                     type="button"
                                     onClick={() => void handleCopyToken(kiosk.token!)}
-                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-xs font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
+                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
                                   >
                                     Copiar token
                                   </button>
@@ -572,7 +530,7 @@ export default function KiosksPage() {
                                   <button
                                     type="button"
                                     onClick={() => void handleCopyLink(kiosk.token!)}
-                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-500/20"
+                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 px-3 text-xs font-semibold text-cyan-700 transition hover:bg-cyan-100"
                                   >
                                     Copiar link
                                   </button>
@@ -580,7 +538,7 @@ export default function KiosksPage() {
                                   <button
                                     type="button"
                                     onClick={() => handleShowQr(kiosk.token!)}
-                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-500/10 px-3 text-xs font-semibold text-violet-200 transition hover:bg-violet-500/20"
+                                    className="inline-flex h-9 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition hover:bg-violet-100"
                                   >
                                     Ver QR
                                   </button>
@@ -601,13 +559,13 @@ export default function KiosksPage() {
                           </td>
 
                           <td className="px-6 py-4 align-top">
-                            <div className="flex flex-wrap justify-end gap-2">
+                            <div className="w-full flex flex-wrap justify-end gap-2">
                               {canManage ? (
                                 <button
                                   type="button"
                                   onClick={() => setEditingKiosk(kiosk)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Editar
                                 </button>
@@ -618,7 +576,7 @@ export default function KiosksPage() {
                                   type="button"
                                   onClick={() => void handleDeactivate(kiosk)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-400/20 bg-amber-500/10 px-4 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Desativar
                                 </button>
@@ -629,7 +587,7 @@ export default function KiosksPage() {
                                   type="button"
                                   onClick={() => void handleActivate(kiosk)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Ativar
                                 </button>
@@ -640,7 +598,7 @@ export default function KiosksPage() {
                                   type="button"
                                   onClick={() => void handleRegenerateToken(kiosk)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-violet-400/20 bg-violet-500/10 px-4 text-sm font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 px-4 text-sm font-semibold text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Regenerar token
                                 </button>
@@ -651,7 +609,7 @@ export default function KiosksPage() {
                                   type="button"
                                   onClick={() => void handleHardDelete(kiosk)}
                                   disabled={isProcessing}
-                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                  className="inline-flex h-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
                                   Excluir
                                 </button>
@@ -665,17 +623,17 @@ export default function KiosksPage() {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 border-t border-white/10 p-6 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-slate-400">
+              <div className="w-full flex flex-col gap-3 border-t border-slate-200 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-slate-600">
                   Página {page} de {totalPages}
                 </p>
 
-                <div className="flex gap-2">
+                <div className="w-full flex gap-2">
                   <button
                     type="button"
                     onClick={() => setPage((current) => Math.max(1, current - 1))}
                     disabled={page === 1}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Anterior
                   </button>
@@ -686,7 +644,7 @@ export default function KiosksPage() {
                       setPage((current) => Math.min(totalPages, current + 1))
                     }
                     disabled={page === totalPages}
-                    className="inline-flex h-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Próxima
                   </button>
@@ -703,7 +661,8 @@ export default function KiosksPage() {
         companies={companies}
         branches={branches}
         isSuperAdmin={superAdmin}
-        defaultCompanyId={resolvedCompanyId ?? currentUser?.companyId ?? ""}
+        defaultCompanyId={superAdmin ? getAdminScopeCompanyId() : resolvedCompanyId ?? currentUser?.companyId ?? ""}
+        defaultBranchId={getAdminScopeBranchId()}
         loading={createLoading}
         onClose={() => {
           if (!createLoading) {
@@ -719,7 +678,8 @@ export default function KiosksPage() {
         companies={companies}
         branches={branches}
         isSuperAdmin={superAdmin}
-        defaultCompanyId={resolvedCompanyId ?? currentUser?.companyId ?? ""}
+        defaultCompanyId={superAdmin ? getAdminScopeCompanyId() : resolvedCompanyId ?? currentUser?.companyId ?? ""}
+        defaultBranchId={getAdminScopeBranchId()}
         loading={editLoading}
         initialData={
           editingKiosk
@@ -742,27 +702,24 @@ export default function KiosksPage() {
       {selectedQrLink ? (
         <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
             onClick={() => setSelectedQrLink(null)}
           />
 
-          <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/40">
-            <div className="border-b border-white/10 p-6">
-              <div className="inline-flex rounded-full border border-violet-400/20 bg-violet-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-200">
-                qr code
-              </div>
+          <div className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_24px_70px_-22px_rgba(15,23,42,0.30)]">
+            <div className="border-b border-slate-200 p-6">
 
-              <h3 className="mt-4 text-2xl font-semibold tracking-tight text-white">
+              <h3 className="text-2xl font-semibold tracking-tight text-slate-900">
                 QR Code do kiosk
               </h3>
 
-              <p className="mt-3 break-all text-sm leading-6 text-slate-400">
+              <p className="mt-3 break-all text-sm leading-6 text-slate-600">
                 {selectedQrLink}
               </p>
             </div>
 
             <div className="p-6">
-              <div className="flex justify-center rounded-[24px] border border-white/10 bg-white p-5">
+              <div className="w-full flex justify-center rounded-[24px] border border-slate-200 bg-white p-5">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(
                     selectedQrLink,
@@ -773,11 +730,11 @@ export default function KiosksPage() {
               </div>
             </div>
 
-            <div className="flex flex-col-reverse gap-3 border-t border-white/10 p-6 sm:flex-row sm:justify-end">
+            <div className="w-full flex flex-col-reverse gap-3 border-t border-slate-200 p-6 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setSelectedQrLink(null)}
-                className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
+                className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
               >
                 Fechar
               </button>

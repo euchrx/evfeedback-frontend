@@ -1,9 +1,10 @@
-import { lazy, Suspense } from "react";
+﻿import { lazy, Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { PrivateRoute } from "./routes/PrivateRoute";
 import { RoleRoute } from "./routes/RoleRoute";
 import { AdminLayout } from "./components/admin/AdminLayout";
+import { isAuthenticated } from "./services/auth";
 
 const LoginPage = lazy(() => import("./pages/Login"));
 const CompaniesPage = lazy(() => import("./pages/Admin/Companies"));
@@ -19,9 +20,17 @@ const PublicFeedbacksPage = lazy(() => import("./pages/PublicFeedbacks"));
 
 function PageFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-300">
+    <div className="flex min-h-screen items-center justify-center bg-white text-slate-500">
       Carregando...
     </div>
+  );
+}
+
+function LoginRoute() {
+  return isAuthenticated() ? (
+    <Navigate to="/admin/dashboard" replace />
+  ) : (
+    <LoginPage />
   );
 }
 
@@ -30,8 +39,16 @@ export function AppRoutes() {
     <BrowserRouter>
       <Suspense fallback={<PageFallback />}>
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/"
+            element={
+              <Navigate
+                to={isAuthenticated() ? "/admin/dashboard" : "/login"}
+                replace
+              />
+            }
+          />
+          <Route path="/login" element={<LoginRoute />} />
 
           <Route element={<PrivateRoute />}>
             <Route path="/admin" element={<AdminLayout />}>
@@ -57,18 +74,25 @@ export function AppRoutes() {
                 <Route path="settings" element={<SettingsPage />} />
               </Route>
 
-              <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
-                <Route path="companies" element={<CompaniesPage />} />
+              <Route
+                element={
+                  <RoleRoute allowedRoles={["SUPER_ADMIN", "COMPANY_ADMIN"]} />
+                }
+              >
                 <Route path="users" element={<UsersPage />} />
                 <Route path="branches" element={<BranchesPage />} />
                 <Route path="kiosks" element={<KiosksPage />} />
+              </Route>
+
+              <Route element={<RoleRoute allowedRoles={["SUPER_ADMIN"]} />}>
+                <Route path="companies" element={<CompaniesPage />} />
               </Route>
             </Route>
           </Route>
 
           <Route path="/feedback" element={<FeedbackKiosk />} />
           <Route path="/shared/feedbacks" element={<PublicFeedbacksPage />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

@@ -1,4 +1,4 @@
-import {
+﻿import {
   createContext,
   useCallback,
   useContext,
@@ -34,14 +34,14 @@ function getVariantStyles(variant: ConfirmDialogVariant) {
     case "danger":
       return {
         badge:
-          "border-rose-400/20 bg-rose-500/10 text-rose-200",
+          "border-rose-200 bg-rose-50 text-rose-700",
         confirmButton:
           "bg-rose-500 text-white hover:bg-rose-400",
       };
     case "warning":
       return {
         badge:
-          "border-amber-400/20 bg-amber-500/10 text-amber-200",
+          "border-amber-200 bg-amber-50 text-amber-700",
         confirmButton:
           "bg-amber-400 text-slate-950 hover:bg-amber-300",
       };
@@ -49,7 +49,7 @@ function getVariantStyles(variant: ConfirmDialogVariant) {
     default:
       return {
         badge:
-          "border-cyan-400/20 bg-cyan-500/10 text-cyan-200",
+          "border-cyan-200 bg-cyan-50 text-cyan-700",
         confirmButton:
           "bg-cyan-400 text-slate-950 hover:bg-cyan-300",
       };

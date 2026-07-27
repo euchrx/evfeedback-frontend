@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 
 type FormDialogProps = {
   open: boolean;
@@ -30,22 +30,19 @@ export function FormDialog({
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-900/30 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/95 shadow-2xl shadow-black/40">
-        <div className="border-b border-white/10 p-6">
-          <div className="inline-flex rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
-            formulário
-          </div>
+      <div className="relative z-10 w-full max-w-xl overflow-visible rounded-3xl border border-white/80 bg-white shadow-[0_24px_70px_-22px_rgba(15,23,42,0.30)]">
+        <div className="border-b border-slate-200 p-6">
 
-          <h2 className="mt-4 text-2xl font-semibold tracking-tight text-white">
+          <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
             {title}
           </h2>
 
           {description ? (
-            <p className="mt-3 text-sm leading-6 text-slate-300">
+            <p className="mt-3 text-sm leading-6 text-slate-600">
               {description}
             </p>
           ) : null}
@@ -53,11 +50,11 @@ export function FormDialog({
 
         <div className="p-6">{children}</div>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-white/10 p-6 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-3 border-t border-slate-200 p-6 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-white/10"
+            className="inline-flex h-11 items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-900 transition hover:border-slate-300 hover:bg-slate-100"
           >
             {cancelText}
           </button>
